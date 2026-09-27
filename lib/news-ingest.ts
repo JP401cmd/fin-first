@@ -512,8 +512,9 @@ export async function runNewsIngest(
   model: any | null,
   opties: IngestOpties = {},
 ): Promise<{ summary: IngestSummary; health: SourceHealth }> {
-  const sources = await loadNewsSources(supabase)
-  const runMoment = (opties.now ?? new Date()).toISOString()
+  const runDatum = opties.now ?? new Date()
+  const sources = await loadNewsSources(supabase, runDatum)
+  const runMoment = runDatum.toISOString()
   const health: SourceHealthEntry[] = []
   const kandidaten: Kandidaat[] = []
   let linksGeweigerd = 0

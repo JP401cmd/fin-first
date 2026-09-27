@@ -13,7 +13,7 @@
 // standaardbronnen: geen node-imports hier.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { stripHtml, decodeEntities, knipTekens } from '@/lib/news-html'
+import { stripHtml, decodeEntities, isStoringspagina } from '@/lib/news-html'
 import { isVeiligeBronUrl, zelfdeHost } from '@/lib/safe-url'
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -107,6 +107,11 @@ export const BRON_OORZAKEN = [
   // een gedegradeerde run als een gewone.
   'terugval_geen_model',
   'terugval_model_fout',
+  // De bron antwoordde wél (vaak met een 200), maar de pagina meldt een storing
+  // of onderhoud in plaats van inhoud (`isStoringspagina`, 27 sep 2026). Een
+  // eigen code en niet 'leeg': er stond wél tekst, alleen niet de bron. Die run
+  // levert bewust niets, zodat een onderhoudsmelding nooit een artikel wordt.
+  'storing',
 ] as const
 export type BronOorzaak = (typeof BRON_OORZAKEN)[number]
 
@@ -125,6 +130,7 @@ export const BRON_OORZAAK_LABEL: Record<BronOorzaak, string> = {
   model_fout: 'AI-keuze mislukt',
   terugval_geen_model: 'geen AI-model — eerste links genomen',
   terugval_model_fout: 'AI-keuze mislukt — eerste links genomen',
+  storing: 'bron meldt storing of onderhoud — niets overgenomen',
 }
 
 /**
@@ -152,37 +158,100 @@ export function isTerugvalOorzaak(oorzaak: BronOorzaak): boolean {
 // ook DNB Algemeen nieuws en DNB Publicaties weg: hun lijst komt uit
 // JavaScript, de server-HTML bevat 0 artikel-links, dus als web_lijst leveren
 // ze nooit iets en als web_pagina alleen de vaste paginaomlijsting.
+//
+// Herijkt op 27-09-2026 (ADR 0176, aanvulling 19–21); elke bron is LIVE door
+// de echte extractor gehaald. Weg of vervangen, met de oorzaak:
+//   - Rijksoverheid Inkomstenbelasting / Pensioen / Koopkracht: themahubs met
+//     alleen kaarten en teasers, dus 0 secties. Inkomstenbelasting → "Soorten
+//     inkomstenbelasting" (box 1-schijven en box 3-grens letterlijk), Pensioen
+//     → "Overgang naar nieuwe pensioenstelsel"; Koopkracht vervalt (de CBS-feed
+//     Inkomen en bestedingen draagt de koopkrachtcijfers).
+//   - Rijksoverheid AOW: één evergreen-sectie van 185 tekens → de pagina
+//     "AOW-leeftijd" met de tabel per jaar.
+//   - CBS Prijzen / CBS Inkomen: de themapagina hangt (0 bytes in 40 s, ook met
+//     een browser-UA) en `…/cijfers` is een lijst StatLine-tabellen zonder
+//     tekst. CBS heeft echte feeds per thema; de nieuwslinks daarin zijn
+//     letterlijk dezelfde URL's als de oude lijstlinks, dus bestaande rijen
+//     houden hun sleutel.
+//   - ECB Monetairbeleidsbeslissingen: de lijst komt uit JavaScript (3
+//     navigatielinks, Engels) → DNB "ECB-rentetarieven" (Nederlands, tarieven
+//     in procenten). ECB Persberichten (rss): Engelse koppen zonder
+//     beschrijving, 0 van 20 met een mechanisme → vervalt; DNB "Rente" draagt
+//     het Nederlandse renteverhaal.
+//   - AFM Waarschuwingen: een lijst namen van malafide partijen (fragment ~13
+//     tekens); het model kiest er terecht niets uit → vervalt.
+// Nieuw, omdat hun fragment de parameter letterlijk bevat: DUO (studieschuld-
+// rente), eigen risico, Belastingdienst box 1-tarieven en box 3-percentages,
+// Belastingplannen voor inkomen, DNB (spaar-/hypotheekrente-markt).
 
-export const DEFAULT_WEB_SOURCES: WebSource[] = [
-  // Rijksoverheid — themapagina's (JSON-LD dateModified aanwezig)
-  { url: 'https://www.rijksoverheid.nl/themas/belastingen-uitkeringen-en-toeslagen/belastingplan', label: 'Rijksoverheid — Belastingplan', soort: 'web_pagina' },
-  { url: 'https://www.rijksoverheid.nl/themas/werk/inkomstenbelasting', label: 'Rijksoverheid — Inkomstenbelasting', soort: 'web_pagina' },
-  { url: 'https://www.rijksoverheid.nl/themas/werk/inkomstenbelasting/plannen-werkelijk-rendement-box-3', label: 'Rijksoverheid — Box 3 werkelijk rendement', soort: 'web_pagina' },
-  { url: 'https://www.rijksoverheid.nl/themas/belastingen-uitkeringen-en-toeslagen/kinderopvangtoeslag', label: 'Rijksoverheid — Kinderopvangtoeslag', soort: 'web_pagina' },
-  { url: 'https://www.rijksoverheid.nl/themas/economie/koopkracht', label: 'Rijksoverheid — Koopkracht', soort: 'web_pagina' },
-  { url: 'https://www.rijksoverheid.nl/themas/werk/minimumloon', label: 'Rijksoverheid — Minimumloon', soort: 'web_pagina' },
-  { url: 'https://www.rijksoverheid.nl/themas/werk/pensioen', label: 'Rijksoverheid — Pensioen', soort: 'web_pagina' },
-  { url: 'https://www.rijksoverheid.nl/themas/belastingen-uitkeringen-en-toeslagen/algemene-ouderdomswet-aow', label: 'Rijksoverheid — AOW', soort: 'web_pagina' },
-  // Rijksfinanciën & Belastingdienst — regel-/documentpagina's
-  { url: 'https://www.rijksfinancien.nl/belastingplan-2026', label: 'Rijksfinanciën — Belastingplan wetteksten', soort: 'web_pagina' },
-  { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3', label: 'Belastingdienst — Box 3', soort: 'web_pagina' },
-  { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/toeslagen', label: 'Belastingdienst — Toeslagen', soort: 'web_pagina' },
-  // Toezichthouders & instituten
-  { url: 'https://www.dnb.nl/voor-de-sector/wet-toekomst-pensioenen/', label: 'DNB — Wet toekomst pensioenen', soort: 'web_pagina' },
-  { url: 'https://www.afm.nl/nl-nl/sector/actueel', label: 'AFM — Sector actueel', soort: 'web_lijst' },
-  { url: 'https://www.afm.nl/nl-nl/sector/themas/duurzaamheid/sfdr', label: 'AFM — SFDR duurzaam beleggen', soort: 'web_pagina' },
-  { url: 'https://www.afm.nl/nl-nl/consumenten/waarschuwingen', label: 'AFM — Waarschuwingen', soort: 'web_lijst' },
-  { url: 'https://www.cpb.nl/publicaties', label: 'CPB — Publicaties', soort: 'web_lijst' },
-  { url: 'https://www.cpb.nl/ramingen', label: 'CPB — Ramingen', soort: 'web_lijst' },
-  // CBS — Statistieken
-  { url: 'https://www.cbs.nl/nl-nl/arbeid-en-inkomen/inkomen-en-bestedingen/cijfers', label: 'CBS — Inkomen en bestedingen', soort: 'web_lijst' },
-  { url: 'https://www.cbs.nl/nl-nl/economie/prijzen', label: 'CBS — Prijzen (CPI / inflatie)', soort: 'web_lijst' },
-  // ECB
-  { url: 'https://www.ecb.europa.eu/press/press_conference/monetary-policy-statement/html/index.nl.html', label: 'ECB — Monetairbeleidsbeslissingen', soort: 'web_lijst' },
-]
+/**
+ * Prinsjesdag van een jaar: de derde dinsdag van september (Grondwet art.
+ * 65), als UTC-middernacht. Puur, voor `lopendBelastingplanJaar`.
+ */
+export function prinsjesdag(jaar: number): Date {
+  const eersteSep = new Date(Date.UTC(jaar, 8, 1)).getUTCDay() // 0 = zondag, 2 = dinsdag
+  const eersteDinsdag = 1 + ((2 - eersteSep + 7) % 7)
+  return new Date(Date.UTC(jaar, 8, eersteDinsdag + 14))
+}
+
+/**
+ * Het jaar van het Belastingplan dat nu in behandeling is. Op Prinsjesdag
+ * verschijnt het Belastingplan voor het VOLGENDE jaar; vanaf de dag erna is
+ * dat het lopende plan. Op Prinsjesdag zelf nog niet: de stukken komen pas in
+ * de middag online, en de ochtendrun zou anders een 404 halen.
+ */
+export function lopendBelastingplanJaar(nu: Date): number {
+  const jaar = nu.getUTCFullYear()
+  const vandaag = Date.UTC(jaar, nu.getUTCMonth(), nu.getUTCDate())
+  return vandaag > prinsjesdag(jaar).getTime() ? jaar + 1 : jaar
+}
+
+/** De wetteksten van het lopende Belastingplan op Rijksfinanciën — veroudert niet meer elk jaar. */
+export function belastingplanWettekstenUrl(nu: Date): string {
+  return `https://www.rijksfinancien.nl/belastingplan-${lopendBelastingplanJaar(nu)}`
+}
+
+/**
+ * De standaard-webbronnen op moment `nu`. Een functie en geen constante,
+ * omdat de Belastingplan-bron met Prinsjesdag meeschuift. Let op: slaat de
+ * beheerder de lijst op in /beheer/nieuws, dan staat het jaartal daar vast
+ * (een opgeslagen lijst wordt letterlijk gevolgd).
+ */
+export function standaardWebBronnen(nu: Date = new Date()): WebSource[] {
+  return [
+    // Rijksoverheid — thema- en regelpagina's (JSON-LD dateModified aanwezig)
+    { url: 'https://www.rijksoverheid.nl/themas/belastingen-uitkeringen-en-toeslagen/belastingplan', label: 'Rijksoverheid — Belastingplan', soort: 'web_pagina' },
+    { url: 'https://www.rijksoverheid.nl/themas/belastingen-uitkeringen-en-toeslagen/belastingplan/plannen-kabinet-belastingen-voor-inkomen', label: 'Rijksoverheid — Belastingplannen voor inkomen', soort: 'web_pagina' },
+    { url: 'https://www.rijksoverheid.nl/themas/werk/inkomstenbelasting/soorten-inkomstenbelasting', label: 'Rijksoverheid — Inkomstenbelasting', soort: 'web_pagina' },
+    { url: 'https://www.rijksoverheid.nl/themas/werk/inkomstenbelasting/plannen-werkelijk-rendement-box-3', label: 'Rijksoverheid — Box 3 werkelijk rendement', soort: 'web_pagina' },
+    { url: 'https://www.rijksoverheid.nl/themas/belastingen-uitkeringen-en-toeslagen/kinderopvangtoeslag', label: 'Rijksoverheid — Kinderopvangtoeslag', soort: 'web_pagina' },
+    { url: 'https://www.rijksoverheid.nl/themas/werk/minimumloon', label: 'Rijksoverheid — Minimumloon', soort: 'web_pagina' },
+    { url: 'https://www.rijksoverheid.nl/themas/werk/pensioen/overgang-naar-nieuwe-pensioenstelsel', label: 'Rijksoverheid — Overgang nieuw pensioenstelsel', soort: 'web_pagina' },
+    { url: 'https://www.rijksoverheid.nl/themas/belastingen-uitkeringen-en-toeslagen/algemene-ouderdomswet-aow/aow-leeftijd', label: 'Rijksoverheid — AOW-leeftijd', soort: 'web_pagina' },
+    { url: 'https://www.rijksoverheid.nl/vraag-en-antwoord/zorgverzekering/eigen-risico-zorgverzekering', label: 'Rijksoverheid — Eigen risico zorgverzekering', soort: 'web_pagina' },
+    // Rijksfinanciën, Belastingdienst & DUO — regel-/documentpagina's
+    { url: belastingplanWettekstenUrl(nu), label: 'Rijksfinanciën — Belastingplan wetteksten', soort: 'web_pagina' },
+    { url: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/inkomstenbelasting/heffingskortingen_boxen_tarieven/boxen_en_tarieven/box_1/box_1', label: 'Belastingdienst — Box 1 tarieven', soort: 'web_pagina' },
+    { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3', label: 'Belastingdienst — Box 3', soort: 'web_pagina' },
+    { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/content/met-welke-percentages-is-het-fictief-rendement-berekend', label: 'Belastingdienst — Box 3 rendementspercentages', soort: 'web_pagina' },
+    { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/toeslagen', label: 'Belastingdienst — Toeslagen', soort: 'web_pagina' },
+    { url: 'https://www.duo.nl/particulier/rente/rente-als-uw-studiefinanciering-stopt.jsp', label: 'DUO — Rente studieschuld', soort: 'web_pagina' },
+    // Toezichthouders & instituten
+    { url: 'https://www.dnb.nl/voor-de-sector/wet-toekomst-pensioenen/', label: 'DNB — Wet toekomst pensioenen', soort: 'web_pagina' },
+    { url: 'https://www.dnb.nl/de-euro-en-europa/monetair-beleid-ecb/ecb-rentetarieven/', label: 'DNB — ECB-rentetarieven', soort: 'web_pagina' },
+    { url: 'https://www.dnb.nl/actuele-economische-vraagstukken/rente/', label: 'DNB — Rente', soort: 'web_pagina' },
+    { url: 'https://www.afm.nl/nl-nl/sector/actueel', label: 'AFM — Sector actueel', soort: 'web_lijst' },
+    { url: 'https://www.afm.nl/nl-nl/sector/themas/duurzaamheid/sfdr', label: 'AFM — SFDR duurzaam beleggen', soort: 'web_pagina' },
+    { url: 'https://www.cpb.nl/publicaties', label: 'CPB — Publicaties', soort: 'web_lijst' },
+    { url: 'https://www.cpb.nl/ramingen', label: 'CPB — Ramingen', soort: 'web_lijst' },
+  ]
+}
 
 export const DEFAULT_RSS_FEEDS: RssFeed[] = [
-  { url: 'https://www.ecb.europa.eu/rss/press.html', label: 'ECB — Persberichten' },
+  // CBS — thema-feeds. Het label blijft dat van de oude lijstbron, zodat de
+  // bronnaam op bestaande en nieuwe rijen gelijk is.
+  { url: 'https://www.cbs.nl/nl-nl/rss-feeds/prijzen', label: 'CBS — Prijzen (CPI / inflatie)' },
+  { url: 'https://www.cbs.nl/nl-nl/rss-feeds/inkomen-en-bestedingen', label: 'CBS — Inkomen en bestedingen' },
 ]
 
 // ── Configuratie normaliseren ────────────────────────────────────────
@@ -296,10 +365,14 @@ function classificeerFout(err: unknown): BronOorzaak {
   return 'netwerk'
 }
 
-/** Een redirect die eindigt op een foutpagina (AFM: 200 op `/404?item=…`). */
-function isFoutpagina(url: string): boolean {
+/**
+ * Een redirect die eindigt op een foutpagina (AFM: 200 op `/404?item=…`; DUO:
+ * 200 op `/particulier/system/error/404.jsp?originalurl=…` — vandaar de
+ * optionele extensie).
+ */
+export function isFoutpagina(url: string): boolean {
   try {
-    return /(^|\/)(404|not-?found|pagina-niet-gevonden)(\/|$|\?)/i.test(new URL(url).pathname + '/')
+    return /(^|\/)(404|not-?found|pagina-niet-gevonden)(\.[a-z0-9]{1,5})?(\/|$|\?)/i.test(new URL(url).pathname + '/')
   } catch {
     return false
   }
@@ -409,8 +482,52 @@ function feedItems(xml: string): string[] {
   return uit
 }
 
-/** Parse een feed-body (RSS <item> of Atom <entry>). Puur, voor tests. */
-export function parseFeed(xml: string, sourceName: string): { items: RssItem[]; isFeed: boolean; afgekapt: number } {
+/**
+ * Per host: alleen feed-items onder dit pad worden een artikel. RSS kent geen
+ * AI-keuzestap zoals `web_lijst`; zonder dit filter wordt elke item een
+ * artikel dat categorisatie en duiding kost.
+ *
+ * CBS (27 sep 2026): de thema-feeds mengen nieuwsberichten
+ * (`/nl-nl/nieuws/…`, met cijfers in de kop) met maatwerktabellen
+ * (`/nl-nl/maatwerk/…`, bv. "Sociaal-economische status per viercijferige
+ * postcode") — 12 van 50 bij Prijzen, 26 van 50 bij Inkomen en bestedingen.
+ * Een tabel draagt geen parameter in zijn fragment (ADR 0176, besluit 19).
+ *
+ * Bewust in code, per host, en niet als veld op de opgeslagen feed: zo geldt
+ * het filter ook als de beheerder de bronnenlijst opslaat, en voor elke
+ * CBS-feed die later wordt toegevoegd.
+ */
+export const RSS_PAD_FILTER: Readonly<Record<string, string>> = {
+  'www.cbs.nl': '/nl-nl/nieuws/',
+}
+
+/** Het pad-filter voor een feed-URL, of null als de host er geen heeft. */
+export function rssPadFilter(feedUrl: string): string | null {
+  try {
+    return RSS_PAD_FILTER[new URL(feedUrl).hostname.toLowerCase()] ?? null
+  } catch {
+    return null
+  }
+}
+
+function linkOnderPad(link: string, pad: string): boolean {
+  try {
+    return new URL(link).pathname.startsWith(pad)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Parse een feed-body (RSS <item> of Atom <entry>). Puur, voor tests.
+ * `alleenPad` filtert vóór de cap van `MAX_RSS_ITEMS`, zodat de cap naar
+ * bruikbare items gaat; wat het filter weert telt niet als `afgekapt`.
+ */
+export function parseFeed(
+  xml: string,
+  sourceName: string,
+  alleenPad: string | null = null,
+): { items: RssItem[]; isFeed: boolean; afgekapt: number } {
   const isFeed = /<(rss|feed|rdf:RDF)\b/i.test(xml)
   if (!isFeed) return { items: [], isFeed: false, afgekapt: 0 }
   const alle: RssItem[] = []
@@ -418,6 +535,7 @@ export function parseFeed(xml: string, sourceName: string): { items: RssItem[]; 
     const title = extractTag(itemXml, 'title')
     const link = extractLink(itemXml)
     if (!title || !link) continue
+    if (alleenPad && !linkOnderPad(link, alleenPad)) continue
     const description =
       extractTag(itemXml, 'description') || extractTag(itemXml, 'content:encoded') || extractTag(itemXml, 'summary') || ''
     const publishedAt = feedDatumNaarIso(
@@ -432,7 +550,7 @@ export function parseFeed(xml: string, sourceName: string): { items: RssItem[]; 
 export async function fetchRssFeed(feed: RssFeed): Promise<RssUitkomst> {
   const r = await haalOp(feed.url, 'application/rss+xml, application/atom+xml, application/xml, text/xml')
   if (!r.ok) return { items: [], oorzaak: r.oorzaak, httpStatus: r.httpStatus, afgekapt: 0 }
-  const { items, isFeed, afgekapt } = parseFeed(r.body, feed.label)
+  const { items, isFeed, afgekapt } = parseFeed(r.body, feed.label, rssPadFilter(feed.url))
   if (!isFeed) return { items: [], oorzaak: 'geen_feed', afgekapt: 0 }
   return { items, oorzaak: items.length > 0 ? 'ok' : 'leeg', afgekapt }
 }
@@ -441,10 +559,16 @@ export type WebPaginaUitkomst =
   | { ok: true; html: string; finalUrl: string }
   | { ok: false; oorzaak: BronOorzaak; httpStatus?: number }
 
-/** Haal een webpagina op als HTML (voor links, secties en metadata). Werpt nooit. */
+/**
+ * Haal een webpagina op als HTML (voor links, secties en metadata). Werpt nooit.
+ * Een pagina die een storing of onderhoud meldt (`isStoringspagina`) is géén
+ * inhoud: dan `oorzaak: 'storing'` en geen HTML, zodat geen enkele bronsoort er
+ * een artikel van kan maken.
+ */
 export async function fetchWebPage(source: { url: string }): Promise<WebPaginaUitkomst> {
   const r = await haalOp(source.url, 'text/html')
   if (!r.ok) return r
+  if (isStoringspagina(r.body)) return { ok: false, oorzaak: 'storing' }
   return { ok: true, html: r.body, finalUrl: r.finalUrl }
 }
 
@@ -472,7 +596,11 @@ export async function fetchWebPage(source: { url: string }): Promise<WebPaginaUi
  * stil lege arrays — `lib/app-settings/publieke-sleutels.test.ts` zondert dit
  * bestand om die reden expliciet uit.
  */
-export async function loadNewsSources(supabase: SupabaseClient): Promise<NewsSources> {
+export async function loadNewsSources(
+  supabase: SupabaseClient,
+  /** Moment van de run: bepaalt het lopende Belastingplan-jaar in de standaardlijst. */
+  nu: Date = new Date(),
+): Promise<NewsSources> {
   const [webRes, rssRes] = await Promise.all([
     supabase.from('app_settings').select('value').eq('key', 'news_web_sources').maybeSingle(),
     supabase.from('app_settings').select('value').eq('key', 'news_rss_feeds').maybeSingle(),
@@ -505,7 +633,7 @@ export async function loadNewsSources(supabase: SupabaseClient): Promise<NewsSou
   // sources are saved. Saving any source set (even just one type) opts out of
   // the fallback and is respected verbatim.
   if (webSources.length === 0 && rssFeeds.length === 0) {
-    return { webSources: DEFAULT_WEB_SOURCES, rssFeeds: DEFAULT_RSS_FEEDS }
+    return { webSources: standaardWebBronnen(nu), rssFeeds: DEFAULT_RSS_FEEDS }
   }
 
   return { webSources, rssFeeds }

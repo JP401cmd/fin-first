@@ -718,3 +718,68 @@ describe('bepaalIngestUitkomst', () => {
     }
   })
 })
+
+// ── Bronherijking 27 sep 2026: dezelfde artikelen via een andere bron ──
+
+describe('runNewsIngest — bron omgezet van web_lijst naar rss (CBS, 27 sep 2026)', () => {
+  const CBS_FEED = { url: 'https://www.cbs.nl/nl-nl/rss-feeds/prijzen', label: 'CBS — Prijzen (CPI / inflatie)' }
+  const feedItem = (slug: string, title: string, publishedAt: string) => ({
+    title,
+    description: null,
+    link: `https://www.cbs.nl/nl-nl/nieuws/2026/${slug}`,
+    publishedAt,
+    sourceName: CBS_FEED.label,
+  })
+
+  it('de links die de oude lijstbron al schreef, blijven "al bekend"; alleen het echt nieuwe item komt erbij — en een tweede run verandert niets', async () => {
+    const { client, rijen } = maakClient()
+
+    // Run 1 (vóór de omschakeling): de CBS-lijstpagina, het model kiest beide links.
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [LIJST] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: LIJST_HTML, finalUrl: LIJST.url })
+    vi.mocked(kiesArtikelLinks).mockResolvedValueOnce({ indexen: [0, 1], geweigerd: 0, afgekapt: 0, ok: true })
+    const voor = await runNewsIngest(client as never, MODEL, { now: NU })
+    expect(voor.summary.inserted).toBe(2)
+
+    // Run 2 (ná de omschakeling): de CBS-feed. Dezelfde twee nieuwslinks, letterlijk
+    // dezelfde URL (live geverifieerd), plus één nieuw item.
+    const items = [
+      feedItem('36/woninghuur-stijgt-gemiddeld-met-4-4-procent', 'Woninghuur stijgt gemiddeld met 4,4 procent', '2026-09-04T04:30:00.000Z'),
+      feedItem('37/inflatie-stijgt-naar-3-3-procent-in-augustus', 'Inflatie stijgt naar 3,3 procent in augustus', '2026-09-08T04:30:00.000Z'),
+      feedItem('39/prijsstijging-koopwoningen-vlakt-in-augustus-verder-af', 'Prijsstijging koopwoningen vlakt in augustus verder af', '2026-09-22T04:30:00.000Z'),
+    ]
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [CBS_FEED], webSources: [] })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items, oorzaak: 'ok', afgekapt: 0 })
+    const na = await runNewsIngest(client as never, MODEL, { now: new Date('2026-09-28T05:23:00.000Z') })
+    expect(na.summary.alBekend).toBe(2)
+    expect(na.summary.inserted).toBe(1)
+    expect(rijen).toHaveLength(3)
+    expect(rijen.filter((r) => r.source_url === items[1].link)).toHaveLength(1)
+
+    // Run 3: dezelfde feed nog eens — idempotent.
+    vi.mocked(categorizeArticles).mockClear()
+    const nogmaals = await runNewsIngest(client as never, MODEL, { now: new Date('2026-09-29T05:23:00.000Z') })
+    expect(nogmaals.summary.inserted).toBe(0)
+    expect(nogmaals.summary.alBekend).toBe(3)
+    expect(rijen).toHaveLength(3)
+    expect(categorizeArticles).not.toHaveBeenCalled()
+  })
+})
+
+describe('runNewsIngest — een bron die een storing meldt levert niets en zegt dat', () => {
+  it('oorzaak storing staat in de gezondheid; geen kandidaat, geen rij', async () => {
+    const { client, rijen } = maakClient()
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [PAGINA] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: false, oorzaak: 'storing' })
+    const { summary, health } = await runNewsIngest(client as never, MODEL, { now: NU })
+    expect(health.sources).toEqual([
+      expect.objectContaining({ url: PAGINA.url, soort: 'web_pagina', oorzaak: 'storing', items: 0, nieuw: 0 }),
+    ])
+    expect(summary.inserted).toBe(0)
+    expect(rijen).toHaveLength(0)
+    // Viel daarmee de hele bronklasse weg, dan meldt de run zich partial (ADR 0178).
+    const uitkomst = bepaalIngestUitkomst(summary, health)
+    expect(uitkomst.status).toBe('partial')
+    expect(uitkomst.verlies.join(' ')).toContain('storing')
+  })
+})

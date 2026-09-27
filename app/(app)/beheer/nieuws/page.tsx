@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { Newspaper, Save, RotateCcw, Check, AlertCircle, ChevronDown, ChevronUp, Globe, Plus, Trash2, Database, Search, RefreshCw, FileText, Activity } from 'lucide-react'
 import {
-  DEFAULT_WEB_SOURCES,
+  standaardWebBronnen,
   DEFAULT_RSS_FEEDS,
   BRON_SOORTEN,
   BRON_SOORT_LABEL,
@@ -132,7 +132,8 @@ function foutNaarRij(
   return { rij, tekst: `Bron ${rij + 1}: ${veld} — ${m[4]}` }
 }
 
-const STANDAARD_BRONNEN: Bron[] = naarBronnen(DEFAULT_WEB_SOURCES, DEFAULT_RSS_FEEDS)
+// Bij het laden van de pagina berekend: de Belastingplan-bron schuift met Prinsjesdag mee.
+const STANDAARD_BRONNEN: Bron[] = naarBronnen(standaardWebBronnen(), DEFAULT_RSS_FEEDS)
 
 /** De oorzaak van een gezondheidsregel, ook voor regels van vóór ADR 0176. */
 function oorzaakVan(s: SourceHealthEntry): BronOorzaak | null {
@@ -151,7 +152,8 @@ function oorzaakTekst(s: SourceHealthEntry): string {
 function oorzaakStip(s: SourceHealthEntry): string {
   const o = oorzaakVan(s)
   if (o === 'ok') return LEVERAGE_STATUS_DOT.good
-  if (o === 'leeg' || o === 'geen_model') return LEVERAGE_STATUS_DOT.warn
+  // `storing`: de bron zelf ligt eruit (onderhoud) — aandacht, niets voor ons om te repareren.
+  if (o === 'leeg' || o === 'geen_model' || o === 'storing') return LEVERAGE_STATUS_DOT.warn
   if (o === null) return LEVERAGE_STATUS_DOT.neutral
   return LEVERAGE_STATUS_DOT.bad
 }

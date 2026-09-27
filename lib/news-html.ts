@@ -188,6 +188,50 @@ export function paginaTitel(html: string): string {
   return title ? stripHtml(html.slice(title.binnen, title.sluit)).split(/\s+[|–—-]\s+/)[0].trim() : ''
 }
 
+// ── Storings- en onderhoudspagina's ──────────────────────────────────
+
+/**
+ * Woorden waarmee een site zegt dat hij (tijdelijk) niet werkt. Bewust
+ * specifiek: "onderhoud" alléén telt niet ("Onderhoud eigen woning" is een
+ * gewone kop), "gepland onderhoud" / "wegens onderhoud" wel.
+ */
+const STORING_PATROON =
+  /\b(niet beschikbaar|niet bereikbaar|onbereikbaar|storing(en)?|gepland onderhoud|wegens onderhoud|in verband met onderhoud|onderhoudswerkzaamheden|(is|zijn|tijdelijk) in onderhoud|bezig met onderhoud|probeer het (later|straks) (nog eens|opnieuw)|service unavailable|temporarily unavailable|under maintenance|scheduled maintenance)\b/i
+
+/**
+ * Een storingspagina is klein: de Belastingdienst-onderhoudspagina van 26 sep
+ * 2026 had 294 tekens lezerstekst. Een gewone themapagina heeft er duizenden.
+ * Boven deze grens toetst alleen de paginatitel nog.
+ */
+export const STORING_MAX_TEKENS = 1_000
+/** Alleen de aanhef telt: een storingsmelding staat bovenaan, niet in een zin diep in de tekst. */
+const STORING_AANHEF_TEKENS = 300
+
+/**
+ * Meldt deze pagina een storing of onderhoud in plaats van inhoud?
+ *
+ * AANLEIDING (26 sep 2026): tijdens gepland onderhoud serveerde de
+ * Belastingdienst op élke URL een 200 met "De websites van de Belastingdienst
+ * zijn niet beschikbaar". De ingest knipte daar netjes een sectie uit en maakte
+ * er een artikel van (`41f41a58…`), dat daarna geduid werd.
+ *
+ * DETERMINISTISCH EN OP PAGINANIVEAU — nooit op een losse zin in een sectie:
+ *  1. de paginatitel (eerste `<h1>`, anders `<title>`) noemt de storing; of
+ *  2. de hele lezerstekst is kort (≤ `STORING_MAX_TEKENS`) én de aanhef
+ *     (eerste `STORING_AANHEF_TEKENS` tekens) noemt de storing.
+ * Een gewone pagina die ergens "deze dienst is tijdelijk niet beschikbaar"
+ * schrijft, valt zo niet om: haar titel is gewoon en haar tekst is lang.
+ *
+ * Een vals-positief kost één run van één bron (zichtbaar als `storing` op
+ * /beheer/nieuws); een vals-negatief is een verzonnen artikel in de Krant. Die
+ * asymmetrie rechtvaardigt de tweede tak.
+ */
+export function isStoringspagina(html: string): boolean {
+  if (STORING_PATROON.test(paginaTitel(html))) return true
+  const tekst = stripHtml(hoofdInhoud(html))
+  return tekst.length <= STORING_MAX_TEKENS && STORING_PATROON.test(tekst.slice(0, STORING_AANHEF_TEKENS))
+}
+
 // ── web_pagina: secties ──────────────────────────────────────────────
 
 export interface PaginaSectie {

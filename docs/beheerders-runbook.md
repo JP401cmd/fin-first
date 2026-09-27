@@ -199,6 +199,21 @@ Het paneel *Meting duiding* toont per week (cohort op binnenkomst) de dekking, d
 duidingen per reden en de poortmaat *Fout getal* (rekenend); die moet twee weken achter elkaar 0
 zijn. Neem de weekcijfers over in het `MEETRESULTAAT`-blok op kaart 1A.
 
+Bij de brongezondheid op hetzelfde scherm: **oranje `bron meldt storing of onderhoud`** betekent
+dat de bron die run een onderhouds- of storingspagina serveerde (ADR 0176, besluit 20). Er is dan
+bewust niets overgenomen en er valt niets te repareren — de volgende run haalt de bron gewoon
+opnieuw op. Blijft een bron dagen achter elkaar op `storing` staan, open dan de URL zelf: toont hij
+wél inhoud, dan is dat een vals-positief van de detectie en hoort het als bug terug. Een artikel
+dat vóór 27 sep 2026 uit zo'n pagina is ontstaan, trek je terug met **Terugtrekken** (B4).
+Let op twee randen. (1) De lengte-tak van de detectie kijkt naar pagina's van hoogstens 1.000 tekens
+lezerstekst; een paar gezonde bronnen zitten daar net boven (Minimumloon ~1.035, AFM Actueel ~1.125).
+Krimpt zo'n pagina en staat er toevallig "niet beschikbaar" in de aanhef, dan valt hij één run weg
+als `storing` — zonder schade, maar ga het na als het blijft. (2) **Opslaan in /beheer/nieuws zet
+het Belastingplan-jaar vast.** Zolang er niets is opgeslagen, schuift de bron "Rijksfinanciën —
+Belastingplan wetteksten" zelf mee na Prinsjesdag (`belastingplan-<jaar>`); na één keer opslaan
+staat de lijst letterlijk in `app_settings` en moet je het jaartal na elke Prinsjesdag met de hand
+bijwerken.
+
 **Openstaand, en geen af te vinken stap:** zolang de support-mailbox niet bestaat, is er geen
 externe meldroute. Dat raakt de twee klokken hierboven rechtstreeks: een AVG-verzoek of
 lekmelding zou vandaag niet binnenkomen. Zie `lib/legal-contact.ts` voor het aanzetten zodra het

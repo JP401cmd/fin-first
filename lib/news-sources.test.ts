@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   loadNewsSources,
-  DEFAULT_WEB_SOURCES,
+  standaardWebBronnen,
   DEFAULT_RSS_FEEDS,
+  prinsjesdag,
+  lopendBelastingplanJaar,
+  belastingplanWettekstenUrl,
+  isFoutpagina,
   MAX_RSS_ITEMS,
   normaliseerWebBronnen,
   parseFeed,
+  rssPadFilter,
+  RSS_PAD_FILTER,
   fetchRssFeed,
   fetchWebPage,
   MAX_REDIRECTS,
@@ -13,6 +19,7 @@ import {
 } from './news-sources'
 import { isVeiligeBronUrl } from './safe-url'
 import { stripHtml } from './news-html'
+import { BELASTINGDIENST_STORING_HTML, STORING_ZONDER_KOP_HTML } from './news-storing.fixture'
 
 /**
  * Tests voor loadNewsSources. De supabase-call wordt gemockt.
@@ -48,9 +55,12 @@ function makeSupabase(stored: Record<string, unknown>): any {
 describe('loadNewsSources', () => {
   it('valt terug op standaardbronnen wanneer er niets is opgeslagen', async () => {
     const supabase = makeSupabase({})
-    const result = await loadNewsSources(supabase)
+    const nu = new Date('2026-09-27T05:23:00.000Z')
+    const result = await loadNewsSources(supabase, nu)
 
-    expect(result.webSources).toEqual(DEFAULT_WEB_SOURCES)
+    expect(result.webSources).toEqual(standaardWebBronnen(nu))
+    // Het moment van de run bepaalt het Belastingplan-jaar in de standaardlijst.
+    expect(result.webSources.map((w) => w.url)).toContain('https://www.rijksfinancien.nl/belastingplan-2027')
     expect(result.rssFeeds).toEqual(DEFAULT_RSS_FEEDS)
     expect(result.webSources.length).toBeGreaterThan(0)
     expect(result.rssFeeds.length).toBeGreaterThan(0)
@@ -105,19 +115,105 @@ describe('loadNewsSources', () => {
   })
 })
 
-describe('standaardbronnen — één keer grondig bijgewerkt (B28)', () => {
+describe('standaardbronnen — één keer grondig bijgewerkt (B28) en herijkt (27 sep 2026)', () => {
+  const WEB = standaardWebBronnen(new Date('2026-09-27T05:23:00.000Z'))
+
   it('geen dode feeds meer; elke webbron draagt een vaste soort', () => {
-    const alle = [...DEFAULT_WEB_SOURCES.map((w) => w.url), ...DEFAULT_RSS_FEEDS.map((r) => r.url)]
+    const alle = [...WEB.map((w) => w.url), ...DEFAULT_RSS_FEEDS.map((r) => r.url)]
     expect(alle.some((u) => u.includes('feeds.rijksoverheid.nl'))).toBe(false)
-    expect(alle.some((u) => /productenoverzicht|publicaties\.rss|overtoeslagen|dsta\.nl|afm\.nl\/rss|cbs\.nl\/nl-nl\/rss/.test(u))).toBe(false)
+    expect(alle.some((u) => /productenoverzicht|publicaties\.rss|overtoeslagen|dsta\.nl|afm\.nl\/rss|cbs\.nl\/nl-nl\/rss\//.test(u))).toBe(false)
+    // …maar de échte CBS-feeds (`/rss-feeds/<thema>`, 27 sep) wél: het oude `/rss/<thema>` gaf 500.
+    expect(DEFAULT_RSS_FEEDS.every((r) => r.url.startsWith('https://www.cbs.nl/nl-nl/rss-feeds/'))).toBe(true)
     expect(alle.some((u) => /rijksoverheid\.nl\/onderwerpen\/(aow|koopwoning|huurtoeslag|toeslagen|zorgtoeslag)$/.test(u))).toBe(false)
-    expect(DEFAULT_RSS_FEEDS.map((r) => r.url)).toEqual(['https://www.ecb.europa.eu/rss/press.html'])
-    for (const w of DEFAULT_WEB_SOURCES) expect(['web_lijst', 'web_pagina']).toContain(w.soort)
+    for (const w of WEB) expect(['web_lijst', 'web_pagina']).toContain(w.soort)
     expect(new Set(alle).size).toBe(alle.length)
     // Elke standaardbron haalt de SSRF-toets van het schrijfpad en de fetch.
     for (const u of alle) expect(isVeiligeBronUrl(u)).toBe(true)
     // DNB-lijsten komen uit JavaScript en leveren server-side niets (release-review 1F, M4).
-    expect(alle.some((u) => /dnb\.nl\/(actueel\/algemeen-nieuws|publicaties\/publicaties-dnb)/.test(u))).toBe(false)
+    expect(alle.some((u) => /dnb\.nl\/(actueel\/algemeen-nieuws|publicaties\/publicaties-dnb|algemeen-nieuws)/.test(u))).toBe(false)
+  })
+
+  it('27 sep: de bronnen die live 0 leverden of alleen ruis zijn weg (oorzaak per regel in de bron)', () => {
+    const urls = WEB.map((w) => w.url)
+    // Themahubs zonder secties (alleen kaarten en teasers).
+    expect(urls).not.toContain('https://www.rijksoverheid.nl/themas/werk/inkomstenbelasting')
+    expect(urls).not.toContain('https://www.rijksoverheid.nl/themas/werk/pensioen')
+    expect(urls).not.toContain('https://www.rijksoverheid.nl/themas/economie/koopkracht')
+    // Eén evergreen-sectie → de AOW-leeftijdpagina.
+    expect(urls).not.toContain('https://www.rijksoverheid.nl/themas/belastingen-uitkeringen-en-toeslagen/algemene-ouderdomswet-aow')
+    // CBS-themapagina hangt; …/cijfers is een lijst StatLine-tabellen → de CBS-feeds.
+    expect(urls.some((u) => u.startsWith('https://www.cbs.nl/'))).toBe(false)
+    // Lijsten uit JavaScript of zonder grondslag.
+    expect(urls.some((u) => u.includes('ecb.europa.eu'))).toBe(false)
+    expect(urls).not.toContain('https://www.afm.nl/nl-nl/consumenten/waarschuwingen')
+    // Nooit meer een vast Belastingplan-jaartal.
+    expect(urls).not.toContain('https://www.rijksfinancien.nl/belastingplan-2026')
+  })
+
+  it('RSS: de CBS-thema-feeds, met het label van de oude lijstbron; de Engelse ECB-feed zonder beschrijving is weg', () => {
+    expect(DEFAULT_RSS_FEEDS).toEqual([
+      { url: 'https://www.cbs.nl/nl-nl/rss-feeds/prijzen', label: 'CBS — Prijzen (CPI / inflatie)' },
+      { url: 'https://www.cbs.nl/nl-nl/rss-feeds/inkomen-en-bestedingen', label: 'CBS — Inkomen en bestedingen' },
+    ])
+  })
+
+  it('elk rekenend mechanisme heeft minstens één bron waarvan het fragment de parameter letterlijk draagt', () => {
+    const urls = WEB.map((w) => w.url)
+    const dekking: Record<string, RegExp> = {
+      'studieschuld-rente': /duo\.nl\/particulier\/rente\//,
+      'eigen-risico': /eigen-risico-zorgverzekering$/,
+      'aow-leeftijd': /algemene-ouderdomswet-aow\/aow-leeftijd$/,
+      'box1-parameter': /boxen_en_tarieven\/box_1\/box_1$/,
+      'box3-parameter': /met-welke-percentages-is-het-fictief-rendement-berekend$/,
+      'spaarrente-markt': /dnb\.nl\/de-euro-en-europa\/monetair-beleid-ecb\/ecb-rentetarieven\/$/,
+      'hypotheekrente-markt': /dnb\.nl\/actuele-economische-vraagstukken\/rente\/$/,
+    }
+    for (const [mechanisme, patroon] of Object.entries(dekking)) {
+      expect(urls.some((u) => patroon.test(u)), mechanisme).toBe(true)
+    }
+  })
+})
+
+describe('Belastingplan-jaar — schuift mee met Prinsjesdag (derde dinsdag van september)', () => {
+  it.each([
+    [2024, '2024-09-17'], // 1 sep = zondag
+    [2025, '2025-09-16'], // 1 sep = maandag
+    [2026, '2026-09-15'], // 1 sep = dinsdag: derde dinsdag is de 15e, de vroegst mogelijke
+    [2027, '2027-09-21'], // 1 sep = woensdag: de 21e, de laatst mogelijke
+  ])('Prinsjesdag %i = %s', (jaar, datum) => {
+    expect(prinsjesdag(jaar).toISOString().slice(0, 10)).toBe(datum)
+  })
+
+  it('valt twintig jaar lang altijd op een dinsdag tussen de 15e en de 21e', () => {
+    for (let jaar = 2020; jaar <= 2040; jaar++) {
+      const d = prinsjesdag(jaar)
+      expect(d.getUTCDay()).toBe(2)
+      expect(d.getUTCMonth()).toBe(8)
+      expect(d.getUTCDate()).toBeGreaterThanOrEqual(15)
+      expect(d.getUTCDate()).toBeLessThanOrEqual(21)
+    }
+  })
+
+  it.each([
+    ['2026-01-01T00:00:00.000Z', 2026], // begin van het jaar
+    ['2026-09-14T23:59:59.999Z', 2026], // dag vóór Prinsjesdag
+    ['2026-09-15T00:00:00.000Z', 2026], // Prinsjesdag zelf, ochtend: stukken nog niet online
+    ['2026-09-15T23:59:59.999Z', 2026], // Prinsjesdag zelf, laatste moment
+    ['2026-09-16T00:00:00.000Z', 2027], // de dag erna: het nieuwe plan
+    ['2026-12-31T23:59:59.999Z', 2027], // eind van het jaar
+    ['2027-01-01T00:00:00.000Z', 2027], // jaarwisseling: nog steeds het plan van dit jaar
+    ['2027-09-21T12:00:00.000Z', 2027], // Prinsjesdag 2027 (laatst mogelijke datum)
+    ['2027-09-22T00:00:00.000Z', 2028],
+  ])('op %s is het lopende plan %i', (iso, jaar) => {
+    expect(lopendBelastingplanJaar(new Date(iso))).toBe(jaar)
+  })
+
+  it('de standaardlijst gebruikt het lopende jaar, vóór en ná Prinsjesdag', () => {
+    const url = (iso: string) =>
+      standaardWebBronnen(new Date(iso)).find((w) => w.label === 'Rijksfinanciën — Belastingplan wetteksten')?.url
+    expect(url('2026-09-15T05:23:00.000Z')).toBe('https://www.rijksfinancien.nl/belastingplan-2026')
+    expect(url('2026-09-16T05:23:00.000Z')).toBe('https://www.rijksfinancien.nl/belastingplan-2027')
+    expect(belastingplanWettekstenUrl(new Date('2026-09-27T05:23:00.000Z'))).toBe('https://www.rijksfinancien.nl/belastingplan-2027')
   })
 })
 
@@ -289,5 +385,89 @@ describe('parseFeed — strenge feed-links', () => {
   it('weigert een link die geen absolute http(s)-URL is', () => {
     const xml = '<rss><item><title>A</title><link>httpx://x.nl/a</link></item><item><title>B</title><link>javascript:alert(1)</link></item><item><title>C</title><link>https://x.nl/c</link></item></rss>'
     expect(parseFeed(xml, 'X').items.map((i) => i.link)).toEqual(['https://x.nl/c'])
+  })
+})
+
+describe('parseFeed — pad-filter per host (CBS: alleen nieuws, geen maatwerktabellen)', () => {
+  const item = (pad: string, i: number) =>
+    `<item><title>Item ${i}</title><link>https://www.cbs.nl${pad}${i}</link></item>`
+
+  it('CBS-feeds krijgen het nieuwspad als filter; andere hosts geen', () => {
+    expect(rssPadFilter('https://www.cbs.nl/nl-nl/rss-feeds/prijzen')).toBe('/nl-nl/nieuws/')
+    expect(rssPadFilter('https://WWW.CBS.NL/nl-nl/rss-feeds/inkomen-en-bestedingen')).toBe('/nl-nl/nieuws/')
+    expect(rssPadFilter('https://www.dnb.nl/rss')).toBeNull()
+    expect(rssPadFilter('geen url')).toBeNull()
+    for (const feed of DEFAULT_RSS_FEEDS.filter((f) => f.url.includes('cbs.nl'))) {
+      expect(rssPadFilter(feed.url)).toBe(RSS_PAD_FILTER['www.cbs.nl'])
+    }
+  })
+
+  it('weert maatwerk-items en filtert vóór de cap: de cap gaat naar nieuws, gewerd telt niet als afgekapt', () => {
+    // Eerst MAX_RSS_ITEMS maatwerktabellen, dan 3 nieuwsberichten. Zonder
+    // filter-vóór-cap vulden de tabellen de hele cap en viel het nieuws weg.
+    const xml = `<rss>${Array.from({ length: MAX_RSS_ITEMS }, (_, i) => item('/nl-nl/maatwerk/2026/39/tabel-', i)).join('')}${[1, 2, 3].map((i) => item('/nl-nl/nieuws/2026/39/bericht-', i)).join('')}</rss>`
+    const r = parseFeed(xml, 'CBS', '/nl-nl/nieuws/')
+    expect(r.items.map((i) => i.link)).toEqual([1, 2, 3].map((i) => `https://www.cbs.nl/nl-nl/nieuws/2026/39/bericht-${i}`))
+    expect(r.afgekapt).toBe(0)
+    // Zonder filter: ongewijzigd gedrag.
+    expect(parseFeed(xml, 'CBS').items).toHaveLength(MAX_RSS_ITEMS)
+  })
+})
+
+// ── Storingspagina's en foutpagina's (27 sep 2026) ──────────────────
+
+describe('fetchWebPage — een storingspagina is geen inhoud', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const antwoord = (body: string, init: { status?: number; location?: string } = {}) => {
+    const status = init.status ?? 200
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (h: string) => (h.toLowerCase() === 'location' ? init.location ?? null : null) },
+      text: async () => body,
+    }
+  }
+
+  it('de echte onderhoudspagina van de Belastingdienst (200) wordt oorzaak storing, zonder HTML', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => antwoord(BELASTINGDIENST_STORING_HTML)))
+    const r = await fetchWebPage({ url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3' })
+    expect(r).toEqual({ ok: false, oorzaak: 'storing' })
+  })
+
+  it('ook de variant zonder kop', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => antwoord(STORING_ZONDER_KOP_HTML)))
+    expect(await fetchWebPage({ url: 'https://www.belastingdienst.nl/x' })).toEqual({ ok: false, oorzaak: 'storing' })
+  })
+
+  it('een gewone pagina blijft gewoon ok', async () => {
+    const html = `<main><h1>Box 3</h1><p>${'Over sparen en beleggen in box 3. '.repeat(40)}</p></main>`
+    vi.stubGlobal('fetch', vi.fn(async () => antwoord(html)))
+    const r = await fetchWebPage({ url: 'https://www.belastingdienst.nl/x' })
+    expect(r.ok).toBe(true)
+  })
+
+  it('DUO: een redirect naar `/system/error/404.jsp?originalurl=…` is een foutpagina, geen inhoud', async () => {
+    const f = vi.fn()
+      .mockResolvedValueOnce(antwoord('', { status: 302, location: '/particulier/system/error/404.jsp?originalurl=/particulier/home/actueel/' }))
+      .mockResolvedValue(antwoord('<main><h1>Foutpagina</h1></main>'))
+    vi.stubGlobal('fetch', f)
+    const r = await fetchWebPage({ url: 'https://duo.nl/particulier/home/actueel/' })
+    expect(r).toMatchObject({ ok: false, oorzaak: 'doorverwezen_naar_fout' })
+    expect(f).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('isFoutpagina — het pad, met of zonder extensie', () => {
+  it.each([
+    ['https://www.afm.nl/404?item=%2frss', true],
+    ['https://duo.nl/particulier/system/error/404.jsp?originalurl=/x', true],
+    ['https://x.nl/pagina-niet-gevonden', true],
+    ['https://x.nl/not-found/', true],
+    ['https://x.nl/nieuws/404-bericht', false],
+    ['https://x.nl/rapport-404', false],
+    ['https://x.nl/nieuws/2026/09/404.jsperiment', false],
+  ])('%s → %s', (url, verwacht) => {
+    expect(isFoutpagina(url)).toBe(verwacht)
   })
 })

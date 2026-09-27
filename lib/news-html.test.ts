@@ -8,7 +8,15 @@ import {
   knipTekens,
   extractBronDatums,
   paginaTitel,
+  isStoringspagina,
+  STORING_MAX_TEKENS,
 } from './news-html'
+import {
+  BELASTINGDIENST_STORING_HTML,
+  STORING_ZONDER_KOP_HTML,
+  STORING_BRON_KOP,
+  STORING_BRON_FRAGMENT,
+} from './news-storing.fixture'
 
 // Een Rijksoverheid-achtige themapagina: JSON-LD en een Next-payload vóóraan,
 // navigatie, dan de inhoud met h2-secties.
@@ -174,5 +182,67 @@ describe('extractBronDatums — datums uit metadata, nooit uit tekst', () => {
     const og = '<meta property="article:published_time" content="2026-09-04T06:30:00+02:00">'
     expect(extractBronDatums(og)).toEqual({ gewijzigd: null, gepubliceerd: '2026-09-04T04:30:00.000Z' })
     expect(extractBronDatums(LIJSTPAGINA)).toEqual({ gewijzigd: null, gepubliceerd: null })
+  })
+})
+
+// ── Storings- en onderhoudspagina's (27 sep 2026) ────────────────────
+
+/** Een pagina met precies deze lezerstekst in `<main>` en zonder titel. */
+const kalePagina = (tekst: string) => `<html><body><main><p>${tekst}</p></main></body></html>`
+
+describe('isStoringspagina — een onderhoudsmelding wordt nooit een artikel', () => {
+  it('de fixture is getrouw: de ingest had uit deze HTML precies de productierij 41f41a58 geknipt', () => {
+    // Zonder deze toets zou de regressietest een verzonnen pagina toetsen.
+    const { secties } = extractSecties(BELASTINGDIENST_STORING_HTML, 12)
+    expect(secties).toEqual([{ kop: STORING_BRON_KOP, tekst: STORING_BRON_FRAGMENT }])
+  })
+
+  it('tak 1: de paginatitel meldt de storing (de echte Belastingdienst-pagina van 26 sep)', () => {
+    expect(isStoringspagina(BELASTINGDIENST_STORING_HTML)).toBe(true)
+  })
+
+  it('tak 2: zonder kop, maar een korte pagina met de melding in de aanhef', () => {
+    expect(paginaTitel(STORING_ZONDER_KOP_HTML)).toBe('Belastingdienst')
+    expect(isStoringspagina(STORING_ZONDER_KOP_HTML)).toBe(true)
+  })
+
+  it('een gewone themapagina is geen storing', () => {
+    expect(isStoringspagina(THEMAPAGINA)).toBe(false)
+    expect(isStoringspagina(LIJSTPAGINA)).toBe(false)
+  })
+
+  it('geen vals-positief op een losse zin diep in een lange pagina', () => {
+    const lang = `<html><head><title>Toeslagen</title></head><body><main><h1>Toeslagen</h1>
+<p>${'Over de toeslagen die u kunt krijgen en hoe u ze aanvraagt. '.repeat(20)}</p>
+<h2>Mijn toeslagen</h2><p>Mijn toeslagen is tijdelijk niet beschikbaar wegens gepland onderhoud. Probeer het later opnieuw.</p>
+</main></body></html>`
+    expect(isStoringspagina(lang)).toBe(false)
+  })
+
+  it('gangbare onderhoudsformuleringen in de kop tellen (eindreview 27 sep)', () => {
+    for (const kop of ['Mijn Belastingdienst is tijdelijk in onderhoud', 'We zijn bezig met onderhoud', 'De site is in onderhoud']) {
+      expect(isStoringspagina(`<html><body><main><h1>${kop}</h1><p>Excuses voor het ongemak.</p></main></body></html>`)).toBe(true)
+    }
+  })
+
+  it('"onderhoud" alléén in de kop is geen storing (Onderhoud eigen woning)', () => {
+    const html = `<html><body><main><h1>Onderhoud eigen woning</h1><p>Kosten voor onderhoud van uw eigen woning zijn niet aftrekbaar in box 1.</p></main></body></html>`
+    expect(isStoringspagina(html)).toBe(false)
+  })
+
+  it('tak 2, lengtegrens aan béíde kanten: precies de grens telt nog, één teken meer niet', () => {
+    const melding = 'Deze website is niet beschikbaar.'
+    const opGrens = melding + ' ' + 'x'.repeat(STORING_MAX_TEKENS - melding.length - 1)
+    expect(opGrens).toHaveLength(STORING_MAX_TEKENS)
+    expect(isStoringspagina(kalePagina(opGrens))).toBe(true)
+    expect(isStoringspagina(kalePagina(opGrens + 'x'))).toBe(false)
+  })
+
+  it('tak 2, aanhefgrens aan béíde kanten: de melding moet binnen de eerste 300 tekens vallen', () => {
+    const melding = 'niet beschikbaar' // 16 tekens
+    const binnen = 'x'.repeat(283) + ' ' + melding // eindigt op teken 300
+    const erbuiten = 'x'.repeat(284) + ' ' + melding // laatste letter valt op teken 301
+    expect(isStoringspagina(kalePagina(binnen))).toBe(true)
+    expect(isStoringspagina(kalePagina(erbuiten))).toBe(false)
   })
 })

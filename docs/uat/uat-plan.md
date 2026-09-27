@@ -7830,7 +7830,7 @@ Alle routes onder /beheer zijn afgeschermd in één centrale layout: `app/(app)/
   1. Open /beheer/nieuws. Bekijk desgewenst de actieve systeemprompt (alleen-lezen, klik om te laden).
   2. Bekijk de ingest-status: laatste runs (status, duur, samenvatting: bronnen gecontroleerd, artikelen gevonden/geëxtraheerd, duplicaten overgeslagen, ingevoegd) en de bron-gezondheid ("X van Y bronnen leverde niets").
   3. Bewerk de webbronnen: URL/label aanpassen, verwijderen (prullenbak) of toevoegen (Plus). Idem voor RSS-feeds.
-  4. Klik "Opslaan" om de bronnen te bewaren, of reset naar de standaardbronnen (DEFAULT_WEB_SOURCES/DEFAULT_RSS_FEEDS).
+  4. Klik "Opslaan" om de bronnen te bewaren, of reset naar de standaardbronnen (`standaardWebBronnen()`/`DEFAULT_RSS_FEEDS`).
   5. Klik op de inlees-knop (RefreshCw) om direct een ingest-ronde te draaien (POST); de artikelendatabase ververst.
   6. Doorzoek de artikelendatabase (zoekveld), klap een artikel uit voor details en verwijder een artikel met de prullenbak.
 - **Schermen/componenten:** /beheer/nieuws — `app/(app)/beheer/nieuws/page.tsx`, `lib/news-sources.ts`; API `/api/admin/news-ingest` (GET status / POST run), `/api/admin/news-active-prompt`, artikel-endpoints in `/api/admin/news-*`.
@@ -13288,7 +13288,7 @@ UAT-BEHEER-07 (gebruikersbeheer) krijgt naast zijn eigen KERN-behandeling drie g
 
 #### UAT-BEHEER-13 — Nieuwsbronnen beheren, ingest draaien en artikelen modereren (dekt WF-BEHEER-13)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~10 min
-- **a. Happy path:** open `/beheer/nieuws`, bekijk laatste ingest-runs en bron-gezondheid; voeg een testbron toe en sla op; klik de inlees-knop om direct een ingest te draaien → *verwacht:* artikelendatabase ververst met een nieuwe run in de status-lijst; doorzoek de artikelendatabase op een bekende term en verwijder een testartikel. **Herstel:** verwijder de testbron weer / reset naar `DEFAULT_WEB_SOURCES`/`DEFAULT_RSS_FEEDS`.
+- **a. Happy path:** open `/beheer/nieuws`, bekijk laatste ingest-runs en bron-gezondheid; voeg een testbron toe en sla op; klik de inlees-knop om direct een ingest te draaien → *verwacht:* artikelendatabase ververst met een nieuwe run in de status-lijst; doorzoek de artikelendatabase op een bekende term en verwijder een testartikel. **Herstel:** verwijder de testbron weer / reset naar `standaardWebBronnen()`/`DEFAULT_RSS_FEEDS`.
 - **c. Cross-module effecten:** bepaalt de inhoud van de Krant voor alle gebruikers.
 
 #### UAT-BEHEER-14 — Vragenlijst opstellen, activeren en respons bekijken (dekt WF-BEHEER-14)

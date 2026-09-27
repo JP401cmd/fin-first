@@ -155,6 +155,42 @@ nog niet. Fase 2 doet dat wél, en is tegelijk de **aanvulling op ADR 0171** (he
     `geduid` mét jsonb. `DUIDING_VERSIE` gaat naar 2; de bestaande versie-bump duidt v1-rijen
     opnieuw (herleiden, niet ophogen).
 
+## Aanvulling 27-09-2026 — bronnen herijkt, storingspagina's geweerd
+
+Aanleiding: van 105 geduide artikelen hadden er 98 geen samenvatting, 5 een mechanisme en 0 een
+rekenend mechanisme. De prompt deed wat hij moest; de ingest leverde te weinig grondslag.
+
+19. **Bronnen worden alleen toegevoegd met live bewijs.** Elke standaardbron is door de échte
+    extractor (`fetchWebPage` + `extractSecties`/`extractLinks`, of `fetchRssFeed`) gehaald. Een
+    nieuwe bron komt er alleen bij als zijn fragment de parameter van een rekenend mechanisme
+    letterlijk bevat (percentage, bedrag, leeftijd, jaar), want de duiding grondt getallen alleen
+    in het fragment. Weg: drie Rijksoverheid-themahubs (alleen kaarten, 0 secties), de CBS-
+    themapagina's (hangen; `…/cijfers` is een lijst StatLine-tabellen), de ECB-lijst (JavaScript)
+    en de ECB-feed (Engelse koppen zonder beschrijving, 0/20 met mechanisme), AFM Waarschuwingen
+    (namen van malafide partijen). CBS draait nu op zijn eigen thema-**feeds**; de nieuwslinks
+    daarin zijn letterlijk de URL's die de oude lijstbron al schreef, dus de sleutel verandert niet
+    (idempotentietest in `lib/news-ingest.test.ts`). De Belastingplan-wetteksten schuiven met
+    Prinsjesdag mee (`lopendBelastingplanJaar`, derde dinsdag van september; vanaf de dag erna het
+    nieuwe jaar); de standaardlijst is daarom een functie, `standaardWebBronnen(nu)`. Een in
+    /beheer/nieuws opgeslagen lijst blijft letterlijk gevolgd — daar staat het jaartal vast.
+    RSS kent geen AI-keuzestap; daarom een **pad-filter per host** (`RSS_PAD_FILTER`, vóór de cap
+    van `MAX_RSS_ITEMS`): van CBS komen alleen `/nl-nl/nieuws/`-items binnen, geen
+    `/nl-nl/maatwerk/`-tabellen (12 van 50 bij Prijzen, 26 van 50 bij Inkomen en bestedingen). In
+    code per host en niet op de opgeslagen feed, zodat het ook na opslaan in /beheer/nieuws geldt.
+20. **Een storingspagina is geen inhoud.** `fetchWebPage` levert `oorzaak: 'storing'` (en geen HTML)
+    als `isStoringspagina` (`lib/news-html.ts`) raak is: de paginatitel noemt een storing of
+    onderhoud, óf de hele lezerstekst is kort (≤ 1.000 tekens) en de aanhef (eerste 300) noemt
+    het. Nooit op een losse zin diep in een sectie. Aanleiding: de Belastingdienst serveerde op
+    26 sep tijdens gepland onderhoud een 200 met "De websites van de Belastingdienst zijn niet
+    beschikbaar", en dat werd artikel `41f41a58…`. `storing` is een eigen oorzaak (oranje op
+    /beheer/nieuws), geen `leeg`; valt een hele bronklasse zo weg, dan landt de run als `partial`
+    (ADR 0178). Een redirect naar een foutpagina mét extensie (`/error/404.jsp`, DUO) telt nu ook
+    als `doorverwezen_naar_fout`.
+21. **Wat bewust níet veranderde:** `FRAGMENT_MAX_TEKENS`, `extractSecties` (menu- en cookieresten
+    als eigen sectie blijven een bekend restpunt) en het ophalen van de detailpagina (fase 3).
+    Rijen van verwijderde bronnen worden niet gewist; ze verlopen via de bewaartermijn (120 dagen
+    niet meer gezien).
+
 ## Gevolgen
 
 - Minder, maar echte artikelen; de LLM-editie op /nieuws verliest de parafrase-dubbels, de
