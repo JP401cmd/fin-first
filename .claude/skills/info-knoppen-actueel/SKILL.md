@@ -30,10 +30,13 @@ Elke `PAGE_INFO`-entry is `{ insight: string, grip: string }`:
 ## Proces
 
 ### 1. Detector draaien
-`npm run page-info:check` (optioneel `-- --json` voor machine-output). Rapporteert drie categorieën:
+`npm run page-info:check` (optioneel `-- --json` voor machine-output). Rapporteert vier categorieën:
 - **missing** — een `getPageInfo('key')`/`infoKey="key"`-aanroep zonder bijbehorende `PAGE_INFO`-entry.
-- **orphaned** — een `PAGE_INFO`-entry waar niets (statisch zichtbaar) naar verwijst.
+- **orphaned** — een `PAGE_INFO`-entry waar niets (statisch zichtbaar) naar verwijst. Alleen een waarschuwing: exit blijft 0.
 - **inlineLiterals** — een `<PageInfoButton content={{ ... }}>` met een object-literal in de JSX zelf, in plaats van via `getPageInfo()`.
+- **uncoveredRoutes** (route-dekking) — een `app/(app)/**/page.tsx` die helemaal géén info-knop rendert, terwijl besluit 9 (`docs/ux-review-jul2026.md`) die op élke inhoudspagina voorschrijft. De scan volgt de importgraaf twee niveaus diep; een knop die pas op niveau drie rendert, meldt als gat. Instellingen- en flowschermen staan bewust op `SETTINGS_OR_FLOW_ROUTES`; nog niet opgeloste gaten op de afbouwlijst `RESIDUE_ROUTES` (beide in `scripts/page-info/check-coverage.mjs`).
+
+**`RESIDUE_ROUTES` mag alleen krimpen.** Een entry die geen gat meer is maar op de lijst blijft staan (`staleResidue`) maakt de gate hard rood: haal 'm dan uit de lijst. Een nieuwe inhoudspagina krijgt een knop, geen regel op die lijst. Exit 1 bij missing, inlineLiterals, uncoveredRoutes of staleResidue.
 
 **Geen treffers ⇒ één regel "info-knoppen actueel, geen wijziging nodig", klaar.** Dat is de lichtheidsgarantie — dezelfde vorm als `uat:stale`/`arch:diagram`.
 
@@ -43,6 +46,8 @@ De detector kan geen dynamische `pathname`-lookup volgen (`getPageInfo(pathname,
 ### 3. Missing en inlineLiterals direct oplossen
 - **missing** — schrijf een nieuwe `{insight, grip}`-entry volgens het format hierboven en voeg 'm toe aan `PAGE_INFO`. Ken je de module (kern/wil/horizon) niet uit de route, check de laag/`layout.tsx` van die route voor `--module-active-*`.
 - **inlineLiterals** — verhuis de tekst naar `PAGE_INFO` onder een sprekende key en herschrijf de call site naar `content={getPageInfo('key')}`.
+- **uncoveredRoutes** — geef de pagina een `PageInfoButton` met een eigen `PAGE_INFO`-entry. Is het een instellingen- of flowscherm, zet de route dan op `SETTINGS_OR_FLOW_ROUTES`; nooit op `RESIDUE_ROUTES`.
+- **staleResidue** — haal de opgeloste route uit `RESIDUE_ROUTES`.
 
 Doe dit **zelf, inline** — geen subagent nodig voor een handvol entries (normale omvang: een nieuwe pagina in een feature-PR levert 1-3 treffers op).
 
@@ -50,7 +55,7 @@ Doe dit **zelf, inline** — geen subagent nodig voor een handvol entries (norma
 Alleen bij een omvangrijke herziening (zoals de aanvankelijke INZICHT/GRIP-migratie, of een toon-brede herschrijving): groepeer de geraakte keys per module/domein en dispatch één content-schrijf-agent per groep. Elke agent **retourneert** zijn `{key: {insight, grip}}`-map als tekst — bewerkt `lib/page-info-content.ts` NOOIT zelf, om te voorkomen dat parallelle agents op hetzelfde bestand botsen. Eén afsluitende stap (hoofdthread) assembleert alle groepen in één bewerking en draait `npx tsc --noEmit` + `npm run page-info:check` opnieuw.
 
 ### 4. Verifiëren
-`npx tsc --noEmit` (een hernoemde/verplaatste key raakt typisch geen types, maar een `getPageInfo`-aanroep met een verkeerd aantal argumenten wel) en `npm run page-info:check` opnieuw — moet 0 missing/inlineLiterals rapporteren.
+`npx tsc --noEmit` (een hernoemde/verplaatste key raakt typisch geen types, maar een `getPageInfo`-aanroep met een verkeerd aantal argumenten wel) en `npm run page-info:check` opnieuw — moet 0 missing/inlineLiterals/uncoveredRoutes/staleResidue rapporteren.
 
 ## Afronding
 Rapporteer: wat de detector vond, wat je toevoegde/verhuisde/verwijderde (met reden bij een verwijdering), en de schone detector-run als bewijs. Geen "info-knoppen actueel" claimen zonder die tweede run te tonen.

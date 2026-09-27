@@ -1,6 +1,6 @@
 # Pijplijn-conventies (gedeeld)
 
-> Gedeelde spelregels voor álle pijplijn-skills in `.claude/skills/*`. Elke pijplijn-skill verwijst hierheen; deze regels gelden onverkort, alsof ze in de skill zelf staan. Skill-specifieke afwijkingen staan in de skill zelf en winnen van dit bestand.
+> Gedeelde spelregels voor álle pijplijn-skills in `.claude/skills/*` en voor de Notion-queue-commands `/trifinity-drain` en `/trifinity-next`. Elke pijplijn-skill en beide commands verwijzen hierheen; deze regels gelden onverkort, alsof ze in de skill zelf staan. Skill-specifieke afwijkingen staan in de skill zelf en winnen van dit bestand.
 
 ## Rol van de hoofdchat — orchestrator
 
@@ -9,6 +9,8 @@ De hoofdchat voert de pijplijn uit als **orchestrator**: hij bewaakt volgorde, s
 **Agent-budget.** Elke pijplijn-skill noemt een agent-budget: het aantal subagent-runs dat voor een normale run van die skill volstaat. Daarbinnen blijven is de norm. Meer agents inzetten mag alleen met een expliciete motivering vooraf aan de gebruiker (welke omstandigheid — bv. een migratie plus een tweede surface — het extra werk nodig maakt).
 
 **Gebundelde eindreview.** De afsluitende review van een run is één review-agent die in dezelfde opdracht drie lenzen meekrijgt: correctheid/kwaliteit, UI-consistentie (bij geraakte UI) en de security-lens. Geen drie aparte review-spawns. **Sinds Fable 5.1 / CLI 2.1.257 draait deze eindreview als fork-subagent** (`subagent_type: "fork"`): de fork erft het volledige gesprek, dus de reviewer kent de wijziging al zonder koude ~0,5M-opstartcontext of herleesronde — geef hem de drie lenzen plus de reviewvraag expliciet mee in de prompt, en instrueer hem de **diff adversarieel** te beoordelen in plaats van de aannames uit het gesprek te vertrouwen (een fork deelt de context van de bouwer; de opdracht moet die bias expliciet tegenwerken). **Spawn de eindreview dus nooit als `subagent_type: "code-review"`**: die agent staat vast op Fable met effort `xhigh` en start koud — precies het verbruik dat de fork moet voorkomen (gemeten 11 sep 2026: een gebundelde eindreview liep tóch via die route, omdat de skillkoppen hem bij naam noemden). De `code-review`-agent blijft bestaan voor een losse review buiten een pijplijn en voor de uitzondering in `release`. **Is `fork` in de omgeving niet beschikbaar** (de Agent-tool meldt "Agent type 'fork' not found"), val dan terug op `senior-developer` (niet `code-review`) mét een expliciete bestandslijst van de feature, de drie lenzen, de opdracht de diff adversarieel te lezen én de opdracht om `tsc`/eslint/vitest (via PowerShell) zelf te draaien en de echte output te rapporteren — zonder die verificatie-verwachting in de briefing kost de koude reviewer een aparte ontdekkingsronde (gemeten 15 sep 2026). Eén uitzondering blijft hard: raakt de wijziging auth, RLS, een migratie, een nieuwe route met datatoegang of partner-/huishouddata, dan draait de `security-specialist` zijn ship-gate-checklist als aparte run met **schone context (géén fork)** — onafhankelijke ogen zijn dáár het punt; die gate wordt niet wegbezuinigd.
+
+**Nieuwe consument van een kernel-uitkomst? Benoem wélke kernel-run het veld voedt.** Leest de wijziging een kernel-veld op een nieuwe plek, dan zegt de review expliciet uit welke run het komt: de hoofdrun/bisectie of een geforceerde stop-/runway-run. Precedent 15 sep 2026: het plan-stoplicht las `solverStatus` van `computeHorizonRunway`; onder `solved` is dat de stop-vandaag-run, wat bijna iedereen vals rood gaf — en tests die de status als prop injecteren zien dat per constructie niet.
 
 **Fable-limiet is geen reden om een gate over te slaan.** Meldt de Agent-tool bij een spawn "You've reached your Fable limit" (gemeten: `security-specialist` ×3 en `senior-developer` ×2 op 17 sep 2026, `senior-developer` ×4 op 18 sep), respawn dan dezelfde agent met de override `model: "opus"` — nooit de stap overslaan, nooit uitstellen tot "de quota terug is", en nooit een ander agent-type kiezen. Voor de `security-specialist` blijft de eis **schone context (géén fork)** onverkort; het model is niet de eis, de onafhankelijke ogen zijn dat. Andersom geldt sinds 19 sep 2026 de spawn-override náár Fable: `deep-dive` en `senior-developer` staan standaard op Opus, maar raakt de opdracht een rekenmotor (`lib/horizon-kernel/**`, `lib/constants.ts`, box1/box3, spaarquote) of de architectuur (domeinen, datastromen, een ADR), geef dan `model: "fable"` mee.
 
@@ -33,6 +35,8 @@ Houd de gebruiker doorlopend op de hoogte. Meld vóór elke stap in één à twe
 Een gedispatchte sub-agent draait zijn eigen verificatie- en review-gates (bv. `npx tsc --noEmit`, een `ux-review-expert`- of `security-specialist`-aanroep) **synchroon af** en rapporteert pas als alles klaar is. Eindig je beurt NOOIT met "ik wacht op de review/notificatie" — spawn je zelf een sub-agent voor een gate, wacht dan op diens resultaat en verwerk het vóór je terugrapporteert. Reden: de orchestrator behandelt een halve afronding als onbetrouwbaar en moet de agent hervatten, wat tokens en tijd kost.
 
 **Geen geneste achtergrond-fan-out.** Een sub-agent mag zelf géén verdere Agent-aanroepen doen met `run_in_background: true`. Een sub-agent kan — anders dan de hoofdchat — niet betrouwbaar over meerdere beurten heen blokkerend wachten op zijn eigen achtergrond-children: hij eindigt zijn beurt, en "ik wacht op hun notificatie" is dan een dode belofte die de orchestrator alsnog handmatig moet detecteren en overnemen (agent-ID's opvragen, children hervatten) — precies de kostbare halve-afronding die deze sectie al verbiedt. Moet een sub-agent werk laten fan-outen naar meerdere andere agents: doe dat **synchroon/foreground binnen dezelfde beurt** (wacht zelf op elk resultaat vóór je verdergaat), of geef de fan-out expliciet terug aan de orchestrator in plaats van 'm zelf in de achtergrond te starten.
+
+**Child-oplevering is ONAF tenzij zelf groen geverifieerd.** Kan een gedispatchte child zijn eigen deel niet groen maken (tsc/vitest op de eigen diff faalt, of is niet gedraaid), dan meldt hij dat als ONAF met de exacte foutstaat — nooit als af. De dispatchende agent behandelt een rapport zonder expliciete groene bevestiging als ONAF en integreert pas na verificatie. Dit geldt op elk niveau: dispatcht een drain-/next-sub-agent zelf children, dan wacht hij synchroon op elk van hen binnen zijn eigen beurt.
 
 ## Tests op een pure functie — élke tak, béíde uiteinden
 
@@ -62,13 +66,77 @@ Subagents en hoofdchat werken in dezelfde working tree, vaak náást parallelle 
 
 **Sluit elke run af met `git status --porcelain -- .claude/` in de eindsamenvatting.** Nul regels is ook een uitkomst en hoort er te staan; zo is een stille zelfmodificatie al zichtbaar vóórdat er een commit bestaat. Staat er wél iets: stage per pad (nooit `git add -A`) en commit het apart met prefix `self-improve:`.
 
+## Notion-queue — gedeelde kaartregels (`/trifinity-drain` en `/trifinity-next`)
+
+Deze regels gelden per kaart in beide commands; die verwijzen hierheen. De drain-orchestrator neemt deze sectie op als verplichte leesopdracht in het instructiebestand voor de sub-agents (drain lus-stap 5).
+
+### Actualiteitscheck — aanvullingen
+
+- **Onderbroken eerdere poging = concept-diff.** Dekt ongecommit werk in de boom exact de scope ("te raken bestanden") van déze kaart, terwijl de kaart nog op een oppakbare bak stond, dan is het een onderbroken eerdere poging op deze kaart — geen vreemd werk. Verifieer het firsthand en maak het af.
+- **Tel zelf.** Noemt de kaart een aantal getroffen items ("twee die X", "acht schermen"), tel het zelf en meld een afwijkende telling expliciet. Een schermwaarneming telt ingangen, de code telt oorzaken; de fix hangt aan het tweede getal. Sluit `.claude/worktrees/**` uit van elke telling (volledige repo-kopieën, tot 4× te veel treffers).
+- **Besluiten buiten git.** Grep naast `git log` ook `docs/*audit*.md` en `docs/adr/` op het onderwerp: een punt kan daar bewust zijn afgevallen of anders zijn opgelost.
+- **Ritme tegen stroom 07.** Noemt de kaart een rol-ritme, cadans of frequentie (dagelijks/wekelijks/maandelijks/per kwartaal), toets die eerst tegen `trifinity-org/org_plan/30-werkstromen.md` §07 "Het ritme" — volgens `00-stappenplan.md` §8.2 de enige ritme-bron; de tabel in `40-landingsplekken.md` is verouderd. Wijkt de kaart af: corrigeer de dimensionering in je analyse en meld de drift in één regel.
+- **De toolchain is ook gedeeld.** `'vitest' is not recognized`, `ERR_MODULE_NOT_FOUND` of een resolutiefout op een transitieve dependency betekent meestal een `npm install` van een parallelle sessie — geen testfalen en geen defect in je diff. Controleer of `node_modules/.bin` bestaat en gevuld is, poll begrensd (enkele pogingen, korte tussenpozen) en draai opnieuw. Blijft het kapot: éénmaal een lockfile-gestuurde `npm install`, meld dat, en commit `package.json`/`package-lock.json` nooit mee. Staat een import wél in `node_modules` maar niet in `package.json`: verwijder de import, voeg de dependency niet toe.
+
+### ONDERZOEK — is dit wel achterstand?
+
+Classificeer vóór je een aanpak schrijft. Een kaart die iets "mist" valt in precies één bak, en de bak bepaalt de aanbeveling:
+
+1. **Omkering** — een audit of besluit koos dit bewust weg en de kaart vraagt het terug. Koerswijziging, geen achterstand: benoem dat en laat de eigenaar kiezen.
+2. **Lacune** — nooit beoordeeld, of de regel dateert van vóór het besluit. Gewoon werk.
+3. **Halve remedie** — zelfde diagnose, destijds een ándere interventie gekozen. Zoek in het audit-/reviewdocument niet alleen óf het punt er staat, maar welke remedie eraan hing.
+4. **Verlopen motivering** — de code noemt het gedrag bewust, met een precondition ("X bestaat nog niet", "Y wordt nooit ingevuld"). Toets die precondition apart tegen HEAD en dateer comment én precondition met `git log -L <start>,<eind>:<pad>` (`git log -S` toont dát er niets wijzigde, niet waaróm). Is de precondition elders opgelost, dan is het besluit vervallen en de correctie vrijwel gratis.
+5. **Vervallen eis / duplicaat** — de datamodel-toets uit het command.
+
+Verwijst de kaart naar een audit-/reviewdocument, lees dan ook de besluiten-/nazorgsectie onderaan. Verwijst ze naar geen document, zoek dan zelf het besluitdocument van het domein (`docs/ux-review-*.md`, `docs/*-audit.md`) of lees de commit-historie van het geraakte bestand.
+
+### Bewijsladder
+
+Elke zelfstandige claim over een oorzaak of over eigen resultaat (bug-oorzaak, "geen conflicten", "N kaarten verwerkt", "X tokens bespaard") noemt het niveau waarop hij rust:
+
+1. **Repro** — een falende/slagende test, een code-trace met bestand + regel die het gedrag 1-op-1 verklaart, een numerieke match met de gemelde cijfers, een inline `node -e`-berekening, of een bestaande groene test die het gedrag vastlegt.
+2. **Registratie** — een commit-hash, een `git log`-telling, de ledger, een nagetrokken Notion-status.
+3. **Eigen meting** — één zelf gedraaide voor/na-meting (queue-select, `git status --porcelain`, tokengebruik).
+4. **Redenering** — afleiding zonder meting. Alleen als 1–3 niet haalbaar zijn; de zwakste vorm.
+
+Een claim zonder label geldt als niveau 4. In Parallelle modus schrijft de ONDERZOEK-tak geen test- of scratchbestanden in de repo: repro op niveau 1 zonder bestandswijziging, prototypes alleen in de scratchpad (via de Write-tool, niet via een bash-heredoc).
+
+### IMPLEMENTATIE — oorzaak en landingsmatrix
+
+- **Oorzaak firsthand.** Een analyse — ook een geoffloade spec in de pagina-body — is autoritatief voor scope, niet voor oorzaak. Bevestig de oorzaak firsthand tegen repo of live data vóór je bouwt, goedkoopste bewijs eerst. Wijkt de echte oorzaak af: volg die en noteer de afwijking met motivering in het `IMPLEMENTATIE (datum)`-blok.
+- **Landingsmatrix.** Toepassingsvolgorde: meerfasig spoor → open deelpunt → Spike/Research → geen no-op.
+  - **Open deelpunt.** Blijft bij een kaart met meerdere onafhankelijke punten één punt open op een échte eigenaarskeuze, terwijl de rest gebouwd en geverifieerd is: land op `5. Klaar om te testen`, zet de open deelvraag met "→ Antwoord a.u.b. in de kolom **Antwoord gebruiker**." in het `IMPLEMENTATIE (datum)`-blok, en één regel in **Notities**. Dit gaat vóór de multi-optie-clausule; `Vraag aan gebruiker` is voor een blocker die de héle kaart tegenhoudt.
+  - **Spike/Research.** Vraagt de kaart naar haar aard om verkenning, vergelijking of een besluit (Type `Spike/Research`, of de geverifieerde analyse beschrijft geen bouwwerk), bouw dan geen productiecode omdat de status `3` heet. Lever de artefacten (verkenning, concept-ADR, aanbeveling — documenten wel, productiecode niet) als `IMPLEMENTATIE (datum)`-blok en land op `Vraag aan gebruiker`, met de go/no-go bovenaan **Analyse & voorstel** + de antwoordregel — niet op `5`: er valt niets te testen. Spiegel van het open deelpunt: daar bestaat een getest artefact en blijft één vraag open; hier ís de beslissing het product. Beschrijft de analyse van een spike wél bouwwerk (bv. een prototype), dan valt hij buiten deze regel.
+
+### Terugmelding van de sub-agent
+
+Sluit de samenvatting af met een kale lijst repo-relatieve paden (met `/`) van élk gewijzigd of nieuw bestand, één per regel, ongegroepeerd — nooit samengevat ("9 ADR's opgeruimd") en nooit een map. In de drain is die lijst de invoer voor de ledger (lus-stap 7) en dus voor de contract-drift-check (lus-stap 2); een samengevatte regel maakt eigen werk vreemd.
+
+### Parallelle modus (alleen `/trifinity-drain`)
+
+Standaard verwerkt de drain één item tegelijk. Parallel werken gebeurt alleen als de gebruiker daar expliciet om vraagt, en dan volgens deze regels:
+
+- **Wat parallel mag.** Alleen-lezen werk (ONDERZOEK en TESTEN, zonder productiecode-wijziging) mag naast een implementatie lopen. Implementaties lopen alleen parallel als hun bestandssets disjunct zijn. Overlap = cluster, strikt sequentieel (drain § Overlappende IMPLEMENTATIE-kaarten).
+- **Blijft gelden.** Eén schrijver per kaart (elke sub-agent claimt zelf) en de gate-discipline. § Rol van de hoofdchat en § Git-hygiëne zijn de veiligheidsbasis.
+- **Golven.** De orchestrator dispatcht onafhankelijke kaarten als één golf in één bericht, verwerkt de rapporten sequentieel in de ledger zodra ze binnenkomen, en draait de contract-drift-check en (bij vreemd werk) `tsc` pas als de hele golf terug is — vóór de volgende golf.
+- **Bestandsplan vooraf.** Elke dispatch noemt de bestanden van de kaart en die van peers om uit te blijven. De agent toetst zijn plan aan `git status --porcelain`: een vuil bestand dat niet in zijn eigen analyse staat is van een ander — niet aanraken; kies een aangrenzend bestand of een chirurgisch anker en meld dat.
+- **Gedeelde curatiebestanden** (`lib/architecture/*`, `lib/constants.ts`, `lib/uat/acceptance/*`): alleen kleine, uniek-matchende edits, vlak vóór de edit opnieuw gelezen; nooit een blok herschrijven.
+- **Verificatie per agent.** `tsc` vóór de eerste en na de laatste edit, per bestand vergeleken op de eigen paden (exit 2 met alleen peer-bestanden = groen; een peer-parse-fout kapt `tsc` vroeg af — noteer en herhaal). Alleen gerichte vitest; de orchestrator draait aan het eind één volledige verificatie. Wijzigt een agent een exportoppervlak, dan grept hij `vi.mock('<module>'` (partiële factory-mocks missen de nieuwe export).
+- **Gedeelde nummers en contracten.** De orchestrator reserveert ADR-nummers per dispatch; de agent checkt vlak vóór het schrijven opnieuw. Wijzigt een kaart een gedeeld contract, dan geeft de orchestrator dat letterlijk door aan de volgende kaart in het spoor.
+- **Instructiebestand.** Schrijf `drain-instructies.md` naar een sessie-onafhankelijk pad, controleer vóór elke golf dat het bestaat, en zet in élke dispatch de terugvalregel: "bestaat het bestand niet: meld dat en volg lus-stap 5 van `.claude/commands/trifinity-drain.md`."
+- **Hervatten, niet herstarten.** Een gestrande agent (limiet, stall, API-uitval) wordt via `SendMessage` hervat: niet opnieuw claimen, eerst `tsc` + `git diff`, dan de bestaande richting afmaken. Een klein cross-kaart-residu gaat terug naar de oorspronkelijke agent.
+
+### Clusterregel (e) — tegenstrijdige tekst op dezelfde ankerregel (drain)
+
+Raken twee goedgekeurde kaarten dezelfde ankerregel, toets dan vóór de eerste dispatch of hun voorgestelde teksten elkaar tegenspreken; volgorde en voortbouwen lossen dat niet op. Bij tegenspraak: dispatch geen van beide voor die plek, en zet beide op `Vraag aan gebruiker` met de concrete keuze bovenaan **Analyse & voorstel** + de antwoordregel (nooit zelf in `Antwoord gebruiker`). De eigenaar kiest; de andere kaart wacht tot hij wordt ingetrokken, aangepast of een andere plek krijgt.
+
 ## Slotstap — zelfverbetering (opt-in, niet elke run)
 
 De zelfverbeterings-slotstap draait **alleen** wanneer één van deze twee dingen waar is: (a) de gebruiker vraagt erom, of (b) tijdens de run is een concreet defect in een definitie gebleken — een misrouting, een instructie die aantoonbaar verkeerd uitpakte, of een subagent-rapport met een expliciete "Verbetervoorstel"-sectie. Is geen van beide het geval, dan eindigt de run zonder retrospectief — een standaard "kijk elke keer of er iets te verbeteren valt"-rondje is zelf overhead.
 
 Draait de slotstap wél, dan geldt:
 
-1. **Leg het voorstel expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*` of `.claude/agents/*` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen). Kijk daarbij expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten?
+1. **Leg het voorstel expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*` of `.claude/agents/*` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen). Kijk daarbij expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten? Gaat het voorstel over een regel die in meerdere instructiebestanden kan wonen (`.claude/commands/*`, `.claude/agents/*`, `.claude/skills/*`, `CLAUDE.md`), lever dan de **grep-dekking** mee: welke bestanden dragen 'm wél/niet, met de grep en de telling. Eén aangewezen bestand is een symptoom, niet de scope; meestal volstaat één canonieke plek plus een verwijzing. Het compacte Verbetervoorstel van een sub-agent hoeft die grep niet te dragen — de orchestrator of hoofdthread die de kaart schrijft draait hem.
 2. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan definities sleutelen. Ook het "verheffen van een gevalideerde tweak tot conventie" (vastleggen in een skill/agent-definitie of CLAUDE.md) loopt via dít protocol — nooit mid-run.
 
 Houd het schaars: één scherp voorstel per run is het maximum.
