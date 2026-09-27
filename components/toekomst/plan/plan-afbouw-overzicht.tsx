@@ -30,10 +30,9 @@
 
 import type { SimResult, SimRow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
-import type { FactorRow } from '@/lib/euro-display'
 import type { FreedomRateSource } from '@/lib/format'
 import { DEFAULT_FIRE_STRATEGY, type FireEndStrategy } from '@/lib/fire-strategy'
-import { freedomDaysAtAge } from '@/lib/horizon/vrijheidsdagen'
+import { freedomDaysAtAge, type FreedomDaysAtAgeArgs } from '@/lib/horizon/vrijheidsdagen'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { AfbouwOverzichtCard } from '@/components/future/afbouw-overzicht-card'
@@ -89,7 +88,8 @@ export function afbouwVrijheidsdagen({
   canonicalDailyRate,
   source,
 }: {
-  rows: readonly (FactorRow & Pick<UnifiedProjectionRow, 'nettoLiquide'>)[]
+  // De rijvorm van de helper zelf (leeftijd + kernelfactor), plus de J-grondslag.
+  rows: readonly (FreedomDaysAtAgeArgs['rows'][number] & Pick<UnifiedProjectionRow, 'nettoLiquide'>)[]
   fireAge: number
   endAge: number
   canonicalDailyRate: number
