@@ -889,9 +889,10 @@ body {
   box-shadow: var(--s1);
   transform: translateY(-1px);
 }
-/* Tips-modus (/toekomst): de hero-kaart mag dan GEEN hover-transform doen — een
-   transform maakt een stacking context die de boven-de-scrim getilde grafiek zou
-   "vangen" en alsnog vervaagt. Hogere specificiteit wint van de regel hierboven. */
+/* Een kaart die zelf niet klikbaar is (bv. het leningdeel-vat) tilt niet op hover. Een
+   transform maakt bovendien een stacking context die een boven een scrim getild kind
+   zou "vangen". Hogere specificiteit wint van de regel hierboven. (De grafiekkaart op
+   /toekomst gebruikt sinds 27 sep geen .card-editorial meer, maar KATERN_VLAK.) */
 .card-editorial.no-hover-lift:hover {
   transform: none;
   box-shadow: var(--s0);

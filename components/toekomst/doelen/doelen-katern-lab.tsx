@@ -10,8 +10,9 @@
  *   (de layout rendert hem via `CanvasZijkolom`), knopvorm `knopWeergave.desktop`; alleen
  *   het lab. De acties staan daaronder over de volle breedte (`DoelenKaternLabActies`, via
  *   `CanvasActierij`, 27 sep);
- * - `DoelenKaternLab plek="onder-koppen"` — direct onder de katern-koppen, mobiel
- *   (`lg:hidden`), knopvorm `knopWeergave.mobiel`, opslaan-actie in de shell-action-bar;
+ * - `DoelenKaternLab plek="onder-koppen"` — mobiel direct onder de grafiek, bovenaan de
+ *   katern-module (`lg:hidden`), knopvorm `knopWeergave.mobiel`, opslaan-actie in de
+ *   shell-action-bar;
  * - `DoelenKaternLabSheets` — de drie sheets, precies één keer gemount (op de page).
  *
  * Beide plekken staan in de DOM; CSS verbergt de plek die niet bij het breekpunt hoort
@@ -32,7 +33,7 @@ import {
   useToekomstEuroContext,
 } from '@/components/toekomst/state/toekomst-state-provider'
 
-/** Welk breekpunt bij welke plek hoort: de kolom is desktop, onder de koppen is mobiel. */
+/** Welk breekpunt bij welke plek hoort: de kolom is desktop, de plek onder de grafiek mobiel. */
 export const BREEKPUNT_VAN_PLEK: Record<DoelenLabPlek, KnopBreekpunt> = {
   kolom: 'desktop',
   'onder-koppen': 'mobiel',
@@ -47,7 +48,7 @@ export const PLEK_ZICHTBAARHEID: Record<DoelenLabPlek, string> = {
 export function DoelenKaternLab({ plek }: { plek: DoelenLabPlek }) {
   const breekpunt = BREEKPUNT_VAN_PLEK[plek]
   // Het anker hoort bij de plek die op dit breekpunt zichtbaar is. Raakt alleen id en ref,
-  // niet de layout; de server rendert hem (mobile-first) onder de koppen.
+  // niet de layout; de server rendert hem (mobile-first) op de mobiele plek.
   const isLg = useIsLgUp()
   const anker = plek === 'kolom' ? isLg : !isLg
   const { verkenSectieZichtbaar } = useToekomstPerspectiefContext()

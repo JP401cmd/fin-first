@@ -64,7 +64,7 @@ describe('ToekomstKaternKoppen — wisselen zonder sprong', () => {
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
-  it('de eigen marge van de nav (mt-6 uit de layout) telt niet als kleven', () => {
+  it('een eigen marge van de nav telt niet als kleven', () => {
     const { rerender } = render(<ToekomstKaternKoppen />)
     posities(276, 300)
     screen.getByTestId('katern-koppen').style.marginTop = '24px'
@@ -81,15 +81,6 @@ describe('ToekomstKaternKoppen — wisselen zonder sprong', () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.instances[0]).toBe(screen.getByTestId('katern-koppen-anker'))
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
-  })
-
-  it('het exemplaar van de andere breedte (display: none) laat de pagina staan', () => {
-    const { rerender } = render(<ToekomstKaternKoppen />)
-    posities(-900, 0)
-    screen.getByTestId('katern-koppen').style.display = 'none'
-    segment = 'doelen'
-    rerender(<ToekomstKaternKoppen />)
-    expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
   it('boven uit beeld (desktop, statisch): ook naar boven, één keer', () => {

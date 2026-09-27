@@ -46,10 +46,10 @@ function metInhoud(
  * wisselt. Een layout rendert bij client-navigatie tussen de katernen niet opnieuw op
  * de server; verse data komt via `router.refresh()` (kaart GW2).
  *
- * Rendervolgorde: kop (oordeelzin + i, ankerregel) → katern-koppen (desktop) → canvas →
- * katern-koppen (mobiel) → meldingenslot → katern → overlays. Op desktop liggen de koppen
- * als tabbladen óp de grafiekkaart en sluit het katern direct onder die kaart aan; mobiel
- * staan ze onder de grafiek en kleven ze (eigenaarswens 27 sep, ADR 0179 addendum (j)).
+ * Rendervolgorde: kop (oordeelzin + i, ankerregel) → katern-koppen → canvas →
+ * meldingenslot → katern → overlays. De koppen liggen als tabbladen óp de grafiekkaart en
+ * het katern sluit direct onder die kaart aan, op elke breedte; mobiel kleven de koppen
+ * onder de TopBar (eigenaarswens 27 sep, ADR 0179 addendum (j) en (k)).
  * De kop draagt geen statuspunten meer (ADR 0179 D2); het punt van een melding staat op de
  * katern-kop van het katern waar ze woont (D6).
  *
@@ -130,21 +130,18 @@ export default async function ToekomstKaternLayout({ children }: { children: Rea
 
           <ToekomstRekenGrens>
             <div className={`mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6 ${DOELEN_MOBIEL_COMPACT.canvasKolom}`}>
-              {/* Desktop: de tabbladen bovenaan, aansluitend op de grafiekkaart (eigenaarswens
-                  27 sep). Twee exemplaren, per breedte één zichtbaar: zo is de volgorde in de
-                  DOM (focus, schermlezer) op elke breedte die van het scherm — hetzelfde
-                  patroon als het lab (`plek="kolom"` / `"onder-koppen"`). */}
-              <ToekomstKaternKoppen className="hidden lg:block" />
+              {/* De tabbladen bovenaan, aansluitend op de grafiekkaart (eigenaarswens 27 sep),
+                  op elke breedte; mobiel kleven ze onder de TopBar. */}
+              <ToekomstKaternKoppen />
               {/* Op desktop een canvas-rij met een kolom naast de grafiek: in Doelen het lab
                   (ADR 0179 D7), in Plan de gebeurtenissen; in Doelen eronder de lab-acties
                   over de volle breedte (27 sep). */}
               <ToekomstCanvas zijkolom={<CanvasZijkolom />} actierij={<CanvasActierij />} />
-              {/* Mobiel: de koppen onder de grafiek, klevend onder de TopBar. */}
-              <ToekomstKaternKoppen className={`mt-6 lg:hidden ${DOELEN_MOBIEL_COMPACT.koppen}`} />
               {/* Het katern draagt het accent van zijn tab als module-accent (eigenaarswens
-                  27 sep): geen gekleurd vlak, alleen accenten. De scope is de witte module:
-                  mobiel staan de drie tabbladen erop, op desktop sluit ze direct aan onder de
-                  grafiekkaart (zonder bovenrand; de onderrand van de kaart scheidt). */}
+                  27 sep): geen gekleurd vlak, alleen accenten. De scope is de witte module,
+                  direct onder de grafiekkaart (zonder bovenrand; de onderrand van de kaart
+                  scheidt). In Instellingen staat op mobiel geen grafiek: daar liggen de tabs
+                  direct op de module. */}
               <ToekomstKaternAccentScope className={`${KATERN_MODULE} ${DOELEN_MOBIEL_COMPACT.module}`}>
                 {/* Meldingen per katern (spec §4.8): bovenaan het actieve katern. */}
                 <ToekomstKaternMeldingSlot className="[&>div]:mt-3" />

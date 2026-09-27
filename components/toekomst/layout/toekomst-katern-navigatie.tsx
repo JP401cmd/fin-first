@@ -8,8 +8,9 @@
  * route nooit; zo blijft de terugvaloptie C′ (drie katernen gestapeld op één route) een
  * herschikking zonder herbouw.
  *
- * Twee consumenten: de katern-koppen (op desktop boven het canvas, mobiel eronder) en de i
- * in de paginakop, die per katern de "Wat zie ik hier?"-inhoud van zijn eigen route toont.
+ * Twee consumenten: de katern-koppen (boven het canvas, als tabbladen op de grafiekkaart)
+ * en de i in de paginakop, die per katern de "Wat zie ik hier?"-inhoud van zijn eigen
+ * route toont.
  */
 
 import { useEffect, useRef, type ReactNode } from 'react'
@@ -30,9 +31,8 @@ import { useActiefKatern } from './actief-katern'
  * geminimaliseerde melding klapt die weer uit (dezelfde `restore` als de
  * Minimaliseren-knop terugdraait; server-side onthouden).
  *
- * De layout zet twee exemplaren (eigenaarswens 27 sep): op desktop boven het canvas, als
- * tabbladen op de grafiekkaart, en mobiel eronder, klevend. Per breedte is er één
- * zichtbaar; het andere staat op `display: none` en laat de scrollregel hieronder met rust.
+ * De koppen staan op elke breedte boven het canvas, als tabbladen op de grafiekkaart
+ * (eigenaarswens 27 sep); mobiel kleven ze onder de TopBar.
  */
 export function ToekomstKaternKoppen({ className = '' }: { className?: string }) {
   const actief = useActiefKatern()
@@ -42,9 +42,10 @@ export function ToekomstKaternKoppen({ className = '' }: { className?: string })
 
   // Katernwissel zonder sprong (fixronde C1). De koppen navigeren met `scroll={false}`;
   // hier één regel voor waar de pagina daarna staat: staan de koppen op hun eigen plek
-  // in beeld, dan blijft alles staan. Kleven ze (mobiel, ver naar beneden gescrold) of
-  // zijn ze boven uit beeld, dan komen ze bovenaan het zichtbare deel, met het nieuwe
-  // katern er direct onder — niet halverwege een katern dat je nog niet gezien hebt.
+  // in beeld, dan blijft alles staan. Kleven ze (mobiel, naar beneden gescrold) of zijn ze
+  // boven uit beeld, dan komen ze op hun eigen plek bovenaan het zichtbare deel, met de
+  // grafiek en het nieuwe katern eronder — niet halverwege een katern dat je nog niet
+  // gezien hebt.
   // Niet bij de eerste render, en niet bij een hash (`#verken-je-aannames`): die
   // scrolt zelf naar zijn anker.
   useEffect(() => {
@@ -55,11 +56,8 @@ export function ToekomstKaternKoppen({ className = '' }: { className?: string })
     if (!anker) return
     const nav = anker.nextElementSibling
     if (!(nav instanceof HTMLElement)) return
-    // Het exemplaar van de andere breedte (`hidden lg:block` / `lg:hidden`) doet niets:
-    // alleen de koppen die je ziet bepalen waar de pagina staat.
-    if (getComputedStyle(nav).display === 'none') return
-    // Natuurlijke bovenkant van de nav = het anker plus de eigen marge van de nav (mobiel
-    // geeft de layout `mt-6`); kleeft hij, dan staat hij lager dan die plek.
+    // Natuurlijke bovenkant van de nav = het anker plus een eventuele eigen marge van de
+    // nav; kleeft hij, dan staat hij lager dan die plek.
     const natuurlijk = anker.getBoundingClientRect().top + (parseFloat(getComputedStyle(nav).marginTop) || 0)
     const kleeft = nav.getBoundingClientRect().top > natuurlijk + 1
     if (!kleeft && natuurlijk >= 0) return

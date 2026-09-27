@@ -16,10 +16,8 @@ export const DOELEN_MOBIEL_COMPACT = {
   /** De ankerregel op één regel, iets kleiner. */
   ankerregel:
     'max-lg:group-data-[katern=doelen]/katern:mb-1 max-lg:group-data-[katern=doelen]/katern:truncate max-lg:group-data-[katern=doelen]/katern:text-[14px]',
-  /** De kolom rond canvas en koppen: minder verticale ruimte. */
+  /** De kolom rond koppen en canvas: minder verticale ruimte. */
   canvasKolom: 'max-lg:group-data-[katern=doelen]/katern:py-2',
-  /** De katern-koppen: dichter onder het canvas. */
-  koppen: 'max-lg:group-data-[katern=doelen]/katern:mt-3',
-  /** De witte katern-module onder de tabbladen: nauwelijks ruimte boven het lab. */
+  /** De witte katern-module onder de grafiek: nauwelijks ruimte boven het lab. */
   module: 'max-lg:group-data-[katern=doelen]/katern:pt-1',
 } as const

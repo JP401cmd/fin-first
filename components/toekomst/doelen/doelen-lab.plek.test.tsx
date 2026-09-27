@@ -1,7 +1,7 @@
 /**
  * Het lab op twee plekken (ADR 0179 D7, fase 4):
  *  - `kolom` naast de grafiek (desktop, knopvorm `knopWeergave.desktop`, standaard harp);
- *  - `onder-koppen` direct onder de katern-koppen (mobiel, `lg:hidden`, `knopWeergave.mobiel`,
+ *  - `onder-koppen` direct onder de grafiek (mobiel, `lg:hidden`, `knopWeergave.mobiel`,
  *    standaard rad), met de opslaan-actie in de action-bar van de shell.
  * Het anker `#verken-je-aannames` hoort bij de plek die op dit breekpunt zichtbaar is.
  */
@@ -104,7 +104,7 @@ describe('DoelenKaternLab — twee plekken', () => {
     expect(h.lab[0].weergaveKiezer).toBe('menu')
   })
 
-  it('onder de koppen: mobiele vorm (rad), lg:hidden, schrijft de mobiele sleutel', () => {
+  it('mobiel, onder de grafiek: mobiele vorm (rad), lg:hidden, schrijft de mobiele sleutel', () => {
     render(<DoelenKaternLab plek="onder-koppen" />)
     expect(screen.getByTestId('lab-knoppen-stub').getAttribute('data-weergave')).toBe('rad')
     const wrapper = document.querySelector('[data-lab-plek="onder-koppen"]') as HTMLElement

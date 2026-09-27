@@ -16,6 +16,10 @@
  * - Mobiel kleven de koppen bovenaan de tray-scroller (`sticky top-0`). De TopBar
  *   staat bewust BUITEN de scrollende `<main>` van `MobileStackShell`, dus `top-0`
  *   ís de onderrand van de TopBar — geen offset-var nodig. Vanaf `lg` statisch.
+ *   Op /toekomst staan de koppen boven de grafiek, die er bij het scrollen onder door
+ *   schuift: `z-[47]` houdt ze boven de canvas-kop (`z-[46]`, boven de tips-scrim) en
+ *   onder de getilde grafiek in de tips-modus (`z-[50]`), het menu en Fin (`z-50`) en
+ *   elke overlay (`z-[70]`).
  * - Elke kop is minstens 44px hoog (raakgebied).
  *
  * Presentational: geen route-lezing, geen data. De host bepaalt `actiefKey`.
@@ -24,7 +28,7 @@
  * koppen worden tabs op een map — een tabstrook op een basislijn, elke tab een eigen
  * omkaderd vlak met een streep in zijn eigen accent bovenaan. De actieve tab ligt vóór:
  * wit (`--paper`), sterkere streep, en hij sluit zonder lijn aan op het vlak eronder (op
- * /toekomst mobiel de katern-module, op desktop de grafiekkaart). De inactieve tabs liggen
+ * /toekomst de grafiekkaart; zonder grafiek de katern-module). De inactieve tabs liggen
  * achter, op de pagina (`--bg`), in `ink-2`. Alle tabs zijn even hoog. Het accent is hier
  * nooit een vlak — de subpagina krijgt haar accent via `KaternAccentScope`.
  * Nog steeds geen segmented control (D6 blijft staan): tabs openen een eigen route met
@@ -87,17 +91,22 @@ const ACCENT_STREEP: Record<KaternAccent, { achter: string; voor: string }> = {
 const TAB_ACHTER = 'bg-transparent text-[var(--ink-2)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'
 
 /**
- * De witte module onder de tabbladen: dezelfde kaart als het canvas (papier, hairline,
- * schaduw `--s0`), zonder bovenrand — de basislijn van de tabstrook is die rand, en de
- * actieve tab schuift er 1px overheen. Op /toekomst-desktop liggen de tabbladen op de
- * grafiekkaart en sluit de module direct onder die kaart aan; daar scheidt de onderrand
- * van de kaart. Utilities in plaats van `.card-editorial`: die
- * klasse staat buiten de CSS-lagen en laat zich niet per zijde overschrijven, en zijn
- * hover-lift hoort niet op een vlak met overlays erin. Onder `sm` loopt de module tot de
- * schermrand, zodat de inhoud even breed blijft (één-scherm-eis in Doelen).
+ * Het witte vlak onder de tabbladen: papier, hairline, schaduw `--s0`, zonder bovenrand —
+ * de basislijn van de tabstrook is die rand, en de actieve tab schuift er 1px overheen.
+ * Utilities in plaats van `.card-editorial`: die klasse staat buiten de CSS-lagen en laat
+ * zich niet per zijde overschrijven, en haar hover-lift zou het vlak van de tabs
+ * losscheuren. Onder `sm` loopt het vlak tot de schermrand (de tabstrook blijft
+ * ingesprongen), zodat de inhoud even breed blijft (één-scherm-eis in Doelen).
+ *
+ * Op /toekomst liggen twee vlakken onder elkaar: eerst de grafiekkaart (`KATERN_VLAK`,
+ * direct onder de tabs), dan de katern-module (`KATERN_MODULE`, met binnenmarge); de
+ * onderrand van de kaart scheidt ze.
  */
-export const KATERN_MODULE =
-  '-mx-4 border-y border-t-0 border-[var(--border-ed)] bg-[var(--paper)] px-4 pb-6 pt-4 shadow-[var(--s0)] sm:mx-0 sm:border-x sm:px-6 sm:pt-5'
+export const KATERN_VLAK =
+  '-mx-4 border-y border-t-0 border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] sm:mx-0 sm:border-x'
+
+/** De katern-module: het witte vlak met de binnenmarge van een katern. */
+export const KATERN_MODULE = `${KATERN_VLAK} px-4 pb-6 pt-4 sm:px-6 sm:pt-5`
 
 export interface KaternKopItem {
   key: string
@@ -147,7 +156,7 @@ export function KaternKoppen({ items, actiefKey, label, className = '' }: Katern
   return (
     <nav
       aria-label={label}
-      className={`sticky top-0 z-20 -mx-4 bg-[var(--bg)] px-4 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:bg-transparent lg:px-0 ${className}`}
+      className={`sticky top-0 z-[47] -mx-4 bg-[var(--bg)] px-4 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:bg-transparent lg:px-0 ${className}`}
       data-testid="katern-koppen"
     >
       <ul

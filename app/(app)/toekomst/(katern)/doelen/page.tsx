@@ -29,7 +29,7 @@ export const metadata: Metadata = {
  * Mutaties in DoelenView en het lab doen `router.refresh()`, waarmee ook de layout (en
  * dus het canvas) verse data krijgt (GW2).
  *
- * Fase 4 (ADR 0179 D7, spec §4.3): mobiel het lab direct onder de koppen, dan de details
+ * Fase 4 (ADR 0179 D7, spec §4.3): mobiel het lab direct onder de grafiek, dan de details
  * (marktaannames, indicatieregel), II · Je doelen, III · Andere paden, en de sheets één keer.
  * Op desktop staat het lab in de rechterkolom van de canvas-rij (layout).
  */
@@ -43,7 +43,7 @@ export default async function ToekomstDoelenPage() {
   return (
     <>
       <NavStackMeta title="Doelen" />
-      {/* Mobiel: het lab direct onder de klevende katern-koppen (ADR 0179 D7); op desktop
+      {/* Mobiel: het lab direct onder de grafiek (ADR 0179 D7 en addendum (k)); op desktop
           staat het in de rechterkolom van de canvas-rij (layout, CanvasZijkolom). */}
       <DoelenKaternLab plek="onder-koppen" />
       <DoelenLabDetails />

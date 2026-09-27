@@ -209,7 +209,7 @@ export type KnopBreekpunt = 'desktop' | 'mobiel'
 
 /**
  * De standaardvorm per breekpunt (ADR 0179 D7, amendement op 0170 B7/B11/B12): harp naast de
- * grafiek op desktop, rad onder de katern-koppen op mobiel. Eén constante voor de beginstand
+ * grafiek op desktop, rad onder de grafiek op mobiel. Eén constante voor de beginstand
  * én de persist-poort ("geen default-blob schrijven").
  */
 export const KNOP_WEERGAVE_STANDAARD: Readonly<Record<KnopBreekpunt, KnopWeergave>> = {

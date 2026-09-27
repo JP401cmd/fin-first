@@ -6,8 +6,9 @@
 // in de parent binnen de euro-weergave-bakens gebouwd); `effectiveStopAge` is een leeftijd.
 //
 // Fase 4 (ADR 0179 D7): het lab staat op twee plekken — in de rechterkolom van de canvas-rij
-// op desktop (`plek="kolom"`, standaard harp) en direct onder de katern-koppen op mobiel
-// (`plek="onder-koppen"`, standaard rad). Zichtbaarheid regelt CSS (de host), dus geen
+// op desktop (`plek="kolom"`, standaard harp) en op mobiel direct onder de grafiek, bovenaan
+// de katern-module (`plek="onder-koppen"`: de naam stamt uit de tijd dat de koppen onder de
+// grafiek stonden; standaard rad). Zichtbaarheid regelt CSS (de host), dus geen
 // hydratiesprong. Eigenaarsbesluit 27 sep: één plek per actie. Desktop: de acties staan in
 // een eigen rij onder grafiek en harp (`DoelenLabActies`); de kolom draagt alleen het lab.
 // Mobiel: met een shell-bar staan álle acties in die bar, anders op de pagina. `vraag={heroVraag}` blijft staan — ADR 0179 toetste B10 op precies die
@@ -37,7 +38,7 @@ import type { zoneVanHuidig, HefboomKey } from '@/lib/horizon/lab-grenzen-types'
 import type { ToekomstScenarioDoel } from '@/lib/horizon/toekomst-scenario'
 import type { FireEndForm } from '@/lib/fire-strategy'
 
-/** Waar het lab staat: naast de grafiek (desktop) of onder de katern-koppen (mobiel). */
+/** Waar het lab staat: naast de grafiek (desktop) of eronder, bovenaan de katern-module (mobiel). */
 export type DoelenLabPlek = 'kolom' | 'onder-koppen'
 
 export interface DoelenLabProps {
@@ -76,11 +77,12 @@ export interface DoelenLabProps {
   handleScenarioReset: () => void
 }
 
-/** De sectieklassen per plek: de kolom heeft zijn eigen rand; onder de koppen compact. */
+/** De sectieklassen per plek: de kolom heeft zijn eigen rand; mobiel compact. */
 export const DOELEN_LAB_PLEK_KLASSE: Record<DoelenLabPlek, string> = {
   kolom: 'scroll-mt-24',
-  // Onder de tabbladen staat het lab in de witte katern-module: die en de tabstrook zijn
-  // de rand, dus geen eigen lijn en geen extra ruimte (één-scherm-eis).
+  // Mobiel staat het lab bovenaan de witte katern-module, direct onder de grafiekkaart: die
+  // en de onderrand van de kaart zijn de rand, dus geen eigen lijn en geen extra ruimte
+  // (één-scherm-eis).
   'onder-koppen': 'scroll-mt-24',
 }
 
@@ -115,8 +117,8 @@ export function DoelenLab({
   setDoelLoslatenOpen,
   handleScenarioReset,
 }: DoelenLabProps) {
-  // Mobiel: de opslaan-actie is de action-bar van de shell (ADR 0179 D7). Alleen de plek
-  // onder de koppen registreert, en alleen als er iets op te slaan is. Is er een bar, dan
+  // Mobiel: de opslaan-actie is de action-bar van de shell (ADR 0179 D7). Alleen de mobiele
+  // plek registreert, en alleen als er iets op te slaan is. Is er een bar, dan
   // staan ÁLLE lab-acties erin (één plek per actie, 27 sep): de twee knoppen, en daarboven
   // stopmoment, plan-keuzes en Loslaten. Zonder bar blijft alles op de pagina en blijft de
   // nav-pill staan — een altijd-bar zou de pill verbergen.
@@ -194,7 +196,7 @@ export function DoelenLab({
                     weergaveKiezer="menu"
                     kicker={plek === 'kolom'}
                     // De schaal-legenda staat onder het lab (DoelenLabDetails): één regel
-                    // minder in de kolom en onder de koppen (één-scherm-eis).
+                    // minder in de kolom en op mobiel (één-scherm-eis).
                     schaalLegenda={false}
                     formatters={labFormatters}
                     stopSlot={

@@ -397,14 +397,18 @@ describe('ToekomstCanvas — de canvas-rij in Doelen: grafiek links, lab rechts 
     }
   })
 
-  it('de kaart (27 sep): tilt niet, deelt op desktop de basislijn van de tabbladen, accentbalk alleen mobiel', () => {
+  it('de kaart (27 sep) is het eerste witte vlak onder de tabbladen: geen bovenrand, geen accentbalk, geen hover-lift', () => {
     renderMetKolom('doelen')
     const kaart = screen.getByTestId('horizon-hero')
-    expect(kaart.className).toContain('no-hover-lift')
-    expect(kaart.className).toContain('lg:-mt-px')
-    const balk = kaart.firstElementChild as HTMLElement
-    expect(balk.className).toContain('h-1.5')
-    expect(balk.className).toContain('lg:hidden')
+    expect(kaart.className).toContain('border-t-0')
+    expect(kaart.className).toContain('bg-[var(--paper)]')
+    // Mobiel tot de schermrand, net als de katern-module; vanaf sm ingesprongen.
+    expect(kaart.className).toContain('-mx-4')
+    expect(kaart.className).toContain('sm:mx-0')
+    // Geen .card-editorial: die zou op hover tillen en laat zich niet per zijde overschrijven.
+    expect(kaart.className).not.toContain('card-editorial')
+    // Geen accentbalk: het eerste kind is de canvas-rij.
+    expect((kaart.firstElementChild as HTMLElement).className).not.toContain('h-1.5')
   })
 
   it('Instellingen: geen rij, geen kolom, geen actierij', () => {

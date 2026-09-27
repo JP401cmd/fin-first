@@ -8,8 +8,8 @@
  * per scherm, niet per plek van het lab.
  *
  * Vroeger zaten beide in het lab zelf. Het lab staat sinds fase 4 op desktop in een smalle
- * kolom naast de grafiek en op mobiel direct onder de koppen, waar elke regel meetelt voor
- * de één-scherm-eis; daarom staat dit hier, op beide breekpunten onder de koppen.
+ * kolom naast de grafiek en op mobiel direct onder de grafiek, waar elke regel meetelt voor
+ * de één-scherm-eis; daarom staat dit hier, op beide breekpunten in de katern-module.
  */
 
 import { useState } from 'react'

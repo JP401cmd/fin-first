@@ -3,8 +3,8 @@
 
 /**
  * Het canvas van /toekomst (ADR 0179 D1/D3/D5): de grafiekkaart die de
- * `(katern)`-layout rendert — op desktop onder de katern-tabbladen, mobiel boven de
- * koppen — en die bij een katernwissel gemonteerd blijft (GW1).
+ * `(katern)`-layout direct onder de katern-tabbladen rendert en die bij een
+ * katernwissel gemonteerd blijft (GW1).
  *
  * Fase 2 (stroom W1):
  * - Boven de grafiek alleen (wireframe §4.3 regel 7): de modus-switch Vermogen ·
@@ -33,6 +33,7 @@ import { PerspectiveContextLabel } from '@/components/app/perspective-context-la
 import type { OverlayBalloonDef } from '@/components/app/horizon/toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
 import { ChartTips } from '@/components/editorial/chart-tips'
+import { KATERN_VLAK } from '@/components/editorial/katern-koppen'
 import { getFireProjectionTips, getIncomeExpenseTips, getWealthCompositionTips } from '@/lib/chart-tips'
 import {
   CANVAS_UITLEG_TITEL,
@@ -74,7 +75,7 @@ const GEEN_FACTOREN: { age: number; factor: number }[] = []
  * grafiek links, een kolom rechts — in Doelen het lab (standaard harp), zodat een knop en
  * zijn effect samen in beeld staan; in Plan de levensgebeurtenissen. Dezelfde kolommen in
  * beide katernen, zodat de grafiek bij een wissel op dezelfde plek blijft. Onder `lg` blijft
- * het één kolom en staan lab en gebeurtenissen onder de katern-koppen.
+ * het één kolom en staan lab en gebeurtenissen onder de grafiek, in de katern-module.
  */
 export const DOELEN_CANVAS_RIJ = 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]'
 /** De rechterkolom: alleen vanaf `lg`, met een haarlijn als scheiding. */
@@ -350,21 +351,17 @@ export function ToekomstCanvas({
           })
     : []
 
-  // De kaart tilt niet op hover (`no-hover-lift`): ze is zelf niet klikbaar, en op desktop
-  // liggen de katern-tabbladen erop en sluit het katern eronder aan (eigenaarswens 27 sep)
-  // — een lift van 1px zou beide losscheuren. Dat dekt ook de tips-modus, waar een
-  // transform de boven de scrim getilde grafiek zou vangen (globals.css). Op desktop is de
-  // basislijn van de tabbladen de bovenrand van de kaart (`lg:-mt-px`: één lijn, geen twee).
+  // De kaart is het eerste witte vlak onder de katern-tabbladen (`KATERN_VLAK`, eigenaarswens
+  // 27 sep): geen bovenrand (de basislijn van de tabs is die rand), geen accentbalk (het
+  // accent zit in de actieve tab) en geen `.card-editorial`, dus ook geen hover-lift die tab
+  // en katern zou losscheuren of in de tips-modus de boven de scrim getilde grafiek zou
+  // vangen. Mobiel loopt ze tot de schermrand, net als de katern-module eronder.
   return (
     <section
       data-testid="horizon-hero"
       data-katern={katern}
-      className={`card-editorial no-hover-lift overflow-hidden lg:-mt-px ${stand.alleenDesktop ? 'hidden lg:block' : ''}`}
+      className={`${KATERN_VLAK} overflow-hidden ${stand.alleenDesktop ? 'hidden lg:block' : ''}`}
     >
-      {/* Module-active accent (Horizon-500 op /toekomst/**), alleen mobiel: op desktop
-          draagt de actieve tab erboven het accent en loopt die naadloos over in de kaart. */}
-      <div className="h-1.5 lg:hidden" style={{ background: 'var(--module-active-500)' }} />
-
       <div
         className={metZijkolom ? DOELEN_CANVAS_RIJ : undefined}
         data-testid={metZijkolom ? 'doelen-canvas-rij' : undefined}

@@ -93,6 +93,8 @@ describe('KaternKoppen', () => {
     expect(nav.className).toContain('sticky')
     expect(nav.className).toContain('top-0')
     expect(nav.className).toContain('lg:static')
+    // Boven de canvas-kop (z-[46]): op /toekomst schuift de grafiek onder de klevende koppen door.
+    expect(nav.className).toContain('z-[47]')
     for (const link of screen.getAllByRole('link')) expect(link.className).toContain('min-h-[44px]')
   })
 

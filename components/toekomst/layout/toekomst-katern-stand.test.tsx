@@ -55,7 +55,7 @@ describe('ToekomstKaternStand', () => {
   it('de layout gebruikt de groep en de compacte klassen', () => {
     const layout = readSourceLF(join(process.cwd(), 'app', '(app)', 'toekomst', '(katern)', 'layout.tsx'))
     expect(layout).toContain('<ToekomstKaternStand>')
-    for (const naam of ['kopSectie', 'oordeel', 'ankerregel', 'canvasKolom', 'koppen', 'module']) {
+    for (const naam of ['kopSectie', 'oordeel', 'ankerregel', 'canvasKolom', 'module']) {
       expect(layout, naam).toContain(`DOELEN_MOBIEL_COMPACT.${naam}`)
     }
   })

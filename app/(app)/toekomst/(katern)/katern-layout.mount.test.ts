@@ -68,19 +68,16 @@ describe('katern-layout — het canvas blijft gemonteerd bij een katernwissel (G
     expect(layout.indexOf('<ToekomstKaternMeldingSlot')).toBeLessThan(layout.indexOf('{children}'))
   })
 
-  it('desktop: de tabbladen boven het canvas; mobiel: de koppen eronder (eigenaarswens 27 sep)', () => {
+  it('de tabbladen staan boven het canvas, één exemplaar voor elke breedte (eigenaarswens 27 sep)', () => {
     const layout = codeOnly(readRel(LAYOUT))
-    const canvas = layout.indexOf('<ToekomstCanvas')
-    const boven = layout.indexOf('<ToekomstKaternKoppen')
-    const onder = layout.lastIndexOf('<ToekomstKaternKoppen')
-    // Precies twee exemplaren, per breedte één zichtbaar.
-    expect(layout.split('<ToekomstKaternKoppen').length - 1).toBe(2)
-    expect(boven).toBeLessThan(canvas)
-    expect(onder).toBeGreaterThan(canvas)
-    expect(layout.slice(boven, layout.indexOf('/>', boven))).toContain('hidden lg:block')
-    expect(layout.slice(onder, layout.indexOf('/>', onder))).toContain('lg:hidden')
-    // Het katern staat onder het canvas: op desktop sluit het daar direct op aan.
-    expect(layout.indexOf('{children}')).toBeGreaterThan(onder)
+    const koppen = layout.indexOf('<ToekomstKaternKoppen')
+    expect(layout.split('<ToekomstKaternKoppen').length - 1).toBe(1)
+    expect(koppen).toBeGreaterThan(-1)
+    expect(koppen).toBeLessThan(layout.indexOf('<ToekomstCanvas'))
+    // Geen breedte-klassen: dezelfde koppen op mobiel en desktop.
+    expect(layout.slice(koppen, layout.indexOf('/>', koppen))).not.toMatch(/hidden/)
+    // Het katern sluit direct onder het canvas aan.
+    expect(layout.indexOf('{children}')).toBeGreaterThan(layout.indexOf('<ToekomstCanvas'))
   })
 
   it('de layout-laag ruimt een meegereisde ?tab= op, binnen Suspense (fixronde C1)', () => {

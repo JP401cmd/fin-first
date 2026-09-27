@@ -108,7 +108,7 @@ export interface LabKnoppenProps {
   onWeergaveChange?: (v: LabKnopWeergave) => void
   /**
    * Vorm van de schakelaar: vijf knoppen (standaard) of één native keuzelijst (ADR 0179 D7:
-   * in katern Doelen staat het lab in een smalle kolom of onder de koppen, en telt elke
+   * in katern Doelen staat het lab in een smalle kolom of direct onder de grafiek, en telt elke
    * regel voor de één-scherm-eis).
    */
   weergaveKiezer?: 'knoppen' | 'menu'
