@@ -97,6 +97,29 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.10',
+    date: '2026-09-27',
+    title: 'Nieuws uit betere bronnen',
+    sections: [
+      {
+        module: 'Fin',
+        color: 'blue',
+        items: [
+          {
+            title: 'Nieuws uit bronnen met de echte cijfers',
+            description:
+              'Nu ook uit pagina’s met de bedragen zelf, zoals de rente op je studieschuld, het eigen risico en de AOW-leeftijd. Bronnen die niets opleverden, zijn weg.',
+          },
+          {
+            title: 'Een storingsmelding is geen nieuws',
+            description:
+              'Meldt een website dat hij tijdelijk niet werkt, dan wordt dat geen nieuwsbericht meer.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.9',
     date: '2026-09-27',
     title: 'Toekomst als tabbladen, en Instellingen als checklist',
