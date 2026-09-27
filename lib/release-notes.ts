@@ -97,6 +97,65 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.8',
+    date: '2026-09-27',
+    title: 'Toekomst in drie delen, en je gezondheid door de tijd',
+    sections: [
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Toekomst in drie delen: Plan, Doelen, Instellingen',
+            description:
+              'Eén grafiek blijft staan terwijl je wisselt. Plan laat zien waar je staat, met je levensgebeurtenissen direct eronder.',
+          },
+          {
+            title: 'Elke instelling op één plek',
+            description:
+              'In Instellingen staat elke keuze als één regel. Pas je iets aan, dan zie je vóór het opslaan wat het met je vrijheidsmoment doet.',
+          },
+          {
+            title: 'Doelen: knoppen en grafiek samen in beeld',
+            description:
+              'Verschuif een knop en je ziet de stippellijn meteen veranderen, ook op je telefoon. Je doelen en andere paden staan eronder.',
+          },
+          {
+            title: 'Slepen in de grafiek wordt weer bewaard',
+            description:
+              'Een gebeurtenis naar een ander jaar slepen werd niet opgeslagen. Nu wel, en lukt het niet, dan staat hij netjes terug.',
+          },
+          {
+            title: 'Minder werken telt als minder inkomen',
+            description:
+              'Minder werken of eerder stoppen rekende soms als extra inkomen, ook in een voorstel van Fin. Nu rekent het als wat het is.',
+          },
+          {
+            title: 'Kosten koper completer',
+            description:
+              'Bij Huis kopen tellen hypotheekadvies en bemiddeling mee, en een aankoopmakelaar als je die kiest.',
+          },
+          {
+            title: 'Verloop van je gezondheid en vrijheidsleeftijd',
+            description:
+              'In de kassabon van je gezondheidsgetal zie je hoe dat getal en je vrijheidsleeftijd de afgelopen twaalf maanden bewogen.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Je vermogensgeschiedenis klopt weer',
+            description:
+              'Je historie toont weer je recentste maanden, één stand per maand, en alleen die van jezelf.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.7',
     date: '2026-09-26',
     title: 'Sneller bij een haperende koersdienst, scherper zicht op fouten',
