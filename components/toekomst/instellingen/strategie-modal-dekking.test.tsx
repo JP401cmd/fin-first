@@ -84,7 +84,7 @@ const PROPS: InstellingenRijenProps = {
   retirementMethod: 'essential_budgets',
   uitgaveNaPensioen: 36_000,
   geenTekortLening: true,
-  tekortLeningRente: null,
+  tekortLeningRente: 0.05,
 }
 
 beforeEach(() => {

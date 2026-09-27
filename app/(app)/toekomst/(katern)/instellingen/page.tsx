@@ -11,6 +11,7 @@ import { OudeGebeurtenissenBladwijzer } from '@/components/toekomst/layout/oude-
 import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
 import { buildPotBalances } from '@/lib/future/pot-balances'
 import { buildStrategieEditorsData } from '@/lib/horizon/strategie-editors-data'
+import { resolveDeficitLoanRate } from '@/lib/horizon-kernel/adapter/params'
 
 export const metadata: Metadata = {
   title: 'Instellingen — TriFinity',
@@ -49,7 +50,6 @@ export default async function ToekomstInstellingenPage() {
   const rawHeffingvrij = rawProfile?.box3_heffingvrij_inkomen
   const box3HeffingvrijInkomen =
     rawHeffingvrij == null || !Number.isFinite(Number(rawHeffingvrij)) ? null : Number(rawHeffingvrij)
-  const rawRente = rawProfile?.deficit_loan_rate
 
   return (
     <>
@@ -87,7 +87,9 @@ export default async function ToekomstInstellingenPage() {
           uitgaveNaPensioen: horizonData.effectiveInput.yearlyMustExpenses,
           // ADR 0149 — NULL = aan; alleen een bewuste `false` is uit.
           geenTekortLening: rawProfile?.fire_no_deficit_loan !== false,
-          tekortLeningRente: rawRente == null || !Number.isFinite(Number(rawRente)) ? null : Number(rawRente),
+          // Dezelfde resolver als de kernel-adapter (default + klem 0..1): de rij toont de
+          // rente waar de kern mee rekent, ook bij een ongeldige DB-waarde.
+          tekortLeningRente: resolveDeficitLoanRate({ date_of_birth: null, deficit_loan_rate: rawProfile?.deficit_loan_rate ?? null }),
         }}
       />
       </div>

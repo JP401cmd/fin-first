@@ -74,7 +74,7 @@ const rijen = {
   retirementMethod: null,
   uitgaveNaPensioen: 0,
   geenTekortLening: true,
-  tekortLeningRente: null,
+  tekortLeningRente: 0.05,
   strategieData,
   fireParams: {
     grossReturn: 0.07,

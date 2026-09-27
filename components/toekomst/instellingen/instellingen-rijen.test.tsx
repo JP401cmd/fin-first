@@ -89,7 +89,7 @@ const PROPS: InstellingenRijenProps = {
   retirementMethod: 'essential_budgets',
   uitgaveNaPensioen: 30_000,
   geenTekortLening: true,
-  tekortLeningRente: null,
+  tekortLeningRente: 0.05,
 }
 
 function renderRijen(mode: 'full' | 'simple' = 'full', props = PROPS) {

@@ -82,8 +82,11 @@ export interface RijwaardenInput {
   uitgaveNaPensioen: number
   /** `profiles.fire_no_deficit_loan !== false` (NULL = aan, ADR 0149). */
   geenTekortLening: boolean
-  /** `profiles.deficit_loan_rate` (fractie) of null (Excel-default). */
-  tekortLeningRente: number | null
+  /**
+   * De tekort-leningrente waar de kern mee rekent (fractie): `resolveDeficitLoanRate` op de
+   * profielrij — default én klem 0..1 zitten dáár, niet hier (review Y2).
+   */
+  tekortLeningRente: number
   potRules: PotRulesConfig
   events: readonly LifeEvent[]
   housingStrategy: HousingStrategyConfig | null
@@ -161,7 +164,7 @@ export function rijwaarde(rij: RijSleutel, i: RijwaardenInput): RijDeel[] {
         { bedrag: i.uitgaveNaPensioen, achter: 'per jaar' },
       ]
     case 'geen-tekort-lening':
-      return i.geenTekortLening ? ['aan'] : ['uit', `rente ${pct(i.tekortLeningRente ?? 0.05)}`]
+      return i.geenTekortLening ? ['aan'] : ['uit', `rente ${pct(i.tekortLeningRente)}`]
     case 'onttrekkingsvolgorde':
       return [volgorde(i.potRules.withdrawalOrderGroups)]
     case 'verdeling-toename':

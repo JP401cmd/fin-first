@@ -14,7 +14,7 @@ const BASIS: RijwaardenInput = {
   retirementMethod: 'essential_budgets',
   uitgaveNaPensioen: 31_500,
   geenTekortLening: true,
-  tekortLeningRente: null,
+  tekortLeningRente: 0.05,
   potRules: POT_RULES_DEFAULTS,
   events: [],
   housingStrategy: { mode: 'include_full' },
@@ -86,5 +86,30 @@ describe('rijwaarden van katern Instellingen', () => {
     expect(t('inflatie')).toBe('2,0% per jaar')
     expect(t('rendement')).toBe('5,0% per jaar')
     expect(t('box3')).toBe('werkelijk rendement')
+  })
+})
+
+describe('tekort-leningrente: de rente waar de kern mee rekent (review Y2)', () => {
+  it('de rij toont de geresolveerde rente en kent zelf geen default', async () => {
+    const { readFileSync } = await import('node:fs')
+    const path = await import('node:path')
+    const bron = readFileSync(path.join(process.cwd(), 'lib/toekomst/instellingen-rijwaarden.ts'), 'utf8')
+    expect(bron).not.toMatch(/0\.05/)
+    const page = readFileSync(path.join(process.cwd(), 'app/(app)/toekomst/(katern)/instellingen/page.tsx'), 'utf8')
+    expect(page).toContain('resolveDeficitLoanRate(')
+  })
+
+  it.each([
+    [null, 0.05],
+    [0.045, 0.045],
+    [4.5, 0.05], // buiten 0..1: de kern valt terug op de default — de rij ook
+    ['x', 0.05],
+  ])('DB %s → rij toont de rente van de kern (%s)', async (raw, verwacht) => {
+    const { resolveDeficitLoanRate } = await import('@/lib/horizon-kernel/adapter/params')
+    const rente = resolveDeficitLoanRate({ date_of_birth: null, deficit_loan_rate: raw as never })
+    expect(rente).toBe(verwacht)
+    expect(t('geen-tekort-lening', { geenTekortLening: false, tekortLeningRente: rente })).toBe(
+      `uit · rente ${String(verwacht * 100).replace('.', ',')}${Number.isInteger(verwacht * 100) ? ',0' : ''}%`,
+    )
   })
 })

@@ -83,7 +83,8 @@ export interface InstellingenRijenProps {
   /** Dezelfde bron als KPI 4 op Plan (`effectiveInput.yearlyMustExpenses`). */
   uitgaveNaPensioen: number
   geenTekortLening: boolean
-  tekortLeningRente: number | null
+  /** De rente waar de kern mee rekent (`resolveDeficitLoanRate`, review Y2). */
+  tekortLeningRente: number
 }
 
 export function InstellingenRijen(props: InstellingenRijenProps) {
