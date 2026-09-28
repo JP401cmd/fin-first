@@ -78,6 +78,18 @@ export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
     description: 'RSS- en webbronnen ophalen, AI-categoriseren en opslaan.',
     maxAgeHours: 26,
   },
+  'krant-weekmeting': {
+    key: 'krant-weekmeting',
+    label: 'Krant — weekmeting',
+    // Geen eigen cron: draait aan het eind van de weekcron /api/krant/cron
+    // (maandag 06:00 UTC), ná de ingest + duiding en ná de editierun.
+    schedule: 'Wekelijks maandag 06:00 UTC (in de weekcron)',
+    path: '/api/krant/cron',
+    description:
+      'Legt elke maandag de K1-maat van de Krant vast over de afgesloten week (B41): G1–G6, dekking per brontype, artikelpagina’s en backfill, lege verversingen per profieltype (k=5) en tokens per AI-feature. Alleen tellingen, herleid uit de tabellen. Een drempeloverschrijding maakt de run partial; zichtbaar als weekreeks op /beheer/nieuws.',
+    // Zelfde cadans als de weekcron waarin hij draait.
+    maxAgeHours: 7 * 24 + 26,
+  },
   'integraties-health': {
     key: 'integraties-health',
     label: 'Integraties liveness',
