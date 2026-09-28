@@ -28,3 +28,50 @@ belastingjaar bij, dan bewegen ze automatisch mee; er is bewust geen losse const
 
 **Eerstvolgende bekende ijkpunten:** Prinsjesdag (Belastingplan volgend jaar) en het
 Box 3-traject richting 2028 (werkelijk rendement).
+
+## Regelkalender (machineleesbare tweeling)
+
+`lib/regelkalender.ts` draagt dezelfde wijzigingen als data: per entry een mechanisme
+(`box3-parameter`, `box1-parameter`, `studieschuld-rente`, `aow-leeftijd`, `eigen-risico`),
+een jaar, een ingangsdatum, een status, alleen de **nieuwe** waarden (de oude is altijd de
+canonieke waarde van het jaar ervóór) en een bron met url of kamerstuk. Bij studieschuld staat
+er ook het stelsel bij (`sf15` of `sf35`, zoals in `DUO_RENTE_PCT`). Geen kop en geen
+samenvatting: de tekst voor de lezer komt uit vaste sjablonen, niet uit de kalender.
+
+De status betekent hetzelfde als in de tabel hierboven:
+
+- `voorstel` — vastgelegd, niet verwerkt. Het jaar staat nog niet in de canonieke tabel.
+- `aangenomen` — besloten (met besluitdatum) en daarmee klaar om de code in te gaan, maar
+  nog niet in de canonieke tabel gezet.
+- `verwerkt` — staat in de canonieke tabel (`BOX3_PARAMS`, `BOX1_PARAMS`, `DUO_RENTE_PCT`,
+  `ZORG_EIGEN_RISICO`) en moet daar exact mee overeenkomen.
+
+**Levensloop.** Een entry gaat van `voorstel` naar `aangenomen` naar `verwerkt`. Komt een jaar
+in de canonieke tabel, dan gaat de entry **in dezelfde PR** naar `verwerkt`. Blijft hij op
+`voorstel` of `aangenomen` staan, dan wordt de test rood, want het jaar staat dan dubbel.
+
+`lib/regelkalender.test.ts` houdt drift tegen. Rood worden:
+
+- een `verwerkt`-entry die afwijkt van de tabel;
+- een `voorstel` of `aangenomen` voor een jaar dat de tabel al kent;
+- een waarde die gelijk is aan die van het jaar ervóór (dat is geen wijziging);
+- twee entries die voor hetzelfde mechanisme, jaar en dezelfde status dezelfde waarde vullen
+  (een Belastingplan naast een losse wet mag, zolang ze elk andere waarden dragen);
+- een entry waarvan de url of het kamerstuk niet in dit logbestand staat. Er wordt gezocht met
+  een grens erachter: "nr. 3" telt niet als vermelding van "nr. 31".
+
+**Bewust stil.** Kent de tabel het jaar vóór een voorstel niet (een voorstel voor 2028 terwijl
+2027 nog niet verwerkt is), dan valt er niets te vergelijken. De toets op "gelijk aan vorig
+jaar" zwijgt dan tot het jaar ervóór verwerkt is.
+
+**Uitzondering: de AOW-leeftijd.** Een verschuiving van de AOW-leeftijd staat niet als waarde
+in een tabel in de code. De AOW-leeftijden zijn rijen in de database (`aow_leeftijd`), en een
+verschuiving is het verschil tussen twee cohorten. Voor `aow-leeftijd` gelden daarom alleen de
+schema- en jaarcontrole, geen vergelijking met een tabel. Open punt voor de eigenaar: een
+AOW-stap wordt vijf jaar vooruit vastgesteld, terwijl het toegestane jaarbereik nu tot 2030
+loopt.
+
+Een entry toevoegen is dus altijd twee dingen tegelijk: een rij hier, met dezelfde url of
+hetzelfde kamerstuk, én de entry in de kalender. De kalender is leeg zolang de eigenaar er
+geen entry met bron in zet: waarden voor een komend jaar vult geen agent in (besluit 27 sep
+2026).
