@@ -16,6 +16,11 @@ import {
   fetchWebPage,
   MAX_REDIRECTS,
   MAX_BODY_BYTES,
+  DETAIL_HOSTS,
+  DETAIL_FRAGMENT_MAX_TEKENS,
+  detailToegestaan,
+  fetchDetailPagina,
+  isHtmlAntwoord,
 } from './news-sources'
 import { isVeiligeBronUrl } from './safe-url'
 import { stripHtml } from './news-html'
@@ -150,6 +155,14 @@ describe('standaardbronnen — één keer grondig bijgewerkt (B28) en herijkt (2
     expect(urls).not.toContain('https://www.rijksfinancien.nl/belastingplan-2026')
   })
 
+  it('28 sep: wetteksten en Box 3 zijn lijstbronnen, Toeslagen is weg (kaderfilter liet ze leeg)', () => {
+    const soort = (label: string) => WEB.find((w) => w.label === label)?.soort
+    expect(soort('Rijksfinanciën — Belastingplan wetteksten')).toBe('web_lijst')
+    expect(soort('Belastingdienst — Box 3')).toBe('web_lijst')
+    expect(soort('Belastingdienst — Box 3 rendementspercentages')).toBe('web_pagina')
+    expect(WEB.some((w) => w.url.includes('/toeslagen/toeslagen'))).toBe(false)
+  })
+
   it('RSS: de CBS-thema-feeds, met het label van de oude lijstbron; de Engelse ECB-feed zonder beschrijving is weg', () => {
     expect(DEFAULT_RSS_FEEDS).toEqual([
       { url: 'https://www.cbs.nl/nl-nl/rss-feeds/prijzen', label: 'CBS — Prijzen (CPI / inflatie)' },
@@ -263,7 +276,9 @@ describe('fetchRssFeed — een oorzaak per bron', () => {
   }
 
   it('404, DNS, time-out, HTML, redirect naar /404, leeg en ok zijn zeven verschillende uitkomsten', async () => {
-    const feed = { url: 'https://x.nl/feed', label: 'X' }
+    // De feed hangt op de host van zijn items: sinds Krant 1F fase 3 weert
+    // parseFeed items op een andere site dan de feed.
+    const feed = { url: 'https://www.ecb.europa.eu/rss/press.html', label: 'X' }
     const dnsFout = Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } })
     const timeout = Object.assign(new Error('aborted'), { name: 'AbortError' })
 
@@ -469,5 +484,204 @@ describe('isFoutpagina — het pad, met of zonder extensie', () => {
     ['https://x.nl/nieuws/2026/09/404.jsperiment', false],
   ])('%s → %s', (url, verwacht) => {
     expect(isFoutpagina(url)).toBe(verwacht)
+  })
+})
+
+// ── Krant 1F fase 3: detailpagina's ──────────────────────────────────
+
+describe('parseFeed — alleen items op de site van de feed (1F fase 3, blokkerend)', () => {
+  const feed = (links: string[]) =>
+    `<rss><channel>${links.map((l, i) => `<item><title>Bericht ${i}</title><link>${l}</link></item>`).join('')}</channel></rss>`
+
+  it('een item op een andere host wordt geweigerd en geteld, www of niet maakt niet uit', () => {
+    const r = parseFeed(
+      feed(['https://www.cbs.nl/nl-nl/nieuws/2026/39/a', 'https://kwaadaardig.nl/nl-nl/nieuws/b', 'https://cbs.nl/nl-nl/nieuws/2026/39/c']),
+      'CBS',
+      null,
+      'https://www.cbs.nl/nl-nl/rss-feeds/prijzen',
+    )
+    expect(r.items.map((i) => i.link)).toEqual(['https://www.cbs.nl/nl-nl/nieuws/2026/39/a', 'https://cbs.nl/nl-nl/nieuws/2026/39/c'])
+    expect(r.geweigerd).toBe(1)
+  })
+
+  it('een subdomein is een andere site', () => {
+    const r = parseFeed(feed(['https://evil.cbs.nl/nl-nl/nieuws/x']), 'CBS', null, 'https://www.cbs.nl/nl-nl/rss-feeds/prijzen')
+    expect(r.items).toHaveLength(0)
+    expect(r.geweigerd).toBe(1)
+  })
+
+  it('fetchRssFeed geeft de feed-URL als grens mee', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => feed(['https://www.cbs.nl/nl-nl/nieuws/2026/39/a', 'https://elders.nl/x']),
+    })))
+    const r = await fetchRssFeed({ url: 'https://www.cbs.nl/nl-nl/rss-feeds/prijzen', label: 'CBS' })
+    expect(r.items).toHaveLength(1)
+    expect(r.geweigerd).toBe(1)
+  })
+})
+
+describe('isHtmlAntwoord — content-type vóór de body', () => {
+  it.each([
+    ['text/html; charset=utf-8', 'streng', true],
+    ['application/xhtml+xml', 'streng', true],
+    ['TEXT/HTML', 'streng', true],
+    ['application/pdf', 'streng', false],
+    ['application/octet-stream', 'los', false],
+    [null, 'streng', false],
+    [null, 'los', true],
+    ['', 'los', true],
+  ] as const)('%s (%s) → %s', (ct, modus, verwacht) => {
+    expect(isHtmlAntwoord(ct, modus)).toBe(verwacht)
+  })
+})
+
+describe('detailToegestaan — alleen hosts en paden uit DETAIL_HOSTS', () => {
+  it('de hostlijst is precies CBS-nieuws, CPB en AFM-sectornieuws (besluit eigenaar 28 sep)', () => {
+    expect(DETAIL_HOSTS).toEqual({ 'www.cbs.nl': '/nl-nl/nieuws/', 'www.cpb.nl': '/', 'www.afm.nl': '/nl-nl/sector/actueel/' })
+  })
+
+  it.each([
+    ['https://www.cbs.nl/nl-nl/nieuws/2026/39/inflatie-daalt', true],
+    ['https://www.cpb.nl/macro-economische-verkenning-2027', true],
+    ['https://www.afm.nl/nl-nl/sector/actueel/2026/sep/toetsrente', true],
+    ['https://www.cbs.nl/nl-nl/cijfers/detail/83131ned', false],
+    ['https://cbs.nl/nl-nl/nieuws/2026/39/x', false],
+    ['https://www.afm.nl/nl-nl/consumenten/x', false],
+    ['http://www.cpb.nl/x', false],
+    ['https://www.cpb.nl:8443/x', false],
+    ['https://www.rijksoverheid.nl/nieuws/x', false],
+    ['https://www.cpb.nl/uit?url=https://kwaadaardig.nl', false],
+    ['https://www.cpb.nl/out/https%3A%2F%2Fkwaadaardig.nl', false],
+    ['https://www.cpb.nl/uit?url=//kwaadaardig.nl', false],
+    ['https://www.cpb.nl/uit?next=%5C%5Ckwaadaardig.nl', false],
+  ])('%s → %s', (url, verwacht) => {
+    expect(detailToegestaan(url)).toBe(verwacht)
+  })
+})
+
+describe('fetchDetailPagina — grenzen vóór en tijdens het ophalen', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  const CPB = 'https://www.cpb.nl/publicaties'
+  const pagina = (init: { status?: number; location?: string; contentType?: string | null; body?: string } = {}) => {
+    const status = init.status ?? 200
+    const text = vi.fn(async () => init.body ?? '')
+    const cancel = vi.fn(async () => undefined)
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: {
+        get: (h: string) => {
+          const k = h.toLowerCase()
+          if (k === 'location') return init.location ?? null
+          if (k === 'content-type') return init.contentType === undefined ? 'text/html; charset=utf-8' : init.contentType
+          return null
+        },
+      },
+      body: { cancel },
+      text,
+      cancel,
+    }
+  }
+  const ARTIKEL = `<html><head><title>MEV 2027 | CPB</title>
+<meta name="publicationdatetime" content="2026-09-15T13:35:00+00:00"></head>
+<body><nav><a href="/">Home</a></nav><main>
+<h1>Macro Economische Verkenning 2027</h1>
+<p>De economie groeit in 2027 met 1,4 procent. De werkloosheid loopt op naar 4,1 procent en de inflatie daalt naar 2,3 procent. ${'Toelichting bij de raming. '.repeat(10)}</p>
+<h2>Downloads</h2><ul><li><a href="/x.pdf">MEV 2027 (pdf)</a></li></ul>
+<h2>Auteurs</h2><p>Jan Jansen</p>
+</main><footer>Contact</footer></body></html>`
+
+  it('een pdf-pad wordt niet opgehaald', async () => {
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
+    expect(await fetchDetailPagina('https://www.cpb.nl/system/files/cpb-publicatie.pdf', CPB)).toEqual({ uitkomst: 'geen_html' })
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('application/pdf zonder pdf-pad: geen_html, en de body wordt niet gelezen', async () => {
+    const antwoord = pagina({ contentType: 'application/pdf', body: '%PDF-1.7 …' })
+    vi.stubGlobal('fetch', vi.fn(async () => antwoord))
+    expect(await fetchDetailPagina('https://www.cpb.nl/document/123', CPB)).toEqual({ uitkomst: 'geen_html' })
+    expect(antwoord.text).not.toHaveBeenCalled()
+    expect(antwoord.cancel).toHaveBeenCalled()
+  })
+
+  it('zonder content-type-header: geen_html (streng)', async () => {
+    const antwoord = pagina({ contentType: null, body: ARTIKEL })
+    vi.stubGlobal('fetch', vi.fn(async () => antwoord))
+    expect(await fetchDetailPagina('https://www.cpb.nl/document/123', CPB)).toEqual({ uitkomst: 'geen_html' })
+    expect(antwoord.text).not.toHaveBeenCalled()
+  })
+
+  it('een adres buiten DETAIL_HOSTS of een doorstuurvorm wordt niet eens geprobeerd', async () => {
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
+    expect(await fetchDetailPagina('https://www.rijksoverheid.nl/nieuws/x', CPB)).toMatchObject({ uitkomst: 'terugval', oorzaak: 'adres_geweigerd' })
+    expect(await fetchDetailPagina('https://www.cpb.nl/uit?url=https://kwaadaardig.nl', CPB)).toMatchObject({ uitkomst: 'terugval', oorzaak: 'adres_geweigerd' })
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('het anker is de geconfigureerde bron: een link op een andere site dan het anker wordt niet opgehaald', async () => {
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
+    expect(await fetchDetailPagina('https://www.cpb.nl/x', 'https://www.afm.nl/nl-nl/sector/actueel')).toMatchObject({ uitkomst: 'terugval', oorzaak: 'adres_geweigerd' })
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('een redirect naar een andere host wordt niet gevolgd', async () => {
+    const f = vi.fn(async () => pagina({ status: 302, location: 'https://kwaadaardig.nl/x' }))
+    vi.stubGlobal('fetch', f)
+    expect(await fetchDetailPagina('https://www.cpb.nl/x', CPB)).toMatchObject({ uitkomst: 'terugval', oorzaak: 'doorverwezen' })
+    expect(f).toHaveBeenCalledTimes(1)
+  })
+
+  it('een redirect binnen de site blijft toegestaan (het anker is dezelfde site)', async () => {
+    const f = vi.fn()
+      .mockResolvedValueOnce(pagina({ status: 301, location: '/macro-economische-verkenning-2027' }))
+      .mockResolvedValueOnce(pagina({ body: ARTIKEL }))
+    vi.stubGlobal('fetch', f)
+    expect(await fetchDetailPagina('https://www.cpb.nl/mev-2027', CPB)).toMatchObject({ uitkomst: 'gelezen' })
+  })
+
+  it('een storingspagina is terugval, geen artikel', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => pagina({ body: BELASTINGDIENST_STORING_HTML })))
+    expect(await fetchDetailPagina('https://www.cpb.nl/x', CPB)).toMatchObject({ uitkomst: 'terugval', oorzaak: 'storing' })
+  })
+
+  it('een pagina met te weinig lezerstekst (JS-app) is terugval', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => pagina({ body: '<html><body><div id="app"></div><script>laad()</script></body></html>' })))
+    expect(await fetchDetailPagina('https://www.cpb.nl/x', CPB)).toMatchObject({ uitkomst: 'terugval', oorzaak: 'leeg' })
+  })
+
+  it('leest de artikeltekst zonder kader, met de datum uit publicationdatetime', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => pagina({ body: ARTIKEL })))
+    const r = await fetchDetailPagina('https://www.cpb.nl/x', CPB)
+    expect(r.uitkomst).toBe('gelezen')
+    if (r.uitkomst !== 'gelezen') return
+    expect(r.tekst).toContain('1,4 procent')
+    expect(r.tekst).not.toMatch(/Downloads|Jan Jansen|Home/)
+    expect(r.datums.gepubliceerd).toBe('2026-09-15T13:35:00.000Z')
+  })
+
+  it('knipt op DETAIL_FRAGMENT_MAX_TEKENS', async () => {
+    const lang = `<main><h1>Lang</h1><p>${'Een zin met een getal van 3,5 procent. '.repeat(400)}</p></main>`
+    vi.stubGlobal('fetch', vi.fn(async () => pagina({ body: lang })))
+    const r = await fetchDetailPagina('https://www.cpb.nl/x', CPB)
+    expect(r.uitkomst === 'gelezen' && [...r.tekst].length).toBe(DETAIL_FRAGMENT_MAX_TEKENS)
+  })
+})
+
+describe('fetchWebPage — content-type los (geconfigureerde webbronnen)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it('een pdf wordt niet gelezen; een ontbrekende header blijft toegestaan', async () => {
+    const text = vi.fn(async () => '%PDF')
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/pdf' : null) }, text })))
+    expect(await fetchWebPage({ url: 'https://www.cpb.nl/x' })).toMatchObject({ ok: false, oorzaak: 'geen_html' })
+    expect(text).not.toHaveBeenCalled()
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null }, text: async () => '<p>Tekst</p>' })))
+    expect(await fetchWebPage({ url: 'https://www.cpb.nl/x' })).toMatchObject({ ok: true })
   })
 })

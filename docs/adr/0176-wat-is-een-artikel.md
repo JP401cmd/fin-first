@@ -191,6 +191,80 @@ rekenend mechanisme. De prompt deed wat hij moest; de ingest leverde te weinig g
     Rijen van verwijderde bronnen worden niet gewist; ze verlopen via de bewaartermijn (120 dagen
     niet meer gezien).
 
+## Aanvulling 28-09-2026 — fase 3: de artikelpagina ophalen
+
+Aanleiding: na de eerste v3-run draaiden 35 van de 59 duidingen alleen op de kop. De CBS-feed geeft
+bij nieuwsitems géén beschrijving (35 van 36 fragmenten leeg), en een CPB- of AFM-lijstregel is één
+regel linktekst. De duiding eist terecht dat elk getal in het fragment staat, dus bleef ze leeg.
+Besluit eigenaar 28 sep (kaart "Krant 1F · Fase 3"): CBS-RSS, CPB en AFM tegelijk.
+
+22. **De ingest haalt de artikelpagina op, alleen op een hostlijst in code.** `DETAIL_HOSTS`
+    (`lib/news-sources.ts`): `www.cbs.nl` `/nl-nl/nieuws/`, `www.cpb.nl` `/`, `www.afm.nl`
+    `/nl-nl/sector/actueel/`. Bewust in code en niet als veld op de bron: het is een
+    beveiligingsgrens die ook geldt als de beheerder de bronnenlijst opslaat. Alleen voor NIEUWE
+    items (na de sleutelcontrole), dus een bekende URL wordt nooit opnieuw opgehaald.
+23. **Sleutel en inhoud-hash blijven die van de aankondiging.** `source_url` is de feed-link of
+    de server-gelezen `href`; `inhoud_hash` gaat over kop + feed- of lijstfragment. Alleen
+    `bron_fragment` (≤ 4.000 tekens, `artikelTekst`) en eventueel de datum veranderen. Zo hangt
+    de identiteit van een artikel niet af van of het netwerk die run lukte. Gevolg, aanvaard: een
+    latere correctie op de bronpagina komt niet binnen, want de pagina wordt één keer gelezen.
+24. **Grenzen vóór het lezen.** (a) `parseFeed` houdt alleen items over waarvan de link op
+    dezelfde site staat als de feed; sinds deze fase is een feed-link een adres dat de server
+    bezoekt (blokkerend punt). (b) `haalOp` kent een **anker**: de site-grens voor de link én elke
+    redirect-hop is de geconfigureerde bron, niet de link zelf. (c) `isDoorstuurVorm` vóór elke
+    detail-fetch. (d) Een documentpad (.pdf, .xlsx, …) wordt niet opgehaald; daarna toetst
+    `haalOp` het **content-type vóór de body**: voor een detailpagina alleen een expliciete
+    HTML-header, anders `geen_html` zonder te lezen. Een geconfigureerde webbron weigert een
+    expliciet niet-HTML-type en laat een ontbrekende header door, zoals vóór deze fase.
+    (e) Storingspagina of te weinig lezerstekst → terugval op het fragment van de aankondiging.
+    DNS-rebinding (G11) wordt niet groter: er komt geen nieuwe host bij die de ingest niet al
+    bezocht.
+25. **Eén cap, één budget, één verzoek per seconde per site.** `MAX_DETAILS_PER_RUN` = 24,
+    `DETAIL_TIJDBUDGET_MS` = 25 s, `DETAIL_TUSSENRUIMTE_MS` = 1 s per host, hosts onderling
+    parallel. Een nieuw item buiten cap of budget wordt NIET geschreven en komt de volgende run
+    opnieuw als nieuw (idempotent). Het nieuwe staat vooraf **om-en-om per bron** (`omEnOm`),
+    zodat een krap budget niet steeds de staart van de bronnenlijst uitstelt (28 sep: precies de
+    vijf rekenende bronnen).
+26. **Kolom `bron_detail`** (`gelezen` · `terugval` · `geen_html`; null = nooit geprobeerd),
+    migratie `20261003120000`. Nodig om "geprobeerd en mislukt" van "nooit geprobeerd" te
+    onderscheiden, anders haalt elke run dezelfde pdf opnieuw op. De upsert stuurt de kolom
+    alleen mee als hij iets zegt.
+27. **Backfill per rij, geen `DUIDING_VERSIE`-bump.** Bestaande `rss`/`web_lijst`-rijen op de
+    hostlijst met `bron_detail is null` (≤ 20 per run, geordend op `fetched_at`, binnen dezelfde
+    cap) krijgen hun artikeltekst; precies die rij gaat terug op `wacht` (dezelfde velden als
+    "Opnieuw duiden"). Een teruggetrokken duiding wordt nooit aangeraakt (B4). Guards op de update
+    (`bron_detail is null`, status ≠ teruggetrokken) maken een tweede run tot een no-op.
+28. **Kader weren: `isKaderSectie`.** Een sectie met een kaderkop (Downloads, Auteurs, Tags,
+    Delen, …), met resten van een deel- of cookiebalk in een korte tekst, of met een
+    linkdichtheid ≥ 0,6 valt weg, zowel uit de artikeltekst als uit `extractSecties`
+    (`web_pagina`). Alleen HELE secties, dus de sleutels van de andere secties blijven gelijk. De
+    bestaande menurijen verlopen via de bewaartermijn. Live gemeten bij de bouw: op de
+    `web_pagina`-bronnen vallen 21 secties weg, alle linktegels of documentlijsten, waaronder
+    alle secties van Belastingdienst Box 3 en Toeslagen. Besluit eigenaar 28 sep: de
+    Belastingplan-wetteksten en Box 3 worden `web_lijst` (een nieuw document of een nieuwe
+    tegel komt als link binnen; live 37 en 31 same-site links), Toeslagen is verwijderd (een hub
+    zonder regelnieuws). De eerste run als lijstbron neemt eenmalig tot 8 bestaande links per
+    lijst mee.
+29. **De categorisatie krijgt ≤ 600 tekens per artikel** (`CATEGORISATIE_FRAGMENT_MAX_TEKENS`).
+    Met artikeltekst werd één call van 20 artikelen anders ~80k tekens.
+30. **Zichtbaar.** `IngestSummary.details` (nieuw) en `.backfill` (bestaand), per bron
+    `detailGelezen/-Terugval/-GeenHtml/-Uitgesteld` in `news_source_health`, getoond op
+    /beheer/nieuws. Meldlaag-**trigger 4** (`bepaalIngestUitkomst`): er waren detailpogingen en
+    er is er 0 gelezen → `partial`. Eén terugval naast een gelezen pagina, `geen_html` en
+    uitgesteld tellen niet. De backfill telt ook `uitgesteld` (buiten budget, rij blijft null) en
+    `fout`; een rij die wel op het prefixfilter maar niet op `detailToegestaan` past, wordt als
+    `terugval` gemarkeerd in plaats van elke run een plek van de limiet te nemen.
+31. **Uit de importreview (28-09).** (a) Een feed-item zonder beschrijving krijgt als inhoud-hash
+    kop + link in plaats van alleen de kop: anders werd een terugkerende CBS-kop de volgende maand
+    als dubbel geweigerd en bleef de oude rij eeuwig "gezien". Alleen nieuwe items merken dit;
+    bekende URL's vallen al eerder op de sleutel. (b) Draait de code vóór de migratie, dan schrijft
+    de upsert bij PGRST204 de rij alsnog zonder `bron_detail` (de backfill pakt hem later op) in
+    plaats van hem stil te laten vallen. (c) De cron geeft de duiding 25 s minder budget
+    (`DUIDING_TIJDBUDGET_MS_CRON − DETAIL_TIJDBUDGET_MS`), zodat alle budgetten samen weer onder
+    `maxDuration` 300 s blijven. Een terugval is definitief, ook bij een tijdelijke fout (429, 5xx,
+    time-out): de pagina wordt één keer geprobeerd; de categorie en de categorisatie-samenvatting
+    blijven die van de aankondiging.
+
 ## Gevolgen
 
 - Minder, maar echte artikelen; de LLM-editie op /nieuws verliest de parafrase-dubbels, de
@@ -198,8 +272,9 @@ rekenend mechanisme. De prompt deed wat hij moest; de ingest leverde te weinig g
 - Een `web_pagina` levert bij de eerste run na de omschakeling één keer zijn huidige secties
   (hoogstens 12 per pagina), daarna alleen bij een gewijzigde sectie.
 - Een `web_lijst`-item draagt in fase 1 de lijstregel als fragment en `eerste_gezien` als datum;
-  de detailpagina ophalen (met zijn eigen `datePublished`) is fase 3, na de redirect-hertoets en
-  een security-run.
+  sinds fase 3 (besluiten 22–30) krijgt een item op de hostlijst de artikeltekst en, als de pagina
+  hem draagt, de datum uit de metadata (CPB `publicationdatetime`; AFM heeft er geen en blijft
+  `eerste_gezien`).
 - Fase 2 is gebouwd (besluiten 12–18) en getoetst op de vier vastgelegde P1-gevallen. Precies
   wat de regressietest bewijst, en niet meer: **twee van de vier tonen echte grondslag-winst**
   (`059ba103` en `41ed4267` kwamen er met de hele pagina dóór en vallen met het eigen fragment op
@@ -224,5 +299,6 @@ rekenend mechanisme. De prompt deed wat hij moest; de ingest leverde te weinig g
   `lib/architecture/archimate-concerns.ts` is daarom niet geschrapt maar herschreven naar dat
   restrisico, met een meetbare uitgang.
 - De duidingsstap doet zelf geen HTTP meer. Het enige fetch-oppervlak van de Krant zit nu in de
-  ingest; fase 3 voegt er één pad aan toe en gaat dáárom pas na een security-run.
+  ingest; fase 3 voegt er één pad aan toe (`fetchDetailPagina`) en gaat dáárom pas na een
+  security-run.
 - Verwant: ADR 0171 (duiding), 0172 (matcher en katern), 0173 (schaduweditie).

@@ -7,8 +7,10 @@ vi.mock('@/lib/news-sources', async (importOriginal) => {
   return {
     ...echt,
     loadNewsSources: vi.fn(async () => ({ rssFeeds: [], webSources: [] })),
-    fetchRssFeed: vi.fn(async () => ({ items: [], oorzaak: 'leeg', afgekapt: 0 })),
+    fetchRssFeed: vi.fn(async () => ({ items: [], oorzaak: 'leeg', afgekapt: 0, geweigerd: 0 })),
     fetchWebPage: vi.fn(async () => ({ ok: false, oorzaak: 'http_fout', httpStatus: 404 })),
+    // Standaard geen netwerk: een detailpagina valt terug op de aankondiging.
+    fetchDetailPagina: vi.fn(async () => ({ uitkomst: 'terugval', oorzaak: 'http_fout', httpStatus: 404 })),
   }
 })
 vi.mock('@/lib/news-enrich', () => ({
@@ -22,11 +24,11 @@ vi.mock('@/lib/krant/duiding', () => ({
 }))
 
 import { duidWachtendeArtikelen } from '@/lib/krant/duiding'
-import { loadNewsSources, fetchRssFeed, fetchWebPage } from '@/lib/news-sources'
+import { loadNewsSources, fetchRssFeed, fetchWebPage, fetchDetailPagina } from '@/lib/news-sources'
 import { kiesArtikelLinks, categorizeArticles } from '@/lib/news-enrich'
 import type { DuidingSummary } from '@/lib/krant/duiding'
 import {
-  runNewsIngest,
+  runNewsIngest as runNewsIngestEcht,
   bepaalIngestUitkomst,
   ARTICLE_RETENTION_DAYS,
   inhoudHash,
@@ -36,17 +38,30 @@ import {
   terugvalLinks,
   isDoorstuurVorm,
   TERUGVAL_MAX_PER_LIJST,
+  omEnOm,
+  pasDetailToe,
+  backfillUrlFilter,
+  webLijstKandidaat,
+  MAX_DETAILS_PER_RUN,
+  MAX_BACKFILL_PER_RUN,
+  DETAIL_TUSSENRUIMTE_MS,
+  CATEGORISATIE_FRAGMENT_MAX_TEKENS,
   type IngestSummary,
   type SourceHealth,
   type SourceHealthEntry,
 } from './news-ingest'
+
+// De echte tussenruimte per host (1 s) hoort niet in een unit-test; tests die
+// het wachten zelf willen zien, geven hun eigen `wacht` mee.
+const runNewsIngest: typeof runNewsIngestEcht = (supabase, model, opties = {}) =>
+  runNewsIngestEcht(supabase, model, { wacht: async () => {}, ...opties })
 
 // ── Nep-client: een in-memory news_articles met een unieke index op source_url ──
 
 type Rij = Record<string, unknown> & { source_url: string }
 interface Stap { m: string; args: unknown[] }
 
-function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean } = {}) {
+function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean; zonderBronDetailKolom?: boolean } = {}) {
   const rijen: Rij[] = []
   const stappen: { table: string; stappen: Stap[] }[] = []
   let volgnummer = 0
@@ -58,6 +73,12 @@ function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean }
       let updateVelden: Record<string, unknown> = {}
       let kolom = ''
       let inFilter: { kolom: string; waarden: string[] } | null = null
+      // Backfill (Krant 1F fase 3): `.is(kolom, null)`, `.neq(kolom, w)`, `.eq('id', w)`
+      // en `.or(...)` — het or-filter wordt alleen vastgelegd, de test toetst de vorm.
+      const isFilters: { kolom: string; waarde: unknown }[] = []
+      const neqFilters: { kolom: string; waarde: unknown }[] = []
+      let eqFilter: { kolom: string; waarde: unknown } | null = null
+      let limiet: number | null = null
       let upsertRij: Rij | null = null
       const chain: Record<string, unknown> = {}
       const stap = (m: string, impl?: (...args: unknown[]) => void) => (...args: unknown[]) => {
@@ -72,10 +93,26 @@ function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean }
       chain.upsert = stap('upsert', (r) => { modus = 'upsert'; upsertRij = r as Rij })
       chain.delete = stap('delete', () => { modus = 'delete' })
       chain.update = stap('update', (v) => { modus = 'update'; updateVelden = v as Record<string, unknown> })
-      for (const m of ['eq', 'lt', 'gte', 'order', 'limit']) chain[m] = stap(m)
+      chain.is = stap('is', (k, v) => { isFilters.push({ kolom: String(k), waarde: v }) })
+      chain.neq = stap('neq', (k, v) => { neqFilters.push({ kolom: String(k), waarde: v }) })
+      chain.eq = stap('eq', (k, v) => { eqFilter = { kolom: String(k), waarde: v } })
+      chain.limit = stap('limit', (n) => { limiet = n as number })
+      for (const m of ['lt', 'gte', 'order', 'or']) chain[m] = stap(m)
+      const past = (r: Rij) =>
+        isFilters.every((f) => (r[f.kolom] ?? null) === f.waarde) && neqFilters.every((f) => r[f.kolom] !== f.waarde)
       chain.then = (res: (v: unknown) => unknown, rej: (e: unknown) => unknown) => {
         let uitkomst: unknown = { data: [], error: null }
-        if (table === 'news_articles' && modus === 'select' && inFilter) {
+        if (table === 'news_articles' && modus === 'select' && inFilter && kolom.includes(',')) {
+          // Meerkoloms-lezing (de backfill): hele rijen die aan alle filters voldoen.
+          const f = inFilter as { kolom: string; waarden: string[] }
+          const treffers = rijen.filter((r) => f.waarden.includes(r[f.kolom] as string) && past(r))
+          uitkomst = { data: limiet === null ? treffers : treffers.slice(0, limiet), error: null }
+        } else if (table === 'news_articles' && modus === 'update' && eqFilter) {
+          const f = eqFilter as { kolom: string; waarde: unknown }
+          const geraakt = rijen.filter((r) => r[f.kolom] === f.waarde && past(r))
+          for (const r of geraakt) Object.assign(r, updateVelden)
+          uitkomst = { data: geraakt.map((r) => ({ id: r.id })), error: null }
+        } else if (table === 'news_articles' && modus === 'select' && inFilter) {
           const f = inFilter as { kolom: string; waarden: string[] }
           uitkomst = opties.hashLeesFout && f.kolom === 'inhoud_hash'
             ? { data: null, error: { message: 'nep: inhoudcontrole faalt' } }
@@ -86,7 +123,10 @@ function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean }
         } else if (table === 'news_articles' && modus === 'upsert' && upsertRij) {
           const rij = upsertRij as Rij
           const bestaat = rijen.some((r) => r.source_url === rij.source_url)
-          if (!bestaat && opties.racePerUrl?.has(rij.source_url)) {
+          if (opties.zonderBronDetailKolom && 'bron_detail' in rij) {
+            // Vóór de migratie 20261003120000: PostgREST kent de kolom niet.
+            uitkomst = { data: null, error: { code: 'PGRST204', message: "Could not find the 'bron_detail' column" } }
+          } else if (!bestaat && opties.racePerUrl?.has(rij.source_url)) {
             // Een parallelle run schreef dezelfde sleutel net tussen voorcontrole en upsert.
             rijen.push({ ...rij, id: `race-${++volgnummer}` })
             uitkomst = { data: [], error: null }
@@ -131,7 +171,7 @@ const FEED_ITEMS = [
 
 function zetBronnen() {
   vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [FEED], webSources: [LIJST, PAGINA] })
-  vi.mocked(fetchRssFeed).mockResolvedValue({ items: FEED_ITEMS, oorzaak: 'ok', afgekapt: 0 })
+  vi.mocked(fetchRssFeed).mockResolvedValue({ items: FEED_ITEMS, oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
   vi.mocked(fetchWebPage).mockImplementation(async (s) =>
     s.url === LIJST.url
       ? { ok: true, html: LIJST_HTML, finalUrl: LIJST.url }
@@ -287,7 +327,7 @@ describe('runNewsIngest — eerlijke telling', () => {
 describe('runNewsIngest — brongezondheid met oorzaak', () => {
   it('elke bron krijgt een oorzaak; zonder model valt een lijstpagina terug op de eerste links', async () => {
     vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [FEED], webSources: [LIJST, PAGINA] })
-    vi.mocked(fetchRssFeed).mockResolvedValue({ items: [], oorzaak: 'dns', afgekapt: 0 })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items: [], oorzaak: 'dns', afgekapt: 0, geweigerd: 0 })
     vi.mocked(fetchWebPage).mockImplementation(async (s) =>
       s.url === LIJST.url ? { ok: true, html: LIJST_HTML, finalUrl: LIJST.url } : { ok: false, oorzaak: 'http_fout', httpStatus: 404 },
     )
@@ -469,8 +509,9 @@ describe('runNewsIngest — bewaren op tijd, geen grens op aantal (ADR 0171)', (
 })
 
 describe('runNewsIngest — categorisatie per brok, met tijdbudget (H1)', () => {
+  // Bewust buiten DETAIL_HOSTS (/nl-nl/nieuws/): deze suite toetst de categorisatie, niet de detailcap.
   const veelLinks = (n: number) =>
-    `<main><ul>${Array.from({ length: n }, (_, i) => `<li><a href="/nl-nl/nieuws/2026/38/bericht-nummer-${i}">Een nieuwsbericht met nummer ${i}</a></li>`).join('')}</ul></main>`
+    `<main><ul>${Array.from({ length: n }, (_, i) => `<li><a href="/nl-nl/achtergrond/2026/38/bericht-nummer-${i}">Een nieuwsbericht met nummer ${i}</a></li>`).join('')}</ul></main>`
 
   it('schrijft per brok meteen; na het budget start geen nieuw brok en komt het restant de volgende run', async () => {
     vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [LIJST] })
@@ -576,7 +617,7 @@ describe('runNewsIngest — de duidingsstap', () => {
 // meldde zich als `status: 'success'`, `error: null`.
 
 describe('bepaalIngestUitkomst', () => {
-  const summary = (duiding: Partial<DuidingSummary> = {}): IngestSummary => ({
+  const summary = (duiding: Partial<DuidingSummary> = {}, extra: Partial<IngestSummary> = {}): IngestSummary => ({
     sourcesChecked: 3,
     rssArticlesFound: 15,
     webArticlesExtracted: 78,
@@ -587,7 +628,10 @@ describe('bepaalIngestUitkomst', () => {
     skipped: 0,
     uitgesteld: 0,
     linksGeweigerd: 0,
+    details: { gelezen: 0, terugval: 0, geenHtml: 0, uitgesteld: 0 },
+    backfill: { gelezen: 0, terugval: 0, geenHtml: 0, herduid: 0, uitgesteld: 0, fout: 0 },
     duiding: { geduid: 3, afgewezen: 0, mislukt: 0, overgeslagen: 0, wacht: 0, ...duiding },
+    ...extra,
   })
 
   const bron = (
@@ -749,7 +793,7 @@ describe('runNewsIngest — bron omgezet van web_lijst naar rss (CBS, 27 sep 202
       feedItem('39/prijsstijging-koopwoningen-vlakt-in-augustus-verder-af', 'Prijsstijging koopwoningen vlakt in augustus verder af', '2026-09-22T04:30:00.000Z'),
     ]
     vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [CBS_FEED], webSources: [] })
-    vi.mocked(fetchRssFeed).mockResolvedValue({ items, oorzaak: 'ok', afgekapt: 0 })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items, oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
     const na = await runNewsIngest(client as never, MODEL, { now: new Date('2026-09-28T05:23:00.000Z') })
     expect(na.summary.alBekend).toBe(2)
     expect(na.summary.inserted).toBe(1)
@@ -781,5 +825,313 @@ describe('runNewsIngest — een bron die een storing meldt levert niets en zegt 
     const uitkomst = bepaalIngestUitkomst(summary, health)
     expect(uitkomst.status).toBe('partial')
     expect(uitkomst.verlies.join(' ')).toContain('storing')
+  })
+})
+
+// ── Krant 1F fase 3: detailpagina's, om-en-om, backfill ─────────────
+
+describe('omEnOm — tegen uithongering van de staart', () => {
+  it('eerst de eerste van elke bron, dan de tweede; binnen een bron dezelfde volgorde', () => {
+    const lijst = [
+      { bron: 0, n: 'a0' }, { bron: 0, n: 'a1' }, { bron: 0, n: 'a2' },
+      { bron: 1, n: 'b0' },
+      { bron: 2, n: 'c0' }, { bron: 2, n: 'c1' },
+    ]
+    expect(omEnOm(lijst).map((k) => k.n)).toEqual(['a0', 'b0', 'c0', 'a1', 'c1', 'a2'])
+  })
+  it('lege lijst en één bron blijven gelijk', () => {
+    expect(omEnOm([])).toEqual([])
+    const een = [{ bron: 3, n: 'x' }, { bron: 3, n: 'y' }]
+    expect(omEnOm(een)).toEqual(een)
+  })
+})
+
+describe('pasDetailToe — alleen fragment, detailstatus en datum veranderen', () => {
+  const RUN = '2026-09-28T05:23:00.000Z'
+  const lijstRij = () => webLijstKandidaat(
+    { url: 'https://www.cpb.nl/mev-2027', tekst: 'Macro Economische Verkenning 2027', fragment: 'MEV 2027 15 september 2026' },
+    { url: 'https://www.cpb.nl/publicaties', label: 'CPB — Publicaties' },
+    RUN,
+  )
+
+  it('gelezen: artikeltekst als fragment, sleutel en hash van de aankondiging blijven', () => {
+    const rij = lijstRij()
+    const uit = pasDetailToe(rij, { uitkomst: 'gelezen', tekst: 'De economie groeit met 1,4 procent.', datums: { gepubliceerd: '2026-09-15T13:35:00.000Z', gewijzigd: null } }, RUN)
+    expect(uit).toMatchObject({
+      bron_fragment: 'De economie groeit met 1,4 procent.',
+      raw_content: 'De economie groeit met 1,4 procent.',
+      bron_detail: 'gelezen',
+      published_at: '2026-09-15T13:35:00.000Z',
+      published_bron: 'meta',
+      source_url: rij.source_url,
+      inhoud_hash: rij.inhoud_hash,
+      bron_kop: rij.bron_kop,
+    })
+  })
+
+  it('een feeddatum wint van de paginametadata; een datum in de toekomst wordt het run-moment', () => {
+    const rss = rssKandidaat(
+      { title: 'Inflatie 2,3 procent', description: null, link: 'https://www.cbs.nl/nl-nl/nieuws/2026/39/inflatie', publishedAt: '2026-09-25T04:30:00.000Z', sourceName: 'CBS' },
+      'https://www.cbs.nl/nl-nl/rss-feeds/prijzen',
+      RUN,
+    )
+    const uit = pasDetailToe(rss, { uitkomst: 'gelezen', tekst: 'Tekst', datums: { gepubliceerd: '2026-09-01T00:00:00.000Z', gewijzigd: null } }, RUN)
+    expect(uit).toMatchObject({ published_at: '2026-09-25T04:30:00.000Z', published_bron: 'feed' })
+    const toekomst = pasDetailToe(lijstRij(), { uitkomst: 'gelezen', tekst: 'T', datums: { gepubliceerd: '2027-01-01T00:00:00.000Z', gewijzigd: null } }, RUN)
+    expect(toekomst.published_at).toBe(RUN)
+  })
+
+  it('terugval en geen_html laten het fragment van de aankondiging staan', () => {
+    const rij = lijstRij()
+    expect(pasDetailToe(rij, { uitkomst: 'terugval', oorzaak: 'timeout' }, RUN)).toEqual({ ...rij, bron_detail: 'terugval' })
+    expect(pasDetailToe(rij, { uitkomst: 'geen_html' }, RUN)).toEqual({ ...rij, bron_detail: 'geen_html' })
+  })
+})
+
+describe('backfillUrlFilter', () => {
+  it('volgt DETAIL_HOSTS, met waarden tussen aanhalingstekens', () => {
+    expect(backfillUrlFilter()).toBe(
+      'source_url.like."https://www.cbs.nl/nl-nl/nieuws/*",source_url.like."https://www.cpb.nl/*",source_url.like."https://www.afm.nl/nl-nl/sector/actueel/*"',
+    )
+  })
+})
+
+describe('runNewsIngest — detailpagina van nieuwe items (1F fase 3)', () => {
+  const CBS = { url: 'https://www.cbs.nl/nl-nl/rss-feeds/prijzen', label: 'CBS — Prijzen' }
+  const CBS2 = { url: 'https://www.cbs.nl/nl-nl/rss-feeds/inkomen-en-bestedingen', label: 'CBS — Inkomen' }
+  const item = (n: number, feed = CBS) => ({
+    title: `CBS-bericht nummer ${n}${feed === CBS2 ? ' over inkomen' : ''}`,
+    description: null,
+    link: `https://www.cbs.nl/nl-nl/nieuws/2026/39/bericht-${n}${feed === CBS2 ? '-inkomen' : ''}`,
+    publishedAt: '2026-09-25T04:30:00.000Z',
+    sourceName: feed.label,
+  })
+  const ARTIKEL = 'De inflatie was in september 2,3 procent. '.repeat(100)
+  const gelezen = { uitkomst: 'gelezen' as const, tekst: ARTIKEL, datums: { gepubliceerd: null, gewijzigd: null } }
+
+  beforeEach(() => {
+    vi.mocked(fetchDetailPagina).mockReset()
+    vi.mocked(fetchDetailPagina).mockResolvedValue(gelezen)
+  })
+
+  it('bewaart de artikeltekst, houdt sleutel en hash van de aankondiging, en telt per bron', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [CBS], webSources: [] })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items: [item(1), item(2)], oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
+    vi.mocked(fetchDetailPagina).mockResolvedValueOnce(gelezen).mockResolvedValueOnce({ uitkomst: 'terugval', oorzaak: 'timeout' })
+    const { client, rijen } = maakClient()
+    const { summary, health } = await runNewsIngest(client as never, null, { now: NU })
+    expect(fetchDetailPagina).toHaveBeenCalledWith(item(1).link, CBS.url)
+    expect(summary.details).toEqual({ gelezen: 1, terugval: 1, geenHtml: 0, uitgesteld: 0 })
+    expect(health.sources[0]).toMatchObject({ detailGelezen: 1, detailTerugval: 1 })
+    const r1 = rijen.find((r) => r.source_url === item(1).link)!
+    expect(r1).toMatchObject({ bron_detail: 'gelezen', bron_fragment: ARTIKEL, inhoud_hash: inhoudHash(`${item(1).title}\n${item(1).link}`) })
+    const r2 = rijen.find((r) => r.source_url === item(2).link)!
+    expect(r2).toMatchObject({ bron_detail: 'terugval', bron_fragment: null })
+  })
+
+  it('idempotent: een tweede run met dezelfde feed haalt 0 detailpagina\'s op en schrijft niets', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [CBS], webSources: [] })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items: [item(1), item(2)], oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
+    const { client, rijen } = maakClient()
+    await runNewsIngest(client as never, null, { now: NU })
+    const voor = rijen.map((r) => ({ ...r }))
+    vi.mocked(fetchDetailPagina).mockClear()
+    const twee = await runNewsIngest(client as never, null, { now: NU })
+    expect(fetchDetailPagina).not.toHaveBeenCalled()
+    expect(twee.summary.inserted).toBe(0)
+    expect(twee.summary.alBekend).toBe(2)
+    expect(rijen.map(({ bron_fragment, inhoud_hash, published_at }) => ({ bron_fragment, inhoud_hash, published_at }))).toEqual(
+      voor.map(({ bron_fragment, inhoud_hash, published_at }) => ({ bron_fragment, inhoud_hash, published_at })),
+    )
+  })
+
+  it('cap: van 30 kandidaten worden er 24 opgehaald; 6 zijn uitgesteld en NIET geschreven', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [CBS, CBS2], webSources: [] })
+    vi.mocked(fetchRssFeed).mockImplementation(async (f) => ({
+      items: Array.from({ length: 15 }, (_, i) => item(i, f.url === CBS2.url ? CBS2 : CBS)),
+      oorzaak: 'ok',
+      afgekapt: 0,
+      geweigerd: 0,
+    }))
+    const { client, rijen } = maakClient()
+    const { summary, health } = await runNewsIngest(client as never, null, { now: NU })
+    expect(fetchDetailPagina).toHaveBeenCalledTimes(MAX_DETAILS_PER_RUN)
+    expect(summary.details.uitgesteld).toBe(6)
+    expect(summary.uitgesteld).toBe(6)
+    expect(rijen).toHaveLength(24)
+    // Om-en-om: elke feed levert er 12, niet de eerste 24 van één feed.
+    expect(health.sources.map((s) => s.detailGelezen)).toEqual([12, 12])
+    expect(health.sources.map((s) => s.detailUitgesteld)).toEqual([3, 3])
+  })
+
+  it('tijdbudget: na het budget start geen fetch meer; het restant is uitgesteld', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [CBS], webSources: [] })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items: [1, 2, 3, 4, 5].map((n) => item(n)), oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
+    let tijd = 0
+    vi.mocked(fetchDetailPagina).mockImplementation(async () => { tijd += 10_000; return gelezen })
+    const { client, rijen } = maakClient()
+    const { summary } = await runNewsIngest(client as never, null, { now: NU, klok: () => tijd, detailTijdBudgetMs: 25_000 })
+    expect(fetchDetailPagina).toHaveBeenCalledTimes(3)
+    expect(summary.details).toMatchObject({ gelezen: 3, uitgesteld: 2 })
+    expect(rijen).toHaveLength(3)
+  })
+
+  it('één verzoek per seconde per host: de tussenruimte zit tussen fetches, niet ervoor', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [CBS], webSources: [] })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items: [1, 2, 3].map((n) => item(n)), oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
+    const wacht = vi.fn(async () => {})
+    const { client } = maakClient()
+    await runNewsIngest(client as never, null, { now: NU, wacht })
+    expect(wacht.mock.calls).toEqual([[DETAIL_TUSSENRUIMTE_MS], [DETAIL_TUSSENRUIMTE_MS]])
+  })
+
+  it('bronnen buiten DETAIL_HOSTS: geen fetch, en bron_detail gaat niet mee in de upsert', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [FEED], webSources: [] })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items: FEED_ITEMS, oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
+    const { client, rijen } = maakClient()
+    await runNewsIngest(client as never, null, { now: NU })
+    expect(fetchDetailPagina).not.toHaveBeenCalled()
+    expect(rijen.length).toBeGreaterThan(0)
+    expect(rijen.every((r) => !('bron_detail' in r))).toBe(true)
+  })
+
+  it('vóór de migratie (PGRST204) schrijft de ingest de rij alsnog, zonder bron_detail', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [CBS], webSources: [] })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items: [item(1)], oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
+    const { client, rijen } = maakClient({ zonderBronDetailKolom: true })
+    const { summary } = await runNewsIngest(client as never, null, { now: NU })
+    expect(summary.inserted).toBe(1)
+    expect(summary.skipped).toBe(0)
+    expect(rijen[0]).toMatchObject({ bron_fragment: ARTIKEL })
+    expect('bron_detail' in rijen[0]).toBe(false)
+  })
+
+  it('de inhoud-hash van een feed-item: kop + beschrijving, of kop + link als de beschrijving leeg is', () => {
+    const RUN = NU.toISOString()
+    const met = rssKandidaat({ ...item(1), description: 'Inflatie 2,3 procent' }, CBS.url, RUN)
+    expect(met.inhoud_hash).toBe(inhoudHash(`${item(1).title}\nInflatie 2,3 procent`))
+    // Dezelfde kop een maand later, nieuwe URL, geen beschrijving: géén dubbel meer.
+    const jan = rssKandidaat({ ...item(1), link: 'https://www.cbs.nl/nl-nl/nieuws/2026/05/werkloosheid' }, CBS.url, RUN)
+    const feb = rssKandidaat({ ...item(1), link: 'https://www.cbs.nl/nl-nl/nieuws/2026/09/werkloosheid' }, CBS.url, RUN)
+    expect(jan.inhoud_hash).not.toBe(feb.inhoud_hash)
+  })
+
+  it('de categorisatie krijgt hoogstens CATEGORISATIE_FRAGMENT_MAX_TEKENS per artikel', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [CBS], webSources: [] })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items: [item(1)], oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
+    const { client } = maakClient()
+    await runNewsIngest(client as never, MODEL, { now: NU })
+    const invoer = vi.mocked(categorizeArticles).mock.calls[0][0]
+    expect(invoer[0].summary.length).toBe(CATEGORISATIE_FRAGMENT_MAX_TEKENS)
+  })
+})
+
+describe('runNewsIngest — backfill per rij, zonder DUIDING_VERSIE-bump', () => {
+  const bestaand = (id: string, extra: Record<string, unknown>) => ({
+    id,
+    source_url: `https://www.cbs.nl/nl-nl/nieuws/2026/38/${id}`,
+    bron_pagina_url: 'https://www.cbs.nl/nl-nl/rss-feeds/prijzen',
+    bron_soort: 'rss',
+    bron_fragment: null,
+    published_bron: 'feed',
+    duiding_status: 'geduid',
+    duiding_pogingen: 1,
+    duiding: { oud: true },
+    duiding_versie: 3,
+    ...extra,
+  })
+
+  beforeEach(() => {
+    vi.mocked(fetchDetailPagina).mockReset()
+    vi.mocked(fetchDetailPagina).mockResolvedValue({ uitkomst: 'gelezen', tekst: 'Nieuwe artikeltekst met 2,3 procent.', datums: { gepubliceerd: null, gewijzigd: null } })
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [] })
+  })
+
+  it('zet de artikeltekst en precies die rij terug op wacht; teruggetrokken en al geprobeerde rijen blijven onaangeroerd', async () => {
+    const { client, rijen, stappen } = maakClient()
+    rijen.push(
+      bestaand('a', {}),
+      bestaand('b', { duiding_status: 'teruggetrokken' }),
+      bestaand('c', { bron_detail: 'terugval' }),
+      // Past op het prefixfilter, niet op de volledige toets (doorstuurvorm): gemarkeerd, niet opgehaald.
+      bestaand('d', { source_url: 'https://www.cpb.nl/uit?url=https://kwaadaardig.nl', bron_pagina_url: 'https://www.cpb.nl/publicaties', bron_soort: 'web_lijst' }),
+    )
+    const { summary } = await runNewsIngest(client as never, null, { now: NU })
+    expect(fetchDetailPagina).toHaveBeenCalledTimes(1)
+    expect(summary.backfill).toEqual({ gelezen: 1, terugval: 1, geenHtml: 0, herduid: 1, uitgesteld: 0, fout: 0 })
+    expect(rijen[0]).toMatchObject({
+      bron_fragment: 'Nieuwe artikeltekst met 2,3 procent.',
+      bron_detail: 'gelezen',
+      duiding_status: 'wacht',
+      duiding_pogingen: 0,
+      duiding: null,
+      duiding_versie: null,
+    })
+    expect(rijen[1]).toMatchObject({ duiding_status: 'teruggetrokken', bron_fragment: null })
+    expect(rijen[2]).toMatchObject({ bron_detail: 'terugval', duiding_status: 'geduid' })
+    expect(rijen[3]).toMatchObject({ bron_detail: 'terugval', duiding_status: 'geduid', bron_fragment: null })
+    // De lezing is expliciet begrensd en geordend, en filtert op de hostlijst.
+    const lezing = stappen.find((q) => q.stappen.some((s) => s.m === 'or'))!
+    expect(lezing.stappen).toEqual(expect.arrayContaining([
+      { m: 'or', args: [backfillUrlFilter()] },
+      { m: 'is', args: ['bron_detail', null] },
+      { m: 'neq', args: ['duiding_status', 'teruggetrokken'] },
+      { m: 'order', args: ['fetched_at', { ascending: false }] },
+      { m: 'limit', args: [MAX_BACKFILL_PER_RUN] },
+    ]))
+  })
+
+  it('twee keer draaien: de tweede run raakt 0 rijen', async () => {
+    const { client, rijen } = maakClient()
+    rijen.push(bestaand('a', {}))
+    await runNewsIngest(client as never, null, { now: NU })
+    vi.mocked(fetchDetailPagina).mockClear()
+    const twee = await runNewsIngest(client as never, null, { now: NU })
+    expect(fetchDetailPagina).not.toHaveBeenCalled()
+    expect(twee.summary.backfill).toEqual({ gelezen: 0, terugval: 0, geenHtml: 0, herduid: 0, uitgesteld: 0, fout: 0 })
+  })
+
+  it('buiten het tijdbudget: geteld als uitgesteld, de rij blijft null en komt terug', async () => {
+    const { client, rijen } = maakClient()
+    rijen.push(bestaand('a', {}), bestaand('b', {}), bestaand('c', {}))
+    let tijd = 0
+    vi.mocked(fetchDetailPagina).mockImplementation(async () => {
+      tijd += 20_000
+      return { uitkomst: 'gelezen', tekst: 'Tekst met 2,3 procent.', datums: { gepubliceerd: null, gewijzigd: null } }
+    })
+    const { summary } = await runNewsIngest(client as never, null, { now: NU, klok: () => tijd, detailTijdBudgetMs: 25_000 })
+    expect(summary.backfill).toMatchObject({ gelezen: 2, uitgesteld: 1 })
+    expect(rijen[2].bron_detail ?? null).toBeNull()
+  })
+
+  it('terugval en geen_html markeren de rij zonder de duiding te resetten', async () => {
+    const { client, rijen } = maakClient()
+    rijen.push(bestaand('a', {}), bestaand('b', {}))
+    vi.mocked(fetchDetailPagina).mockResolvedValueOnce({ uitkomst: 'terugval', oorzaak: 'timeout' }).mockResolvedValueOnce({ uitkomst: 'geen_html' })
+    const { summary } = await runNewsIngest(client as never, null, { now: NU })
+    expect(summary.backfill).toEqual({ gelezen: 0, terugval: 1, geenHtml: 1, herduid: 0, uitgesteld: 0, fout: 0 })
+    expect(rijen.map((r) => [r.bron_detail, r.duiding_status])).toEqual([['terugval', 'geduid'], ['geen_html', 'geduid']])
+  })
+})
+
+describe('bepaalIngestUitkomst — trigger 4: detailpagina\'s', () => {
+  const summary = (details: Partial<IngestSummary['details']>, backfill: Partial<IngestSummary['backfill']> = {}): IngestSummary => ({
+    sourcesChecked: 1, rssArticlesFound: 3, webArticlesExtracted: 0, perSoort: { rss: 3, web_lijst: 0, web_pagina: 0 },
+    duplicatesSkipped: 0, alBekend: 0, inserted: 3, skipped: 0, uitgesteld: 0, linksGeweigerd: 0,
+    details: { gelezen: 0, terugval: 0, geenHtml: 0, uitgesteld: 0, ...details },
+    backfill: { gelezen: 0, terugval: 0, geenHtml: 0, herduid: 0, uitgesteld: 0, fout: 0, ...backfill },
+    duiding: { geduid: 1, afgewezen: 0, mislukt: 0, overgeslagen: 0, wacht: 0 },
+  })
+  const health: SourceHealth = { checkedAt: NU.toISOString(), sources: [{ label: 'CBS', url: 'https://www.cbs.nl/x', soort: 'rss', type: 'rss', items: 3, nieuw: 3, oorzaak: 'ok' }] }
+
+  it('0 van N gelezen → partial, met de telling in de regel', () => {
+    expect(bepaalIngestUitkomst(summary({ terugval: 3 }), health)).toEqual({ status: 'partial', verlies: ["detailpagina's: 0 van 3 gelezen (terugval 3)"] })
+    expect(bepaalIngestUitkomst(summary({}, { terugval: 2 }), health).status).toBe('partial')
+  })
+  it('één gelezen naast terugvallen, alleen geen_html, of alleen uitgesteld → success', () => {
+    expect(bepaalIngestUitkomst(summary({ gelezen: 1, terugval: 2 }), health).status).toBe('success')
+    expect(bepaalIngestUitkomst(summary({}, { gelezen: 1, terugval: 4 }), health).status).toBe('success')
+    expect(bepaalIngestUitkomst(summary({ geenHtml: 3 }), health).status).toBe('success')
+    expect(bepaalIngestUitkomst(summary({ uitgesteld: 5 }), health).status).toBe('success')
   })
 })

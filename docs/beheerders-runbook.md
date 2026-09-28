@@ -214,6 +214,18 @@ Belastingplan wetteksten" zelf mee na Prinsjesdag (`belastingplan-<jaar>`); na �
 staat de lijst letterlijk in `app_settings` en moet je het jaartal na elke Prinsjesdag met de hand
 bijwerken.
 
+**Artikelpagina's (Krant 1F fase 3).** Voor nieuwe items van CBS-nieuws, CPB en AFM-sectornieuws
+haalt de ingest de artikelpagina zelf op (alleen de hosts en paden in `DETAIL_HOSTS`,
+`lib/news-sources.ts`). De run-regel toont *artikelpagina's: X gelezen, Y terugval*. Een losse
+terugval is gezondheid, geen incident: het fragment uit de feed of lijstregel blijft dan staan.
+**Staat er "detailpagina's: 0 van N gelezen" als verliesregel** (de run is dan *deels geslaagd* en
+de meldlaag vuurt), dan leest de ingest die dag weer alleen aankondigingen. Open één van de
+artikel-URL's zelf: laadt de tekst pas via JavaScript, of weigert de site ons (403/429), dan is dat
+een bronwijziging die een codewijziging vraagt — geen knop op dit scherm. *Geen webpagina* (een pdf)
+is verwacht en telt niet als verlies. Bestaande rijen van die hosts krijgen hun artikeltekst via de
+backfill (≤ 20 per run) en gaan per rij terug in de duidingswachtrij; een teruggetrokken duiding
+wordt daarbij nooit aangeraakt.
+
 **Openstaand, en geen af te vinken stap:** zolang de support-mailbox niet bestaat, is er geen
 externe meldroute. Dat raakt de twee klokken hierboven rechtstreeks: een AVG-verzoek of
 lekmelding zou vandaag niet binnenkomen. Zie `lib/legal-contact.ts` voor het aanzetten zodra het

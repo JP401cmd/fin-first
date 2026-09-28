@@ -39,6 +39,8 @@ const SUMMARY_BASIS: IngestSummary = {
   skipped: 0,
   uitgesteld: 0,
   linksGeweigerd: 0,
+  details: { gelezen: 0, terugval: 0, geenHtml: 0, uitgesteld: 0 },
+  backfill: { gelezen: 0, terugval: 0, geenHtml: 0, herduid: 0, uitgesteld: 0, fout: 0 },
   duiding: { geduid: 3, afgewezen: 0, mislukt: 0, overgeslagen: 0, wacht: 0 },
 }
 

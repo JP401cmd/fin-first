@@ -97,6 +97,24 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.14',
+    date: '2026-09-28',
+    title: 'Nieuws leest het hele bericht',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De nieuwe Krant leest het hele bericht',
+            description:
+              'Van CBS, CPB en AFM lezen we nu de volledige tekst, niet alleen de aankondiging. Voor jou nog geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.13',
     date: '2026-09-28',
     title: 'Nieuws over kinderen beter herkend',

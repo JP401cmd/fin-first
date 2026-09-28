@@ -22,6 +22,9 @@ const NAMED_ENTITIES: Record<string, string> = {
   euro: '€', ndash: '–', mdash: '—', hellip: '…', laquo: '«', raquo: '»',
   lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', eacute: 'é', euml: 'ë',
   iuml: 'ï', ouml: 'ö', uuml: 'ü', auml: 'ä', egrave: 'è', agrave: 'à',
+  // Aangevuld in Krant 1F fase 3: op CPB-detailpagina's stond `&aacute;` onvertaald.
+  aacute: 'á', oacute: 'ó', iacute: 'í', uacute: 'ú', ecirc: 'ê', ocirc: 'ô',
+  ccedil: 'ç', ntilde: 'ñ', shy: '', middot: '·', bull: '•', deg: '°',
 }
 
 /** Decodeer HTML-entiteiten: benoemd (beperkte set) en numeriek (&#039; &#x27;). */
@@ -60,10 +63,18 @@ function vindElementen(html: string, tags: readonly string[]): Element[] {
   const lower = html.toLowerCase()
   const openRe = new RegExp(`<(${tags.join('|')})(?=[\\s>/])[^<>]*>`, 'gi')
   const wijzer = new Map<string, number>()
+  // Elementen van dezelfde tag zijn DISJUNCT: een opening binnen een vorig
+  // element van dezelfde tag (geneste of ongesloten `<a>`/`<li>`) telt niet
+  // als eigen element. Zonder dit kregen N ongesloten tags allemaal dezelfde
+  // sluittag, en sliceten de consumers (`isKaderSectie`, `zonderTeasers`,
+  // `extractLinks`) N keer bijna het hele document: O(N×L), ~15 min CPU op een
+  // pagina van 2 MB (security-review Krant 1F fase 3, Y1).
+  const laatsteEind = new Map<string, number>()
   const uit: Element[] = []
   let m: RegExpExecArray | null
   while ((m = openRe.exec(html)) !== null) {
     const tag = m[1].toLowerCase()
+    if (m.index < (laatsteEind.get(tag) ?? -1)) continue
     const binnen = m.index + m[0].length
     let sluit = wijzer.get(tag) ?? -2
     if (sluit !== -1 && sluit < binnen) {
@@ -71,7 +82,9 @@ function vindElementen(html: string, tags: readonly string[]): Element[] {
       wijzer.set(tag, sluit)
     }
     const eindTag = sluit >= 0 ? lower.indexOf('>', sluit) : -1
-    uit.push({ tag, start: m.index, binnen, sluit, eind: sluit >= 0 ? (eindTag >= 0 ? eindTag + 1 : html.length) : html.length })
+    const eind = sluit >= 0 ? (eindTag >= 0 ? eindTag + 1 : html.length) : html.length
+    uit.push({ tag, start: m.index, binnen, sluit, eind })
+    laatsteEind.set(tag, eind)
   }
   return uit
 }
@@ -270,13 +283,56 @@ function zonderTeasers(html: string): string {
 }
 
 /**
- * Knip de hoofdinhoud op kopniveau h1–h3 in secties. Deterministisch: dezelfde
- * HTML geeft dezelfde secties in dezelfde volgorde. Teasers en kaarten gaan er
- * vóór het knippen uit (die wisselen per fetch). Identieke secties komen één
- * keer terug. `max` is een EXPLICIETE cap: wat erbuiten valt, telt de
- * aanroeper als `afgekapt` in de brongezondheid.
+ * Koppen van secties die bij het kader van een pagina horen en niet bij de
+ * inhoud: bijlagen, auteurs, contactpersonen, tags, "gerelateerd", delen,
+ * cookies. Bewust de HELE kop (na trimmen): "Contact" is kader, "Contact met
+ * de Belastingdienst over uw aanslag" niet.
  */
-export function extractSecties(html: string, max: number): { secties: PaginaSectie[]; afgekapt: number } {
+const KADER_KOP =
+  /^(downloads?|bijlagen?|auteurs?|over de auteurs?|contactpersonen?|contact|persinformatie|tags?|trefwoorden|onderwerpen|gerelateerde? (publicaties|berichten|artikelen|onderwerpen|informatie)|lees ook|zie ook|meer (nieuws|berichten)|delen|deel (dit|deze) (bericht|pagina|artikel)|share|cookies?|cookie-?instellingen|op deze pagina|inhoud|inhoudsopgave)$/i
+/** Resten van een deel- of cookiebalk; alleen in een KORTE sectie (≤ `KADER_RESTEN_MAX_TEKENS`) een kaderteken. */
+const KADER_RESTEN = /\b(alles accepteren|alleen noodzakelijk|cookie-?instellingen|deel via|delen via|delen op (linkedin|facebook|x|twitter))\b/i
+const KADER_RESTEN_MAX_TEKENS = 300
+/** Aandeel linktekst waarboven een sectie een menu of lijst verwijzingen is, geen lopende tekst. */
+export const KADER_LINKDICHTHEID = 0.6
+
+/**
+ * Is deze sectie kader in plaats van inhoud? Drie deterministische tekens:
+ *  1. de kop is een kaderkop (`KADER_KOP`: Downloads, Auteurs, Tags, …);
+ *  2. de sectie is kort en draagt resten van een deel- of cookiebalk;
+ *  3. de linkdichtheid is ≥ `KADER_LINKDICHTHEID`: de tekst bestaat vooral uit
+ *     linkteksten (menu, "Lees verder", teaserlijst).
+ *
+ * AANLEIDING (Krant 1F fase 3, 28 sep 2026): ~9 rijen in productie waren
+ * menuresten die als eigen artikel geduid werden (DNB "Lees verder", "Delen
+ * via LinkedIn", DUO "Naar Studieschuld Op deze pagina…"). Een HELE sectie
+ * weglaten houdt de sleutels van de andere secties stabiel (hun tekst en dus
+ * hun hash verandert niet); tekst bínnen een sectie opschonen zou dat niet doen.
+ */
+export function isKaderSectie(kop: string, sectieHtml: string): boolean {
+  if (KADER_KOP.test(kop.trim())) return true
+  const tekst = stripHtml(sectieHtml)
+  if (tekst.length === 0) return true
+  if (tekst.length <= KADER_RESTEN_MAX_TEKENS && KADER_RESTEN.test(tekst)) return true
+  let linktekst = 0
+  for (const a of vindElementen(sectieHtml, ['a'])) {
+    if (a.sluit < 0) continue
+    linktekst += stripHtml(sectieHtml.slice(a.binnen, a.sluit)).length
+  }
+  return linktekst / tekst.length >= KADER_LINKDICHTHEID
+}
+
+interface RuweSectie {
+  kop: string
+  tekst: string
+}
+
+/**
+ * De hoofdinhoud geknipt op kopniveau h1–h3, zonder teasers en zonder
+ * kadersecties, ontdubbeld. Eén snede voor `extractSecties` (web_pagina) en
+ * `artikelTekst` (detailpagina), zodat beide dezelfde grens trekken.
+ */
+function inhoudSecties(html: string): RuweSectie[] {
   const inhoud = zonderTeasers(hoofdInhoud(html))
   const titel = paginaTitel(html)
   const stukken: { kop: string; van: number; tot: number }[] = []
@@ -289,17 +345,47 @@ export function extractSecties(html: string, max: number): { secties: PaginaSect
   stukken.push({ kop: vorige.kop, van: vorige.van, tot: inhoud.length })
 
   const gezien = new Set<string>()
-  const alle: PaginaSectie[] = []
+  const uit: RuweSectie[] = []
   for (const s of stukken) {
-    const tekst = stripHtml(inhoud.slice(s.van, s.tot))
-    if (tekst.length < MIN_SECTIE_TEKENS) continue
+    const sectieHtml = inhoud.slice(s.van, s.tot)
     const kop = s.kop || titel
+    if (isKaderSectie(kop, sectieHtml)) continue
+    const tekst = stripHtml(sectieHtml)
     const sleutel = normaliseerInhoud(`${kop}\n${tekst}`)
     if (gezien.has(sleutel)) continue
     gezien.add(sleutel)
-    alle.push({ kop, tekst })
+    uit.push({ kop, tekst })
   }
+  return uit
+}
+
+/**
+ * Knip de hoofdinhoud op kopniveau h1–h3 in secties. Deterministisch: dezelfde
+ * HTML geeft dezelfde secties in dezelfde volgorde. Teasers, kaarten en
+ * kadersecties (`isKaderSectie`) gaan er vóór het knippen uit. Identieke
+ * secties komen één keer terug. `max` is een EXPLICIETE cap: wat erbuiten
+ * valt, telt de aanroeper als `afgekapt` in de brongezondheid.
+ */
+export function extractSecties(html: string, max: number): { secties: PaginaSectie[]; afgekapt: number } {
+  const alle = inhoudSecties(html).filter((s) => s.tekst.length >= MIN_SECTIE_TEKENS)
   return { secties: alle.slice(0, Math.max(0, max)), afgekapt: Math.max(0, alle.length - Math.max(0, max)) }
+}
+
+// ── Detailpagina: de artikeltekst (Krant 1F fase 3) ──────────────────
+
+/**
+ * De lezerstekst van een artikelpagina als één tekst: per inhoudssectie de kop
+ * en de tekst, zonder kader (`isKaderSectie`: Downloads, Auteurs, Tags, menu's,
+ * deel- en cookiebalken) en zonder teasers. Anders dan bij `extractSecties`
+ * tellen ook korte secties mee: op een artikelpagina kan één korte alinea het
+ * kerngetal dragen. Knippen op de fragmentgrens doet de aanroeper.
+ */
+export function artikelTekst(html: string): string {
+  return inhoudSecties(html)
+    .filter((s) => s.tekst.length > 0)
+    .map((s) => (s.tekst.startsWith(s.kop) ? s.tekst : `${s.kop}\n${s.tekst}`))
+    .join('\n\n')
+    .trim()
 }
 
 // ── web_lijst: links ─────────────────────────────────────────────────
@@ -485,7 +571,8 @@ const MAX_JSON_LD_BLOKKEN = 10
 
 /**
  * Lees de publicatie- en wijzigingsdatum uit de metadata van de bron (JSON-LD,
- * dan Open Graph-`article:*`). Nooit uit lopende tekst en nooit van het model.
+ * dan Open Graph-`article:*`, dan `<meta name="publicationdatetime">`). Nooit
+ * uit lopende tekst en nooit van het model.
  */
 export function extractBronDatums(html: string): BronDatums {
   let gewijzigd: string | null = null
@@ -506,5 +593,8 @@ export function extractBronDatums(html: string): BronDatums {
   }
   gewijzigd ??= isoOfNull(metaInhoud(html, 'article:modified_time'))
   gepubliceerd ??= isoOfNull(metaInhoud(html, 'article:published_time'))
+  // CPB heeft geen JSON-LD en geen Open Graph, wel deze meta (Krant 1F fase 3).
+  // Metadata, geen lopende tekst: dezelfde regel als hierboven.
+  gepubliceerd ??= isoOfNull(metaInhoud(html, 'publicationdatetime'))
   return { gewijzigd, gepubliceerd }
 }

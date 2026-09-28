@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { errorResponse, serverError } from '@/lib/api/respond'
 import { getModel } from '@/lib/ai/config'
-import { bepaalIngestUitkomst, runNewsIngest } from '@/lib/news-ingest'
+import { bepaalIngestUitkomst, runNewsIngest, DETAIL_TIJDBUDGET_MS } from '@/lib/news-ingest'
 import { DUIDING_MAX_PER_RUN_CRON, DUIDING_TIJDBUDGET_MS_CRON } from '@/lib/krant/duiding'
 import { recordJobRun } from '@/lib/job-runs'
 
@@ -122,7 +122,10 @@ export async function GET(request: Request) {
     const { summary, health } = await runNewsIngest(service, model, {
       duidingModel,
       duidingMaxPerRun: DUIDING_MAX_PER_RUN_CRON,
-      duidingTijdBudgetMs: DUIDING_TIJDBUDGET_MS_CRON,
+      // Krant 1F fase 3 zette een detailstap (25 s) vóór de categorisatie; zonder
+      // deze aftrek telden de budgetten op tot ~300 s = maxDuration, en een trage
+      // ochtend liet Vercel de run afkappen vóór job_runs werd afgesloten.
+      duidingTijdBudgetMs: DUIDING_TIJDBUDGET_MS_CRON - DETAIL_TIJDBUDGET_MS,
     })
 
     // De status volgt de UITKOMST, niet het uitblijven van een exception. Tot

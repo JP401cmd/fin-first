@@ -61,6 +61,9 @@ interface JobRun {
     duiding?: { geduid?: number; afgewezen?: number; mislukt?: number; overgeslagen?: number; wacht?: number }
     /** Welke stap zijn resultaat verloor bij een `partial`-run; tellingen en labels, geen tekst. */
     verlies?: string[]
+    /** Krant 1F fase 3: artikelpagina's van nieuwe items en van de backfill in deze run. */
+    details?: DetailTellers
+    backfill?: BackfillTellers
   } | null
   error: string | null
 }
@@ -78,7 +81,42 @@ interface SourceHealthEntry {
   httpStatus?: number
   afgekapt?: number
   geweigerd?: number
+  detailGelezen?: number
+  detailTerugval?: number
+  detailGeenHtml?: number
+  detailUitgesteld?: number
   error?: string
+}
+
+interface DetailTellers { gelezen?: number; terugval?: number; geenHtml?: number; uitgesteld?: number }
+interface BackfillTellers { gelezen?: number; terugval?: number; geenHtml?: number; herduid?: number; uitgesteld?: number; fout?: number }
+
+/**
+ * Eén regel over de artikelpagina's van een run (Krant 1F fase 3), of null als
+ * er geen enkele poging was. Alleen tellingen — geen URL's of tekst.
+ */
+function detailRegel(d?: DetailTellers, b?: BackfillTellers): string | null {
+  const delen: string[] = []
+  const nieuw = (d?.gelezen ?? 0) + (d?.terugval ?? 0) + (d?.geenHtml ?? 0) + (d?.uitgesteld ?? 0)
+  if (nieuw > 0) {
+    delen.push(
+      `artikelpagina's: ${d?.gelezen ?? 0} gelezen, ${d?.terugval ?? 0} terugval${d?.geenHtml ? `, ${d.geenHtml} geen webpagina` : ''}${d?.uitgesteld ? `, ${d.uitgesteld} uitgesteld` : ''}`,
+    )
+  }
+  const oud = (b?.gelezen ?? 0) + (b?.terugval ?? 0) + (b?.geenHtml ?? 0) + (b?.uitgesteld ?? 0) + (b?.fout ?? 0)
+  if (oud > 0) {
+    delen.push(
+      `bestaande rijen: ${b?.gelezen ?? 0} gelezen (${b?.herduid ?? 0} opnieuw te duiden), ${b?.terugval ?? 0} terugval${b?.geenHtml ? `, ${b.geenHtml} geen webpagina` : ''}${b?.uitgesteld ? `, ${b.uitgesteld} naar de volgende run` : ''}${b?.fout ? `, ${b.fout} fout (zie serverlog)` : ''}`,
+    )
+  }
+  return delen.length > 0 ? delen.join(' · ') : null
+}
+
+/** De detailtellers van één bron, of een lege tekst. */
+function bronDetailTekst(s: SourceHealthEntry): string {
+  const totaal = (s.detailGelezen ?? 0) + (s.detailTerugval ?? 0) + (s.detailGeenHtml ?? 0) + (s.detailUitgesteld ?? 0)
+  if (totaal === 0) return ''
+  return ` · artikelpagina's ${s.detailGelezen ?? 0}/${totaal} gelezen${s.detailTerugval ? `, ${s.detailTerugval} terugval` : ''}${s.detailGeenHtml ? `, ${s.detailGeenHtml} geen webpagina` : ''}${s.detailUitgesteld ? `, ${s.detailUitgesteld} uitgesteld` : ''}`
 }
 
 /** Eén bron in de editor: web (lijst/pagina) en RSS in één lijst, gesplitst bij opslaan. */
@@ -406,9 +444,10 @@ export default function BeheerNieuwsPage() {
       // Een run die liep maar een stap verloor, zegt dat er ook bij: zonder die
       // regel is "het is gelukt" niet te onderscheiden van "er is niets gebeurd".
       const verlies: string[] = Array.isArray(s.verlies) ? s.verlies : []
+      const detail = detailRegel(s.details, s.backfill)
       setStatus({
         type: 'success',
-        message: `${s.inserted} nieuw · ${s.alBekend ?? 0} al bekend · ${s.duplicatesSkipped ?? 0} dubbel${s.skipped ? ` · ${s.skipped} niet geschreven` : ''}${s.uitgesteld ? ` · ${s.uitgesteld} uitgesteld naar de volgende run` : ''} (${s.rssArticlesFound ?? 0} uit RSS, ${s.webArticlesExtracted ?? 0} uit web) uit ${s.sourcesChecked} bronnen${verlies.length > 0 ? ` — deels geslaagd, verloren: ${verlies.join(' · ')}` : ''}`,
+        message: `${s.inserted} nieuw · ${s.alBekend ?? 0} al bekend · ${s.duplicatesSkipped ?? 0} dubbel${s.skipped ? ` · ${s.skipped} niet geschreven` : ''}${s.uitgesteld ? ` · ${s.uitgesteld} uitgesteld naar de volgende run` : ''} (${s.rssArticlesFound ?? 0} uit RSS, ${s.webArticlesExtracted ?? 0} uit web) uit ${s.sourcesChecked} bronnen${detail ? ` · ${detail}` : ''}${verlies.length > 0 ? ` — deels geslaagd, verloren: ${verlies.join(' · ')}` : ''}`,
       })
       loadArticles(dbSearch, { status: statusFilter, rekenend: alleenRekenend })
       loadIngestStatus()
@@ -586,6 +625,9 @@ export default function BeheerNieuwsPage() {
                         overgeslagen, {run.summary.duiding.wacht ?? 0} wacht
                       </>
                     )}
+                    {detailRegel(run.summary.details, run.summary.backfill) && (
+                      <> · {detailRegel(run.summary.details, run.summary.backfill)}</>
+                    )}
                   </span>
                 ) : run.error ? (
                   <span className="text-red-700">{run.error}</span>
@@ -631,7 +673,12 @@ export default function BeheerNieuwsPage() {
                             <span className="block pl-4 text-xs text-[var(--ink-4)]">
                               {oorzaakTekst(source)}
                               {source.afgekapt ? ` · ${source.afgekapt} boven de cap niet meegenomen` : ''}
-                              {source.geweigerd ? ` · ${source.geweigerd} linkkeuzes geweigerd` : ''}
+                              {source.geweigerd
+                                ? source.soort === 'rss'
+                                  ? ` · ${source.geweigerd} items op een andere site geweigerd`
+                                  : ` · ${source.geweigerd} linkkeuzes geweigerd`
+                                : ''}
+                              {bronDetailTekst(source)}
                             </span>
                           </td>
                           <td className="px-3 py-2 text-xs text-[var(--ink-4)]">

@@ -13,7 +13,15 @@
 // standaardbronnen: geen node-imports hier.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { stripHtml, decodeEntities, isStoringspagina } from '@/lib/news-html'
+import {
+  stripHtml,
+  decodeEntities,
+  isStoringspagina,
+  artikelTekst,
+  extractBronDatums,
+  knipTekens,
+  type BronDatums,
+} from '@/lib/news-html'
 import { isVeiligeBronUrl, zelfdeHost } from '@/lib/safe-url'
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -112,6 +120,11 @@ export const BRON_OORZAKEN = [
   // eigen code en niet 'leeg': er stond wél tekst, alleen niet de bron. Die run
   // levert bewust niets, zodat een onderhoudsmelding nooit een artikel wordt.
   'storing',
+  // Het antwoord was geen HTML (pdf, spreadsheet, afbeelding): de body is NIET
+  // gelezen (Krant 1F fase 3). Voor een detailpagina is dat verwacht en geen
+  // verlies; voor een geconfigureerde webbron betekent het dat de bron-URL naar
+  // een document wijst in plaats van een pagina.
+  'geen_html',
 ] as const
 export type BronOorzaak = (typeof BRON_OORZAKEN)[number]
 
@@ -131,6 +144,7 @@ export const BRON_OORZAAK_LABEL: Record<BronOorzaak, string> = {
   terugval_geen_model: 'geen AI-model — eerste links genomen',
   terugval_model_fout: 'AI-keuze mislukt — eerste links genomen',
   storing: 'bron meldt storing of onderhoud — niets overgenomen',
+  geen_html: 'geen webpagina (pdf of ander document) — niet gelezen',
 }
 
 /**
@@ -230,11 +244,17 @@ export function standaardWebBronnen(nu: Date = new Date()): WebSource[] {
     { url: 'https://www.rijksoverheid.nl/themas/belastingen-uitkeringen-en-toeslagen/algemene-ouderdomswet-aow/aow-leeftijd', label: 'Rijksoverheid — AOW-leeftijd', soort: 'web_pagina' },
     { url: 'https://www.rijksoverheid.nl/vraag-en-antwoord/zorgverzekering/eigen-risico-zorgverzekering', label: 'Rijksoverheid — Eigen risico zorgverzekering', soort: 'web_pagina' },
     // Rijksfinanciën, Belastingdienst & DUO — regel-/documentpagina's
-    { url: belastingplanWettekstenUrl(nu), label: 'Rijksfinanciën — Belastingplan wetteksten', soort: 'web_pagina' },
+    // Wetteksten en Box 3 zijn LIJSTEN (documenten, tegels): als themapagina
+    // bleef er na het kaderfilter van Krant 1F fase 3 niets van over (6→1 en
+    // 5→0 secties). Als lijstbron komt een nieuw wetsvoorstel of een nieuwe
+    // tegel als link binnen, met de linktekst als kop (besluit eigenaar 28 sep).
+    // De wetteksten zijn pdf's: buiten DETAIL_HOSTS, dus alleen de kop.
+    { url: belastingplanWettekstenUrl(nu), label: 'Rijksfinanciën — Belastingplan wetteksten', soort: 'web_lijst' },
     { url: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/inkomstenbelasting/heffingskortingen_boxen_tarieven/boxen_en_tarieven/box_1/box_1', label: 'Belastingdienst — Box 1 tarieven', soort: 'web_pagina' },
-    { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3', label: 'Belastingdienst — Box 3', soort: 'web_pagina' },
+    { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3', label: 'Belastingdienst — Box 3', soort: 'web_lijst' },
     { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/content/met-welke-percentages-is-het-fictief-rendement-berekend', label: 'Belastingdienst — Box 3 rendementspercentages', soort: 'web_pagina' },
-    { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/toeslagen', label: 'Belastingdienst — Toeslagen', soort: 'web_pagina' },
+    // Belastingdienst — Toeslagen verwijderd (28 sep): een hub met tegels naar
+    // aanvragen en inloggen, geen regelnieuws; als themapagina 8→0 secties.
     { url: 'https://www.duo.nl/particulier/rente/rente-als-uw-studiefinanciering-stopt.jsp', label: 'DUO — Rente studieschuld', soort: 'web_pagina' },
     // Toezichthouders & instituten
     { url: 'https://www.dnb.nl/voor-de-sector/wet-toekomst-pensioenen/', label: 'DNB — Wet toekomst pensioenen', soort: 'web_pagina' },
@@ -349,7 +369,27 @@ export const MAX_RSS_ITEMS = 25
 export const MAX_BODY_BYTES = 2_000_000
 /** Hoogstens zoveel redirects; elke hop wordt opnieuw getoetst. */
 export const MAX_REDIRECTS = 3
-const USER_AGENT = 'TriFinity/1.0 NewsAggregator'
+/** Met contactadres, zodat een bronbeheerder weet wie er komt en ons kan bereiken (Krant 1F fase 3). */
+const USER_AGENT = 'TriFinity/1.0 NewsAggregator (+https://fin-first.vercel.app)'
+
+interface HaalOpOpties {
+  /** De geconfigureerde bron-URL: elke hop moet op dezelfde site blijven. Standaard de URL zelf. */
+  anker?: string
+  /**
+   * Content-type-toets vóór de body wordt gelezen. `streng`: alleen een
+   * expliciete HTML-header (detailpagina's). `los`: weiger een expliciet
+   * niet-HTML-type, maar laat een ontbrekende header door (geconfigureerde
+   * webbronnen, zoals vóór fase 3).
+   */
+  html?: 'streng' | 'los'
+}
+
+/** Is dit antwoord HTML? Zie `HaalOpOpties.html`. */
+export function isHtmlAntwoord(contentType: string | null, modus: 'streng' | 'los'): boolean {
+  if (!contentType || !contentType.trim()) return modus === 'los'
+  const type = contentType.split(';')[0].trim().toLowerCase()
+  return type === 'text/html' || type === 'application/xhtml+xml'
+}
 
 type Ophaal =
   | { ok: true; body: string; finalUrl: string }
@@ -411,8 +451,12 @@ async function leesBegrensd(res: Response): Promise<string> {
  * opgeslagen. Sinds Krant 1F fase 2 is de ingest de ENIGE aanroeper: de
  * duidingsstap doet zelf geen HTTP meer.
  */
-async function haalOp(url: string, accept: string): Promise<Ophaal> {
+async function haalOp(url: string, accept: string, opties: HaalOpOpties = {}): Promise<Ophaal> {
   if (!isVeiligeBronUrl(url)) return { ok: false, oorzaak: 'adres_geweigerd' }
+  // De site-grens is het ANKER (de geconfigureerde bron), niet de opgehaalde
+  // URL zelf — anders schuift de grens mee met een link (Krant 1F fase 3).
+  const anker = opties.anker ?? url
+  if (!zelfdeHost(url, anker)) return { ok: false, oorzaak: 'adres_geweigerd' }
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
@@ -434,7 +478,7 @@ async function haalOp(url: string, accept: string): Promise<Ophaal> {
         } catch {
           return { ok: false, oorzaak: 'doorverwezen', httpStatus: res.status }
         }
-        if (!isVeiligeBronUrl(volgende) || !zelfdeHost(volgende, url)) {
+        if (!isVeiligeBronUrl(volgende) || !zelfdeHost(volgende, anker)) {
           return { ok: false, oorzaak: 'doorverwezen', httpStatus: res.status }
         }
         if (isFoutpagina(volgende)) return { ok: false, oorzaak: 'doorverwezen_naar_fout', httpStatus: res.status }
@@ -442,6 +486,12 @@ async function haalOp(url: string, accept: string): Promise<Ophaal> {
         continue
       }
       if (!res.ok) return { ok: false, oorzaak: 'http_fout', httpStatus: res.status }
+      // Vóór de body: is dit wel HTML? Een pdf van 850 kB werd anders als
+      // "tekst" ingelezen (28 sep 2026). Niet lezen, socket vrijgeven.
+      if (opties.html && !isHtmlAntwoord(res.headers?.get?.('content-type') ?? null, opties.html)) {
+        await res.body?.cancel?.().catch(() => undefined)
+        return { ok: false, oorzaak: 'geen_html', httpStatus: res.status }
+      }
       const body = await leesBegrensd(res)
       return { ok: true, body, finalUrl: huidig }
     }
@@ -458,6 +508,8 @@ export interface RssUitkomst {
   httpStatus?: number
   /** Items die de feed wél had, maar boven `MAX_RSS_ITEMS` vielen. */
   afgekapt: number
+  /** Items waarvan de link naar een andere site wees dan de feed — niet overgenomen. */
+  geweigerd: number
 }
 
 /**
@@ -522,19 +574,32 @@ function linkOnderPad(link: string, pad: string): boolean {
  * Parse een feed-body (RSS <item> of Atom <entry>). Puur, voor tests.
  * `alleenPad` filtert vóór de cap van `MAX_RSS_ITEMS`, zodat de cap naar
  * bruikbare items gaat; wat het filter weert telt niet als `afgekapt`.
+ *
+ * `zelfdeSiteAls` (de feed-URL) houdt alleen items over waarvan de link op
+ * dezelfde site staat als de feed (Krant 1F fase 3). Sinds de ingest de
+ * artikelpagina van een feed-item zelf ophaalt, is een feed-link een adres dat
+ * de SERVER bezoekt; zonder deze grens kan een feed de server naar elke host
+ * sturen. Wat de grens weert, telt als `geweigerd` (zichtbaar in de
+ * brongezondheid).
  */
 export function parseFeed(
   xml: string,
   sourceName: string,
   alleenPad: string | null = null,
-): { items: RssItem[]; isFeed: boolean; afgekapt: number } {
+  zelfdeSiteAls: string | null = null,
+): { items: RssItem[]; isFeed: boolean; afgekapt: number; geweigerd: number } {
   const isFeed = /<(rss|feed|rdf:RDF)\b/i.test(xml)
-  if (!isFeed) return { items: [], isFeed: false, afgekapt: 0 }
+  if (!isFeed) return { items: [], isFeed: false, afgekapt: 0, geweigerd: 0 }
   const alle: RssItem[] = []
+  let geweigerd = 0
   for (const itemXml of feedItems(xml)) {
     const title = extractTag(itemXml, 'title')
     const link = extractLink(itemXml)
     if (!title || !link) continue
+    if (zelfdeSiteAls && !zelfdeHost(link, zelfdeSiteAls)) {
+      geweigerd++
+      continue
+    }
     if (alleenPad && !linkOnderPad(link, alleenPad)) continue
     const description =
       extractTag(itemXml, 'description') || extractTag(itemXml, 'content:encoded') || extractTag(itemXml, 'summary') || ''
@@ -543,16 +608,16 @@ export function parseFeed(
     )
     alle.push({ title, description: description || null, link, publishedAt, sourceName })
   }
-  return { items: alle.slice(0, MAX_RSS_ITEMS), isFeed: true, afgekapt: Math.max(0, alle.length - MAX_RSS_ITEMS) }
+  return { items: alle.slice(0, MAX_RSS_ITEMS), isFeed: true, afgekapt: Math.max(0, alle.length - MAX_RSS_ITEMS), geweigerd }
 }
 
 /** Haal een feed op en parse hem. Werpt nooit; de uitkomst draagt de oorzaak. */
 export async function fetchRssFeed(feed: RssFeed): Promise<RssUitkomst> {
   const r = await haalOp(feed.url, 'application/rss+xml, application/atom+xml, application/xml, text/xml')
-  if (!r.ok) return { items: [], oorzaak: r.oorzaak, httpStatus: r.httpStatus, afgekapt: 0 }
-  const { items, isFeed, afgekapt } = parseFeed(r.body, feed.label, rssPadFilter(feed.url))
-  if (!isFeed) return { items: [], oorzaak: 'geen_feed', afgekapt: 0 }
-  return { items, oorzaak: items.length > 0 ? 'ok' : 'leeg', afgekapt }
+  if (!r.ok) return { items: [], oorzaak: r.oorzaak, httpStatus: r.httpStatus, afgekapt: 0, geweigerd: 0 }
+  const { items, isFeed, afgekapt, geweigerd } = parseFeed(r.body, feed.label, rssPadFilter(feed.url), feed.url)
+  if (!isFeed) return { items: [], oorzaak: 'geen_feed', afgekapt: 0, geweigerd: 0 }
+  return { items, oorzaak: items.length > 0 ? 'ok' : 'leeg', afgekapt, geweigerd }
 }
 
 export type WebPaginaUitkomst =
@@ -566,22 +631,137 @@ export type WebPaginaUitkomst =
  * een artikel van kan maken.
  */
 export async function fetchWebPage(source: { url: string }): Promise<WebPaginaUitkomst> {
-  const r = await haalOp(source.url, 'text/html')
+  const r = await haalOp(source.url, 'text/html', { html: 'los' })
   if (!r.ok) return r
   if (isStoringspagina(r.body)) return { ok: false, oorzaak: 'storing' }
   return { ok: true, html: r.body, finalUrl: r.finalUrl }
 }
 
 // `WEB_TEKST_MAX_TEKENS` / `webTekstVoorDuiding` / `fetchWebContent` stonden
-// hier tot Krant 1F fase 2. Ze leverden de volledige paginatekst aan de
-// duidingsstap (met een "[label]: "-prefix die die stap er weer afhaalde);
-// sinds fase 2 is de grondslag uitsluitend het eigen `bron_fragment` van een
-// rij, dus ze hadden geen aanroeper meer. Een geëxporteerde fetch-helper met
-// "gebruikt door de duidingsstap" in zijn commentaar is de kortste weg terug
-// naar precies het pad dat deze fase sloot (security-review 1F fase 2,
-// bevinding 4). Fase 3 haalt een DETAILPAGINA per item op — dat is een andere
-// aanroepvorm, die zijn eigen helper en security-run krijgt en `fetchWebPage`
-// hieronder als basis heeft.
+// hier tot Krant 1F fase 2 en leverden de volledige paginatekst aan de
+// duidingsstap. Die stap leest sinds fase 2 uitsluitend het eigen
+// `bron_fragment` van een rij en doet zelf geen HTTP. De artikelpagina van
+// fase 3 hieronder wordt door de INGEST opgehaald en in `bron_fragment`
+// bewaard — de duiding blijft zonder netwerk.
+
+// ── Detailpagina's (Krant 1F fase 3) ─────────────────────────────────
+
+/**
+ * Hosts en paden waarvan de ingest de artikelpagina van een item zelf ophaalt.
+ * Bewust in code (naar het voorbeeld van `RSS_PAD_FILTER`) en niet als veld op
+ * de opgeslagen bron: het is tegelijk een BEVEILIGINGSGRENS — de server
+ * bezoekt alleen deze adressen — en die blijft gelden als de beheerder de
+ * bronnenlijst opslaat. Een nieuwe host erbij is een codewijziging met review.
+ *
+ *   www.cbs.nl  /nl-nl/nieuws/          de RSS-nieuwsitems: de feed geeft bij
+ *               nieuws géén description (35 van 36 fragmenten leeg, 28 sep)
+ *   www.cpb.nl  /                       publicaties en ramingen (lijstbron)
+ *   www.afm.nl  /nl-nl/sector/actueel/  sectornieuws (lijstbron)
+ */
+export const DETAIL_HOSTS: Readonly<Record<string, string>> = {
+  'www.cbs.nl': '/nl-nl/nieuws/',
+  'www.cpb.nl': '/',
+  'www.afm.nl': '/nl-nl/sector/actueel/',
+}
+
+/** Bovengrens van de bewaarde artikeltekst (besluit eigenaar 28 sep: 4.000 tekens). */
+export const DETAIL_FRAGMENT_MAX_TEKENS = 4_000
+/** Minder lezerstekst dan dit is geen artikel (een JS-app, een lege sjabloonpagina): terugval. */
+export const DETAIL_MIN_TEKENS = 200
+/** Documenten die we nooit ophalen: pdf's en kantoorbestanden (buiten scope, zie de kaart). */
+const DOCUMENT_PAD = /\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|csv|zip)$/i
+
+/**
+ * Draagt deze same-site URL een andere absolute URL in zijn pad of query? Dat
+ * is de vorm van een open redirector (`https://bron.nl/uit?url=https://elders`).
+ *
+ * Eerst (25 sep 2026) alleen voor de terugval van een lijstbron: een
+ * doorstuur-link zou zonder model bovenaan de paginavolgorde als klikbare bron
+ * bij de lezer komen. Sinds Krant 1F fase 3 is het óók een grens vóór de
+ * server een detailpagina ophaalt: `haalOp` volgt geen redirect naar een andere
+ * site, maar de server hoort zo'n adres niet eens te proberen.
+ *
+ * Bewust een VORM-toets, geen lijst van parameternamen: `?url=`, `?redirect=`,
+ * `?next=`, `/out/https://…` — de naam varieert, de vorm niet.
+ */
+export function isDoorstuurVorm(url: string): boolean {
+  let doel: URL
+  try {
+    doel = new URL(url)
+  } catch {
+    return true
+  }
+  const verdacht = /https?:\/\//i
+  // `decodeURIComponent` werpt op een misvormde escape (`%ZZ`). Dan toetsen we
+  // de rauwe vorm: een URL die niet eens te decoderen is, verdient geen
+  // voorkeursbehandeling.
+  const ontcijfer = (t: string): string => {
+    try {
+      return decodeURIComponent(t)
+    } catch {
+      return t
+    }
+  }
+  if (verdacht.test(ontcijfer(doel.pathname))) return true
+  for (const [, waarde] of doel.searchParams) {
+    const w = ontcijfer(waarde).trim()
+    // Ook de protocol-relatieve vorm (`?url=//elders.nl`, `?next=\\elders.nl`).
+    // Alleen in de query: een dubbele slash in het PAD is gewoon (de ECB-feeds
+    // dragen letterlijk `//press`).
+    if (verdacht.test(w) || /^[\\/]{2}/.test(w)) return true
+  }
+  return false
+}
+
+/**
+ * Mag de server de artikelpagina op dit adres ophalen? Alleen https op een
+ * host en pad uit `DETAIL_HOSTS` (exacte hostnaam), geen doorstuurvorm, en
+ * de bestaande adrestoets (`isVeiligeBronUrl`: geen IP, poort of lokale host).
+ */
+export function detailToegestaan(url: string): boolean {
+  if (!isVeiligeBronUrl(url) || isDoorstuurVorm(url)) return false
+  try {
+    const u = new URL(url)
+    const pad = DETAIL_HOSTS[u.hostname.toLowerCase()]
+    return pad !== undefined && u.pathname.startsWith(pad)
+  } catch {
+    return false
+  }
+}
+
+export type DetailUitkomst =
+  | { uitkomst: 'gelezen'; tekst: string; datums: BronDatums }
+  | { uitkomst: 'terugval'; oorzaak: BronOorzaak; httpStatus?: number }
+  | { uitkomst: 'geen_html' }
+
+/**
+ * Haal de artikelpagina van één item op en lees de artikeltekst. Werpt nooit.
+ *
+ * Grenzen, in deze volgorde:
+ *  1. `detailToegestaan` — host en pad uit `DETAIL_HOSTS`, geen doorstuurvorm;
+ *  2. een documentpad (.pdf, .xlsx, …) wordt niet opgehaald → `geen_html`;
+ *  3. `haalOp` met ANKER = de geconfigureerde bron (feed of lijstpagina): de
+ *     link en elke redirect-hop blijven op die site, niet op de site van de link;
+ *  4. content-type `streng`: alleen een expliciete HTML-header; anders wordt
+ *     de body niet gelezen → `geen_html`;
+ *  5. een storingspagina of een pagina zonder artikeltekst → `terugval`.
+ *
+ * De tekst is `artikelTekst` (zonder kader), geknipt op
+ * `DETAIL_FRAGMENT_MAX_TEKENS`. De datums komen uit de metadata van de pagina.
+ */
+export async function fetchDetailPagina(detailUrl: string, ankerUrl: string): Promise<DetailUitkomst> {
+  if (!detailToegestaan(detailUrl)) return { uitkomst: 'terugval', oorzaak: 'adres_geweigerd' }
+  if (DOCUMENT_PAD.test(new URL(detailUrl).pathname)) return { uitkomst: 'geen_html' }
+  const r = await haalOp(detailUrl, 'text/html', { anker: ankerUrl, html: 'streng' })
+  if (!r.ok) {
+    if (r.oorzaak === 'geen_html') return { uitkomst: 'geen_html' }
+    return { uitkomst: 'terugval', oorzaak: r.oorzaak, ...(r.httpStatus !== undefined ? { httpStatus: r.httpStatus } : {}) }
+  }
+  if (isStoringspagina(r.body)) return { uitkomst: 'terugval', oorzaak: 'storing' }
+  const tekst = knipTekens(artikelTekst(r.body), DETAIL_FRAGMENT_MAX_TEKENS)
+  if (tekst.length < DETAIL_MIN_TEKENS) return { uitkomst: 'terugval', oorzaak: 'leeg' }
+  return { uitkomst: 'gelezen', tekst, datums: extractBronDatums(r.body) }
+}
 
 // ── Source configuration from Supabase ───────────────────────────────
 

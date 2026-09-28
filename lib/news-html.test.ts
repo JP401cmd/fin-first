@@ -10,6 +10,9 @@ import {
   paginaTitel,
   isStoringspagina,
   STORING_MAX_TEKENS,
+  isKaderSectie,
+  artikelTekst,
+  KADER_LINKDICHTHEID,
 } from './news-html'
 import {
   BELASTINGDIENST_STORING_HTML,
@@ -244,5 +247,105 @@ describe('isStoringspagina — een onderhoudsmelding wordt nooit een artikel', (
     const erbuiten = 'x'.repeat(284) + ' ' + melding // laatste letter valt op teken 301
     expect(isStoringspagina(kalePagina(binnen))).toBe(true)
     expect(isStoringspagina(kalePagina(erbuiten))).toBe(false)
+  })
+})
+
+// ── Krant 1F fase 3: kader weren en de artikeltekst ─────────────────
+
+describe('isKaderSectie', () => {
+  it.each(['Downloads', 'Auteurs', 'Contactpersonen', 'Tags', 'Gerelateerde publicaties', 'Delen', ' Op deze pagina '])(
+    'kaderkop %s',
+    (kop) => expect(isKaderSectie(kop, '<p>Een gewone alinea met genoeg tekst om geen menu te zijn, ook al is de kop kader.</p>')).toBe(true),
+  )
+
+  it('een kop die alleen met een kaderwoord BEGINT is inhoud', () => {
+    expect(
+      isKaderSectie('Contact met de Belastingdienst over uw aanslag', '<p>Bel de BelastingTelefoon als u vragen hebt over uw aanslag over 2026.</p>'),
+    ).toBe(false)
+  })
+
+  it('resten van een deel- of cookiebalk in een korte sectie', () => {
+    expect(isKaderSectie('Nieuws', '<p>Delen: Deel via LinkedIn Deel via X</p>')).toBe(true)
+    expect(isKaderSectie('Instellingen', '<p>Alles accepteren Alleen noodzakelijk</p>')).toBe(true)
+  })
+
+  it('dezelfde woorden diep in een lange sectie maken hem geen kader', () => {
+    const lang = `<p>${'De regeling wijzigt per 1 januari en geldt voor iedereen met een hypotheek. '.repeat(5)} Deel via LinkedIn.</p>`
+    expect(isKaderSectie('Wat verandert er', lang)).toBe(false)
+  })
+
+  it('linkdichtheid: op de grens wel, eronder niet', () => {
+    // 6 van 10 tekens linktekst = precies de grens (stripHtml zet een spatie tussen link en tekst).
+    expect(isKaderSectie('X', '<p><a href="/a">aaaaaa</a>bbb</p>')).toBe(true)
+    expect(KADER_LINKDICHTHEID).toBe(0.6)
+    // 5 van 10: lopende tekst met een inline link.
+    expect(isKaderSectie('X', '<p><a href="/a">aaaaa</a>bbbb</p>')).toBe(false)
+    // Menu: alleen links.
+    expect(isKaderSectie('Lees verder', '<ul><li><a href="/1">Rente</a></li><li><a href="/2">Inflatie</a></li></ul>')).toBe(true)
+  })
+
+  it('een lege sectie is kader', () => {
+    expect(isKaderSectie('Iets', '<div>  </div>')).toBe(true)
+  })
+})
+
+describe('extractSecties weert kadersecties zonder de sleutels van de rest te verschuiven', () => {
+  const inhoud = `<h2>Wat verandert er</h2><p>${'De heffingskorting stijgt in 2027 met 120 euro per jaar voor iedereen. '.repeat(2)}</p>`
+  it('dezelfde inhoudssectie met en zonder menu en deelbalk ernaast geeft dezelfde secties', () => {
+    const zonder = extractSecties(`<main>${inhoud}</main>`, 12).secties
+    const met = extractSecties(
+      `<main>${inhoud}<h2>Lees verder</h2><ul><li><a href="/a">Belastingplan 2027 in het kort</a></li><li><a href="/b">Alles over box 3 en het werkelijk rendement</a></li></ul><h2>Delen</h2><p>Deel via LinkedIn, deel via X of stuur het door per e-mail aan iemand die het wil lezen.</p></main>`,
+      12,
+    ).secties
+    expect(met).toEqual(zonder)
+    expect(met).toHaveLength(1)
+  })
+})
+
+describe('lineair op vijandige HTML (security-review 1F fase 3, Y1)', () => {
+  // 2.000 ongesloten <a>'s vóór 200k tekens: vóór de fix deelden ze allemaal
+  // dezelfde sluittag en kostte dit ~5 s (O(N×L)). Nu zijn de elementen per tag
+  // disjunct. Ruime grens tegen flakiness onder belasting; het oude gedrag zat
+  // er een factor 5+ boven.
+  it('artikelTekst, extractSecties en extractLinks blijven ruim binnen een seconde', () => {
+    const html = `<main>${'<a href="/x">'.repeat(2000)}${'tekst '.repeat(33_000)}</a></main>`
+    const t0 = performance.now()
+    artikelTekst(html)
+    extractSecties(html, 12)
+    extractLinks(html, 'https://www.cpb.nl/publicaties', 120)
+    expect(performance.now() - t0).toBeLessThan(1_000)
+  })
+
+  it('geneste lijstitems: het buitenste element telt, zoals knipElementen al deed', () => {
+    const html = '<main><ul><li><a href="/a">Eerste artikel met een kop</a><ul><li>binnen</li></ul></li><li><a href="/b">Tweede artikel met een kop</a></li></ul></main>'
+    expect(extractLinks(html, 'https://www.cpb.nl/publicaties', 10).links.map((l) => l.url)).toEqual([
+      'https://www.cpb.nl/a',
+      'https://www.cpb.nl/b',
+    ])
+  })
+})
+
+describe('artikelTekst', () => {
+  it('neemt koppen en korte alinea mee, laat kader en nav weg', () => {
+    const html = `<html><body><nav><a href="/">Home</a></nav><main><h1>Toetsrente</h1><p>De toetsrente blijft 5%.</p>
+<h2>Berekening</h2><p>Het gemiddelde van de tienjaarsrente plus een opslag.</p>
+<h2>Downloads</h2><ul><li><a href="/x.pdf">Rapport (pdf)</a></li></ul><h2>Tags</h2><p>hypotheek</p></main></body></html>`
+    const tekst = artikelTekst(html)
+    expect(tekst).toContain('De toetsrente blijft 5%.')
+    expect(tekst).toContain('Berekening')
+    expect(tekst).not.toMatch(/Home|Downloads|Rapport|Tags|hypotheek$/)
+  })
+
+  it('decodeert de aangevulde entiteiten', () => {
+    expect(decodeEntities('caf&eacute; &aacute; &oacute;')).toBe('café á ó')
+  })
+
+  it('publicationdatetime telt als bronmetadata, na Open Graph', () => {
+    expect(extractBronDatums('<meta name="publicationdatetime" content="2026-09-15T13:35:00+00:00">').gepubliceerd).toBe('2026-09-15T13:35:00.000Z')
+    expect(
+      extractBronDatums(
+        '<meta property="article:published_time" content="2026-09-01T00:00:00Z"><meta name="publicationdatetime" content="2026-09-15T13:35:00+00:00">',
+      ).gepubliceerd,
+    ).toBe('2026-09-01T00:00:00.000Z')
   })
 })

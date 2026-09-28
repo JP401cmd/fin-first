@@ -24,7 +24,17 @@
 // 3. Ontdubbelen: binnen de batch op sleutel én op exacte inhoud-hash, daarna
 //    tegen de bestaande rijen (sleutel en inhoud-hash). Alleen wat écht nieuw
 //    is gaat naar de categorisatie — geen modelcall voor wat we al hebben.
-//    Wat al bekend is, krijgt `laatst_gezien_at` = nu.
+//    Wat al bekend is, krijgt `laatst_gezien_at` = nu. Het nieuwe staat daarna
+//    OM-EN-OM per bron (`omEnOm`), zodat een tijdbudget niet steeds de staart
+//    van de bronnenlijst uitstelt.
+// 3b. Detailpagina's (Krant 1F fase 3): voor een nieuw item op een host uit
+//    `DETAIL_HOSTS` haalt de server de artikelpagina op en bewaart de
+//    artikeltekst als `bron_fragment` (≤ 4.000 tekens). De sleutel en de
+//    inhoud-hash blijven die van de AANKONDIGING (feed of lijstregel), zodat
+//    de identiteit niet afhangt van of het netwerk lukte. Met dezelfde cap en
+//    hetzelfde tijdbudget haalt de backfill de pagina op voor bestaande rijen
+//    die nog nooit geprobeerd zijn; die rij gaat per rij terug naar de
+//    duidingswachtrij (geen globale DUIDING_VERSIE-bump).
 // 4+5. Per brok van 20: categorisatie (optioneel model) en METEEN de upsert
 //    met `onConflict: 'source_url'` (= de unieke index), `ignoreDuplicates`
 //    + `.select('id')`: `inserted` telt de rijen die de database TERUGGAF, niet
@@ -47,9 +57,14 @@ import {
   loadNewsSources,
   fetchRssFeed,
   fetchWebPage,
+  fetchDetailPagina,
+  detailToegestaan,
+  isDoorstuurVorm,
   isTerugvalOorzaak,
+  DETAIL_HOSTS,
   type BronOorzaak,
   type BronSoort,
+  type DetailUitkomst,
   type SourceArticle,
 } from '@/lib/news-sources'
 import { extractBronDatums, extractLinks, extractSecties, knipTekens, kopUitLinktekst, normaliseerInhoud } from '@/lib/news-html'
@@ -96,6 +111,21 @@ const CATEGORISATIE_PARALLEL = 2
  * restant komt de volgende run.
  */
 export const CATEGORISATIE_TIJDBUDGET_MS = 75_000
+/**
+ * Tekens bronfragment per artikel in de categorisatie-call. Die call krijgt 20
+ * artikelen tegelijk; met artikeltekst van 4.000 tekens werd één call ~80k
+ * tekens. Voor een categorie en een korte samenvatting is de aanhef genoeg
+ * (Krant 1F fase 3, blokkerend punt uit het onderzoek).
+ */
+export const CATEGORISATIE_FRAGMENT_MAX_TEKENS = 600
+/** Detailpagina's per run, nieuwe items en backfill samen (expliciete cap; de rest is `uitgesteld`). */
+export const MAX_DETAILS_PER_RUN = 24
+/** Tijdbudget voor het ophalen van detailpagina's; daarna start geen nieuwe fetch. */
+export const DETAIL_TIJDBUDGET_MS = 25_000
+/** Tussenruimte tussen twee fetches op dezelfde host: één verzoek per seconde per site. */
+export const DETAIL_TUSSENRUIMTE_MS = 1_000
+/** Bestaande rijen die de backfill per run hoogstens oppakt (binnen `MAX_DETAILS_PER_RUN`). */
+export const MAX_BACKFILL_PER_RUN = 20
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -118,9 +148,39 @@ export interface IngestSummary {
   uitgesteld: number
   /** Linknummers van het model die niet in de aangeboden lijst stonden. */
   linksGeweigerd: number
+  /** Detailpagina's van NIEUWE items in deze run (Krant 1F fase 3). */
+  details: DetailTellers
+  /** Detailpagina's van BESTAANDE rijen (backfill); `herduid` = rijen terug in de duidingswachtrij. */
+  backfill: BackfillTellers
   /** Uitkomst van de duidingsstap (zichtbaar in job_runs en op de beheerpagina). */
   duiding: DuidingSummary
 }
+
+/** Per-run uitkomsten van kandidaten, geen persistente tellers. */
+export interface DetailTellers {
+  gelezen: number
+  /** Ophalen of lezen mislukte; het fragment van de aankondiging bleef staan. */
+  terugval: number
+  /** Een pdf of ander document: verwacht, niet gelezen, geen verlies. */
+  geenHtml: number
+  /** Buiten cap of tijdbudget: NIET geschreven, komt de volgende run opnieuw als nieuw. */
+  uitgesteld: number
+}
+
+export interface BackfillTellers {
+  gelezen: number
+  terugval: number
+  geenHtml: number
+  /** Rijen met nieuwe artikeltekst die terug op `wacht` gingen. */
+  herduid: number
+  /** Buiten tijdbudget niet opgehaald; de rij blijft `bron_detail is null` en komt de volgende run terug. */
+  uitgesteld: number
+  /** Lezen of schrijven mislukte (alleen geteld; de fout staat in de serverlog). */
+  fout: number
+}
+
+export const LEGE_DETAIL_TELLERS: DetailTellers = { gelezen: 0, terugval: 0, geenHtml: 0, uitgesteld: 0 }
+export const LEGE_BACKFILL_TELLERS: BackfillTellers = { gelezen: 0, terugval: 0, geenHtml: 0, herduid: 0, uitgesteld: 0, fout: 0 }
 
 export interface IngestOpties {
   /** Model voor de duidingsstap (`getModel(service, 'nieuws_duiding')`); null = alleen wachtrij tellen. */
@@ -136,6 +196,10 @@ export interface IngestOpties {
   categorisatieTijdBudgetMs?: number
   /** Klok voor het tijdbudget (test-injectie). */
   klok?: () => number
+  /** Budget voor de detailpagina's (ms); standaard `DETAIL_TIJDBUDGET_MS`. */
+  detailTijdBudgetMs?: number
+  /** Wachten tussen twee fetches op dezelfde host (test-injectie); standaard een echte timer. */
+  wacht?: (ms: number) => Promise<void>
 }
 
 export interface SourceHealthEntry {
@@ -153,8 +217,13 @@ export interface SourceHealthEntry {
   httpStatus?: number
   /** Items boven een expliciete cap (feed-items, secties of links). */
   afgekapt?: number
-  /** Linknummers van het model die niet op de pagina stonden. */
+  /** Linknummers van het model die niet op de pagina stonden, of feed-items op een andere site. */
   geweigerd?: number
+  /** Detailpagina's van nieuwe items van deze bron (Krant 1F fase 3). */
+  detailGelezen?: number
+  detailTerugval?: number
+  detailGeenHtml?: number
+  detailUitgesteld?: number
   /** Alleen nog op gezondheid van vóór ADR 0176. */
   error?: string
 }
@@ -183,8 +252,8 @@ export interface IngestUitkomst {
  * en de run landde als `status: 'success'`, `error: null`. De AI-stappen zijn
  * bewust niet-fataal; wat ontbrak was de MELDING van het resultaatverlies.
  *
- * TWEE TRIGGERS, bewust smal (een te brede poort wordt binnen een week
- * genegeerd — eigenaarsbesluit):
+ * DE TRIGGERS, bewust smal (een te brede poort wordt binnen een week
+ * genegeerd — eigenaarsbesluit); 3 en 4 kwamen later en staan bij hun code:
  *
  *  1. **De duiding hield rijen in handen en duidde er niets van.** `pogingen` =
  *     `geduid + afgewezen + mislukt`. `overgeslagen` (geen grondslag, of buiten
@@ -247,6 +316,19 @@ export function bepaalIngestUitkomst(
     }
   }
 
+  // Trigger 4 (Krant 1F fase 3): er waren detailpogingen en er is er GEEN ENKELE
+  // gelezen. Dan leest de ingest weer alleen aankondigingen — een host die zijn
+  // pagina's naar JavaScript omzette, of ons blokkeert. Bewust smal: één
+  // terugval naast een gelezen pagina is gewoon gezondheid, en `geen_html`
+  // (een pdf) is verwacht en telt niet als poging. Uitgesteld telt ook niet:
+  // dat komt de volgende run terug.
+  const d = summary.details ?? LEGE_DETAIL_TELLERS
+  const b = summary.backfill ?? LEGE_BACKFILL_TELLERS
+  const detailPogingen = d.gelezen + d.terugval + b.gelezen + b.terugval
+  if (detailPogingen > 0 && d.gelezen + b.gelezen === 0) {
+    verlies.push(`detailpagina's: 0 van ${detailPogingen} gelezen (terugval ${d.terugval + b.terugval})`)
+  }
+
   return { status: verlies.length > 0 ? 'partial' : 'success', verlies }
 }
 
@@ -266,6 +348,8 @@ interface ArticleCandidate {
   published_bron: 'feed' | 'meta' | 'eerste_gezien'
   bron_kop: string
   bron_fragment: string | null
+  /** Krant 1F fase 3: null = niet geprobeerd (andere host); zie de migratie 20261003120000. */
+  bron_detail: 'gelezen' | 'terugval' | 'geen_html' | null
 }
 
 type Kandidaat = { rij: ArticleCandidate; bron: number }
@@ -309,10 +393,16 @@ export function rssKandidaat(
     raw_content: fragment,
     bron_soort: 'rss',
     bron_pagina_url: feedUrl,
-    inhoud_hash: inhoudHash(`${item.title}\n${item.description ?? ''}`),
+    // Zonder beschrijving is de kop alleen geen identiteit: CBS geeft bij
+    // nieuwsitems geen description, en een terugkerende kop ("Werkloosheid
+    // nauwelijks veranderd") zou de volgende maand als dubbel geweigerd worden
+    // én de oude rij eeuwig "gezien" houden. Dan hoort de link erbij — nog
+    // steeds de aankondiging, niet de artikeltekst (Krant 1F fase 3, besluit 23).
+    inhoud_hash: inhoudHash(item.description ? `${item.title}\n${item.description}` : `${item.title}\n${item.link}`),
     published_bron: gepubliceerd ? 'feed' : 'eerste_gezien',
     bron_kop: knipTekens(item.title, BRON_KOP_MAX_TEKENS),
     bron_fragment: fragment,
+    bron_detail: null,
   }
 }
 
@@ -342,6 +432,7 @@ export function webPaginaKandidaten(
       published_bron: metaDatum ? 'meta' : 'eerste_gezien',
       bron_kop: knipTekens(s.kop, BRON_KOP_MAX_TEKENS),
       bron_fragment: fragment,
+      bron_detail: null,
     }
   })
   return { kandidaten, afgekapt }
@@ -377,46 +468,10 @@ export function terugvalLinks<T extends { url: string }>(
   return links.filter((l) => !isDoorstuurVorm(l.url)).slice(0, Math.max(0, max))
 }
 
-/**
- * Draagt deze same-site URL een andere absolute URL in zijn pad of query? Dat
- * is de vorm van een open redirector (`https://bron.nl/uit?url=https://elders`).
- *
- * WAAROM DIT HIER STAAT EN NIET IN `extractLinks`. De hostgrens houdt ook
- * zonder deze toets stand — `extractLinks` laat alleen http(s)-links op dezelfde
- * host als de GECONFIGUREERDE bron door, en voor een `web_lijst` haalt de server
- * de gekozen link nooit zelf op. Maar het model deed naast relevantie óók,
- * impliciet, een zeef op wélke same-site link werd opgeslagen; die zeef is in de
- * terugval weg. Een doorstuur-link zou dan gegarandeerd bovenaan de
- * paginavolgorde staan en via `bronkoppenEditie` zónder enig model ertussen als
- * klikbare bron bij de lezer komen (security-review 25 sep 2026).
- *
- * Bewust een VORM-toets, geen lijst van parameternamen: `?url=`, `?redirect=`,
- * `?next=`, `/out/https://…` — de naam varieert, de vorm niet.
- */
-export function isDoorstuurVorm(url: string): boolean {
-  let doel: URL
-  try {
-    doel = new URL(url)
-  } catch {
-    return true
-  }
-  const verdacht = /https?:\/\//i
-  // `decodeURIComponent` werpt op een misvormde escape (`%ZZ`). Dan toetsen we
-  // de rauwe vorm: een URL die niet eens te decoderen is, verdient geen
-  // voorkeursbehandeling.
-  const ontcijfer = (s: string): string => {
-    try {
-      return decodeURIComponent(s)
-    } catch {
-      return s
-    }
-  }
-  if (verdacht.test(ontcijfer(doel.pathname))) return true
-  for (const [, waarde] of doel.searchParams) {
-    if (verdacht.test(ontcijfer(waarde))) return true
-  }
-  return false
-}
+// `isDoorstuurVorm` staat sinds Krant 1F fase 3 in lib/news-sources.ts: het is
+// nu óók de grens vóór het ophalen van een detailpagina. Hier alleen
+// doorgegeven, zodat bestaande importeurs blijven werken.
+export { isDoorstuurVorm }
 
 export function webLijstKandidaat(
   link: { url: string; tekst: string; fragment: string },
@@ -432,8 +487,8 @@ export function webLijstKandidaat(
     source_name: source.label,
     category: null,
     potential_impact: null,
-    // Een lijstregel draagt geen server-leesbare metadata; de detailpagina
-    // ophalen (en zijn datePublished lezen) is 1F fase 3.
+    // Een lijstregel draagt geen server-leesbare metadata. Haalt fase 3 de
+    // detailpagina op, dan zet `pasDetailToe` de datum uit diens metadata.
     published_at: runMoment,
     raw_content: fragment,
     bron_soort: 'web_lijst',
@@ -442,7 +497,125 @@ export function webLijstKandidaat(
     published_bron: 'eerste_gezien',
     bron_kop: kop,
     bron_fragment: fragment,
+    bron_detail: null,
   }
+}
+
+// ── Detailpagina's (Krant 1F fase 3, puur, getest) ───────────────────
+
+/**
+ * Leg de uitkomst van de detailpagina op een kandidaat. Alleen `bron_fragment`
+ * (en `raw_content`, dezelfde tekst), `bron_detail` en eventueel de datum
+ * veranderen; de sleutel en de inhoud-hash blijven die van de aankondiging
+ * (besluit eigenaar 28 sep), zodat de identiteit niet afhangt van het netwerk.
+ * Een datum uit de feed wint; anders geldt de metadata van de pagina, nooit
+ * later dan het run-moment.
+ */
+export function pasDetailToe(rij: ArticleCandidate, u: DetailUitkomst, runMoment: string): ArticleCandidate {
+  if (u.uitkomst === 'geen_html') return { ...rij, bron_detail: 'geen_html' }
+  if (u.uitkomst === 'terugval') return { ...rij, bron_detail: 'terugval' }
+  const uit: ArticleCandidate = { ...rij, bron_fragment: u.tekst, raw_content: u.tekst, bron_detail: 'gelezen' }
+  const meta = u.datums.gepubliceerd ?? u.datums.gewijzigd
+  if (meta && rij.published_bron !== 'feed') {
+    uit.published_at = meta > runMoment ? runMoment : meta
+    uit.published_bron = 'meta'
+  }
+  return uit
+}
+
+/**
+ * Zet kandidaten om-en-om per bron: de eerste van elke bron, dan de tweede van
+ * elke bron, enz. Binnen een bron blijft de volgorde gelijk. Zonder dit
+ * stelde een krap tijdbudget op drukke dagen steeds de staart van de
+ * bronnenlijst uit — op 28 sep 2026 precies de vijf rekenende bronnen.
+ */
+export function omEnOm<T extends { bron: number }>(lijst: readonly T[]): T[] {
+  const perBron = new Map<number, T[]>()
+  for (const k of lijst) {
+    const rij = perBron.get(k.bron)
+    if (rij) rij.push(k)
+    else perBron.set(k.bron, [k])
+  }
+  const rijen = [...perBron.values()]
+  const uit: T[] = []
+  for (let i = 0; uit.length < lijst.length; i++) {
+    for (const rij of rijen) if (i < rij.length) uit.push(rij[i])
+  }
+  return uit
+}
+
+/**
+ * PostgREST-filter voor de backfill: `source_url` begint met een host en pad
+ * uit `DETAIL_HOSTS`. Afgeleid uit dezelfde lijst, zodat de backfill nooit een
+ * adres oppakt dat `detailToegestaan` zou weigeren (dat toetst de ingest per
+ * rij ook nog). Waarden tussen dubbele aanhalingstekens: ze bevatten `.` en `:`.
+ */
+export function backfillUrlFilter(): string {
+  return Object.entries(DETAIL_HOSTS)
+    .map(([host, pad]) => `source_url.like."https://${host}${pad}*"`)
+    .join(',')
+}
+
+interface DetailTaak {
+  url: string
+  anker: string
+  verwerk: (u: DetailUitkomst) => Promise<void> | void
+  uitgesteld: () => void
+}
+
+/**
+ * Voer detailtaken uit: per host na elkaar met `DETAIL_TUSSENRUIMTE_MS`
+ * ertussen, hosts onderling parallel. Voor elke fetch toetst de klok het
+ * budget; wat erbuiten valt krijgt `uitgesteld()`. Werpt nooit
+ * (`fetchDetailPagina` werpt niet; een fout in `verwerk` telt als uitgesteld).
+ */
+async function voerDetailTakenUit(
+  taken: readonly DetailTaak[],
+  deadline: number,
+  klok: () => number,
+  wacht: (ms: number) => Promise<void>,
+): Promise<void> {
+  const perHost = new Map<string, DetailTaak[]>()
+  for (const t of taken) {
+    const host = new URL(t.url).hostname.toLowerCase()
+    const rij = perHost.get(host)
+    if (rij) rij.push(t)
+    else perHost.set(host, [t])
+  }
+  await Promise.all(
+    [...perHost.values()].map(async (rij) => {
+      for (let i = 0; i < rij.length; i++) {
+        if (i > 0) await wacht(DETAIL_TUSSENRUIMTE_MS)
+        if (klok() >= deadline) {
+          for (let j = i; j < rij.length; j++) rij[j].uitgesteld()
+          return
+        }
+        try {
+          await rij[i].verwerk(await fetchDetailPagina(rij[i].url, rij[i].anker))
+        } catch (err) {
+          console.error('[news-ingest] detailstap mislukt:', err instanceof Error ? err.message : err)
+          rij[i].uitgesteld()
+        }
+      }
+    }),
+  )
+}
+
+/** De velden die de backfill terugzet: dezelfde als de beheerknop "Opnieuw duiden". */
+const DUIDING_RESET = {
+  duiding_status: 'wacht',
+  duiding_pogingen: 0,
+  duiding_fout: null,
+  duiding: null,
+  duiding_versie: null,
+  geduid_at: null,
+} as const
+
+interface BackfillRij {
+  id: string
+  source_url: string
+  bron_pagina_url: string | null
+  published_bron: string | null
 }
 
 /** Ontdubbel binnen de batch: eerste wint, op sleutel én op exacte inhoud. */
@@ -536,6 +709,7 @@ export async function runNewsIngest(
       oorzaak: u.oorzaak,
       ...(u.httpStatus !== undefined ? { httpStatus: u.httpStatus } : {}),
       ...(u.afgekapt ? { afgekapt: u.afgekapt } : {}),
+      ...(u.geweigerd ? { geweigerd: u.geweigerd } : {}),
     })
     for (const item of u.items) kandidaten.push({ rij: rssKandidaat(item, feed.url, runMoment), bron })
   })
@@ -638,6 +812,120 @@ export async function runNewsIngest(
   await markeerGezien(supabase, 'source_url', [...bekendeUrls], runMoment)
   await markeerGezien(supabase, 'inhoud_hash', [...bekendeHashes], runMoment)
 
+  // ── Om-en-om per bron (tegen uithongering van de staart) ───────
+  nieuw = omEnOm(nieuw)
+
+  // ── Detailpagina's: nieuwe items, daarna de backfill ───────────
+  // Eén cap en één tijdbudget voor beide. Nieuwe items eerst: wat daarvan
+  // buiten cap of budget valt, wordt NIET geschreven en komt de volgende run
+  // opnieuw als nieuw (sleutel = server, dus idempotent). De backfill pakt
+  // alleen rijen met `bron_detail is null` — na één poging staat die kolom,
+  // dus een tweede run raakt dezelfde rij niet opnieuw.
+  const klok = opties.klok ?? (() => Date.now())
+  const wacht = opties.wacht ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+  const details: DetailTellers = { ...LEGE_DETAIL_TELLERS }
+  const backfill: BackfillTellers = { ...LEGE_BACKFILL_TELLERS }
+  const detailUitgesteld = new Set<Kandidaat>()
+  const taken: DetailTaak[] = []
+  const tel = (k: Kandidaat, veld: 'detailGelezen' | 'detailTerugval' | 'detailGeenHtml' | 'detailUitgesteld') => {
+    health[k.bron][veld] = (health[k.bron][veld] ?? 0) + 1
+  }
+  for (const k of nieuw) {
+    if (k.rij.bron_soort === 'web_pagina' || !detailToegestaan(k.rij.source_url)) continue
+    const uitstellen = () => {
+      details.uitgesteld++
+      tel(k, 'detailUitgesteld')
+      detailUitgesteld.add(k)
+    }
+    if (taken.length >= MAX_DETAILS_PER_RUN) {
+      uitstellen()
+      continue
+    }
+    taken.push({
+      url: k.rij.source_url,
+      anker: k.rij.bron_pagina_url,
+      verwerk: (u) => {
+        k.rij = pasDetailToe(k.rij, u, runMoment)
+        if (u.uitkomst === 'gelezen') { details.gelezen++; tel(k, 'detailGelezen') }
+        else if (u.uitkomst === 'geen_html') { details.geenHtml++; tel(k, 'detailGeenHtml') }
+        else { details.terugval++; tel(k, 'detailTerugval') }
+      },
+      uitgesteld: uitstellen,
+    })
+  }
+
+  const backfillRuimte = Math.min(MAX_BACKFILL_PER_RUN, MAX_DETAILS_PER_RUN - taken.length)
+  if (backfillRuimte > 0) {
+    // Expliciete volgorde en limiet: nooit een stille afkap. Wat overblijft
+    // pakt de volgende run (de rij staat dan nog op `bron_detail is null`).
+    const { data, error } = await supabase
+      .from('news_articles')
+      .select('id, source_url, bron_pagina_url, published_bron')
+      .is('bron_detail', null)
+      .in('bron_soort', ['rss', 'web_lijst'])
+      .neq('duiding_status', 'teruggetrokken')
+      .or(backfillUrlFilter())
+      .order('fetched_at', { ascending: false })
+      .limit(backfillRuimte)
+    if (error) {
+      console.error('[news-ingest] backfill-lezing mislukt:', error.message)
+      backfill.fout++
+    } else {
+      for (const r of (data ?? []) as BackfillRij[]) {
+        if (!detailToegestaan(r.source_url)) {
+          // Past op het prefixfilter maar niet op de volledige toets (in de
+          // praktijk: een doorstuurvorm). Markeren als terugval, anders neemt
+          // hij elke run opnieuw een plek van de limiet in.
+          const { data: gemarkeerd, error: fout } = await supabase
+            .from('news_articles')
+            .update({ bron_detail: 'terugval' })
+            .eq('id', r.id)
+            .is('bron_detail', null)
+            .select('id')
+          if (fout) backfill.fout++
+          else if ((gemarkeerd?.length ?? 0) > 0) backfill.terugval++
+          continue
+        }
+        taken.push({
+          url: r.source_url,
+          anker: r.bron_pagina_url ?? r.source_url,
+          verwerk: async (u) => {
+            const velden: Record<string, unknown> =
+              u.uitkomst === 'gelezen'
+                ? { bron_fragment: u.tekst, raw_content: u.tekst, bron_detail: 'gelezen', ...DUIDING_RESET }
+                : { bron_detail: u.uitkomst }
+            if (u.uitkomst === 'gelezen' && r.published_bron === 'eerste_gezien') {
+              const meta = u.datums.gepubliceerd ?? u.datums.gewijzigd
+              if (meta) Object.assign(velden, { published_at: meta > runMoment ? runMoment : meta, published_bron: 'meta' })
+            }
+            // Guards: alleen een rij die nog nooit geprobeerd is, en nooit een
+            // teruggetrokken duiding (B4: dat is een menselijke beslissing).
+            const { data: geraakt, error: fout } = await supabase
+              .from('news_articles')
+              .update(velden)
+              .eq('id', r.id)
+              .is('bron_detail', null)
+              .neq('duiding_status', 'teruggetrokken')
+              .select('id')
+            if (fout) {
+              console.error('[news-ingest] backfill-schrijven mislukt:', fout.message)
+              backfill.fout++
+              return
+            }
+            if ((geraakt?.length ?? 0) === 0) return
+            if (u.uitkomst === 'gelezen') { backfill.gelezen++; backfill.herduid++ }
+            else if (u.uitkomst === 'geen_html') backfill.geenHtml++
+            else backfill.terugval++
+          },
+          uitgesteld: () => { backfill.uitgesteld++ },
+        })
+      }
+    }
+  }
+
+  await voerDetailTakenUit(taken, klok() + (opties.detailTijdBudgetMs ?? DETAIL_TIJDBUDGET_MS), klok, wacht)
+  nieuw = nieuw.filter((k) => !detailUitgesteld.has(k))
+
   // ── Categorisatie + upsert per brok, met tijdbudget ────────────
   // Per brok: categoriseren (optioneel model), dan METEEN schrijven. Zo legt
   // een run altijd iets vast, ook als de categorisatie traag is: na het budget
@@ -647,19 +935,19 @@ export async function runNewsIngest(
   // budget vooruitgang boekt (release-review 1F, H1).
   let inserted = 0
   let skipped = 0
+  let uitgesteld = details.uitgesteld
   const brokken: Kandidaat[][] = []
   for (let i = 0; i < nieuw.length; i += CATEGORISATIE_BROK) brokken.push(nieuw.slice(i, i + CATEGORISATIE_BROK))
-  const nu = opties.klok ?? (() => Date.now())
+  const nu = klok
   const deadline = nu() + (opties.categorisatieTijdBudgetMs ?? CATEGORISATIE_TIJDBUDGET_MS)
   let volgende = 0
   let gestart = 0
-  let uitgesteld = 0
 
   const verwerkBrok = async (brok: Kandidaat[]) => {
     if (model) {
       const invoer: SourceArticle[] = brok.map((k) => ({
         title: k.rij.bron_kop,
-        summary: k.rij.bron_fragment ?? '',
+        summary: knipTekens(k.rij.bron_fragment ?? '', CATEGORISATIE_FRAGMENT_MAX_TEKENS),
         sourceName: k.rij.source_name,
       }))
       const map = await categorizeArticles(invoer, model)
@@ -672,10 +960,22 @@ export async function runNewsIngest(
       })
     }
     for (const k of brok) {
-      const { data, error } = await supabase
-        .from('news_articles')
-        .upsert({ ...k.rij, fetched_at: runMoment, laatst_gezien_at: runMoment }, { onConflict: 'source_url', ignoreDuplicates: true })
-        .select('id')
+      // `bron_detail` alleen meesturen als hij iets zegt: een rij die niet
+      // geprobeerd is, blijft zo schrijfbaar als de kolom (nog) ontbreekt.
+      const { bron_detail, ...rest } = k.rij
+      const schrijf = (rij: Record<string, unknown>) =>
+        supabase
+          .from('news_articles')
+          .upsert({ ...rij, fetched_at: runMoment, laatst_gezien_at: runMoment }, { onConflict: 'source_url', ignoreDuplicates: true })
+          .select('id')
+      let { data, error } = await schrijf(bron_detail === null ? rest : k.rij)
+      // Draait deze code vóór de migratie 20261003120000, dan kent PostgREST de
+      // kolom niet (PGRST204) en zou élk item van CBS/CPB/AFM stil wegvallen.
+      // Dan zonder de kolom schrijven: de rij staat er, met `bron_detail` null,
+      // en de backfill pakt hem op zodra de kolom bestaat.
+      if (error && bron_detail !== null && (error as { code?: string }).code === 'PGRST204') {
+        ;({ data, error } = await schrijf(rest))
+      }
       if (error) {
         skipped++
         continue
@@ -758,6 +1058,8 @@ export async function runNewsIngest(
       skipped,
       uitgesteld,
       linksGeweigerd,
+      details,
+      backfill,
       duiding,
     },
     health: sourceHealth,
