@@ -35,12 +35,13 @@
 //    hetzelfde tijdbudget haalt de backfill de pagina op voor bestaande rijen
 //    die nog nooit geprobeerd zijn; die rij gaat per rij terug naar de
 //    duidingswachtrij (geen globale DUIDING_VERSIE-bump).
-// 4+5. Per brok van 20: categorisatie (optioneel model) en METEEN de upsert
+// 4+5. Per brok van 10: categorisatie (optioneel model) en METEEN de upsert
 //    met `onConflict: 'source_url'` (= de unieke index), `ignoreDuplicates`
 //    + `.select('id')`: `inserted` telt de rijen die de database TERUGGAF, niet
 //    de aanroepen (vóór ADR 0176 telde een no-op mee). Tijdbudget: na
-//    `CATEGORISATIE_TIJDBUDGET_MS` start geen nieuw brok; het restant komt de
-//    volgende run (`uitgesteld`).
+//    `CATEGORISATIE_TIJDBUDGET_MS` start geen nieuw brok, en ook niet als de
+//    langste gemeten brok van deze run er niet meer in past; het restant komt
+//    de volgende run (`uitgesteld`).
 // 6. Bewaren op tijd: weg wat ARTICLE_RETENTION_DAYS niet meer gezien is
 //    (`laatst_gezien_at`), geen grens op aantal (ADR 0171)
 // 7. Per-bron gezondheid naar app_settings (key: news_source_health)
@@ -100,17 +101,37 @@ export const BRON_KOP_MAX_TEKENS = 300
  * dat de query-string met URL's van ~150 tekens onder ~8 kB blijft.
  */
 const IN_BROK = 40
-/** Artikelen per categorisatie-call (en per schrijfbrok). */
-const CATEGORISATIE_BROK = 20
+/**
+ * Artikelen per categorisatie-call (en per schrijfbrok). 10 i.p.v. 20 sinds
+ * 29 sep: de duur volgt vooral de uitvoertokens (20 samenvattingen = 48–75 s),
+ * dus kleinere brokken vullen het budget fijner en de ongemeten eerste golf
+ * loopt hoogstens half zo ver uit. Het aantal gelijktijdige calls blijft 2.
+ */
+export const CATEGORISATIE_BROK = 10
 /** Gelijktijdige categorisatie-calls; meer raakt rate-limits. */
 const CATEGORISATIE_PARALLEL = 2
 /**
  * Tijdbudget voor categoriseren + schrijven. De cron en de beheerknop hebben
- * `maxDuration` 300 s; ophalen kost ~30 s en de duidingsstap krijgt daarna
- * zijn eigen budget (150 s cron). Na dit budget start geen nieuw brok; het
+ * `maxDuration` 300 s; ophalen kost ~30 s, de detailstap 25 s, en de
+ * duidingsstap krijgt daarna zijn eigen budget (cron: 150 − 25 = 125 s),
+ * begrensd door `RUN_TIJDBUDGET_MS`. Na dit budget start geen nieuw brok, en
+ * ook niet als de langste gemeten brok van de run er niet meer in past; het
  * restant komt de volgende run.
  */
 export const CATEGORISATIE_TIJDBUDGET_MS = 75_000
+/**
+ * Absoluut einde van de hele run, vanaf de start van `runNewsIngest`: 30 s
+ * onder `maxDuration` (300 s). De duidingsstap krijgt hoogstens wat er dan nog
+ * over is — zijn eigen deadline telt vanaf zijn eigen start, dus zonder deze
+ * grens schoof elke uitloop eerder in de run door naar de maxDuration.
+ */
+export const RUN_TIJDBUDGET_MS = 270_000
+
+/** Het duidingsbudget, begrensd door wat er van de run over is (nooit negatief). */
+export function begrensDuidingBudget(gevraagd: number | undefined, resterend: number): number {
+  const rest = Math.max(0, resterend)
+  return gevraagd === undefined ? rest : Math.min(gevraagd, rest)
+}
 /**
  * Tekens bronfragment per artikel in de categorisatie-call. Die call krijgt 20
  * artikelen tegelijk; met artikeltekst van 4.000 tekens werd één call ~80k
@@ -686,6 +707,10 @@ export async function runNewsIngest(
   opties: IngestOpties = {},
 ): Promise<{ summary: IngestSummary; health: SourceHealth }> {
   const runDatum = opties.now ?? new Date()
+  // Het absolute run-einde: de duiding krijgt nooit meer dan wat er tot
+  // RUN_TIJDBUDGET_MS over is, zodat uitloop in een eerdere stap niet één-op-één
+  // doorschuift naar maxDuration (import-review categorisatiebudget, 29 sep).
+  const runStartMs = (opties.klok ?? Date.now)()
   const sources = await loadNewsSources(supabase, runDatum)
   const runMoment = runDatum.toISOString()
   const health: SourceHealthEntry[] = []
@@ -990,9 +1015,17 @@ export async function runNewsIngest(
     }
   }
 
+  // De langste gemeten brokduur van deze run. Een brok start alleen als hij
+  // naar verwachting vóór de deadline klaar is: alleen bij de start toetsen
+  // liet een brok van ~60 s op 74 s beginnen, en de stap liep tot 134 s
+  // tegen een budget van 75 s (meting 28 sep). Zolang er nog geen brok klaar
+  // is, is er niets gemeten en geldt alleen de deadline.
+  let langsteBrokMs: number | null = null
   const werker = async () => {
     while (volgende < brokken.length) {
-      if (gestart > 0 && nu() >= deadline) {
+      const t = nu()
+      const pastNiet = t >= deadline || (langsteBrokMs !== null && t + langsteBrokMs > deadline)
+      if (gestart > 0 && pastNiet) {
         for (let i = volgende; i < brokken.length; i++) uitgesteld += brokken[i].length
         volgende = brokken.length
         break
@@ -1000,6 +1033,8 @@ export async function runNewsIngest(
       const brok = brokken[volgende++]
       gestart++
       await verwerkBrok(brok)
+      const duur = nu() - t
+      langsteBrokMs = langsteBrokMs === null ? duur : Math.max(langsteBrokMs, duur)
     }
   }
   await Promise.all(Array.from({ length: Math.min(CATEGORISATIE_PARALLEL, brokken.length) }, werker))
@@ -1039,7 +1074,7 @@ export async function runNewsIngest(
   if (opties.duidingMaxPerRun !== undefined) {
     duiding = await duidWachtendeArtikelen(supabase, opties.duidingModel ?? null, {
       maxPerRun: opties.duidingMaxPerRun,
-      tijdBudgetMs: opties.duidingTijdBudgetMs,
+      tijdBudgetMs: begrensDuidingBudget(opties.duidingTijdBudgetMs, RUN_TIJDBUDGET_MS - (klok() - runStartMs)),
     })
   }
 

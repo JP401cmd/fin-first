@@ -46,6 +46,9 @@ import {
   MAX_BACKFILL_PER_RUN,
   DETAIL_TUSSENRUIMTE_MS,
   CATEGORISATIE_FRAGMENT_MAX_TEKENS,
+  CATEGORISATIE_BROK,
+  RUN_TIJDBUDGET_MS,
+  begrensDuidingBudget,
   type IngestSummary,
   type SourceHealth,
   type SourceHealthEntry,
@@ -526,18 +529,104 @@ describe('runNewsIngest — categorisatie per brok, met tijdbudget (H1)', () => 
     })
     const { client, rijen } = maakClient()
     const een = await runNewsIngest(client as never, MODEL, { now: NU, klok, categorisatieTijdBudgetMs: 90_000 })
-    // Twee werkers pakken samen de eerste twee brokken van 20 (vóór de deadline); het derde valt erbuiten.
-    expect(een.summary.inserted).toBe(40)
-    expect(een.summary.uitgesteld).toBe(10)
-    expect(rijen).toHaveLength(40)
+    // Twee werkers pakken samen de eerste twee brokken van CATEGORISATIE_BROK
+    // (vóór de deadline); daarna staat de klok op 120 s en start er niets meer.
+    expect(een.summary.inserted).toBe(2 * CATEGORISATIE_BROK)
+    expect(een.summary.uitgesteld).toBe(50 - 2 * CATEGORISATIE_BROK)
+    expect(rijen).toHaveLength(2 * CATEGORISATIE_BROK)
     expect(rijen.every((r) => r.category === 'macro')).toBe(true)
 
+    // De volgende run pakt het restant op; wat al staat, is al bekend (sleutel = server).
     tijd = 0
     const twee = await runNewsIngest(client as never, MODEL, { now: NU, klok, categorisatieTijdBudgetMs: 90_000 })
-    expect(twee.summary.inserted).toBe(10)
-    expect(twee.summary.alBekend).toBe(40)
-    expect(twee.summary.uitgesteld).toBe(0)
+    expect(twee.summary.inserted).toBe(2 * CATEGORISATIE_BROK)
+    expect(twee.summary.alBekend).toBe(2 * CATEGORISATIE_BROK)
+    expect(rijen).toHaveLength(4 * CATEGORISATIE_BROK)
+    tijd = 0
+    const drie = await runNewsIngest(client as never, MODEL, { now: NU, klok, categorisatieTijdBudgetMs: 90_000 })
+    expect(drie.summary.inserted).toBe(50 - 4 * CATEGORISATIE_BROK)
+    expect(drie.summary.uitgesteld).toBe(0)
     expect(rijen).toHaveLength(50)
+  })
+
+  it('verwachte eindtijd: na twee gelijktijdige brokken van 60 s start er bij 75 s budget geen derde (meting 28 sep)', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [LIJST] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: veelLinks(100), finalUrl: LIJST.url })
+    vi.mocked(kiesArtikelLinks).mockImplementation(async (links) => ({ indexen: links.map((_, i) => i), geweigerd: 0, afgekapt: 0, ok: true }))
+    // Realistische klok: de twee werkers lopen GELIJKTIJDIG. Elke call eindigt
+    // 60 s na zijn eigen start; de klok springt pas als de call klaar is.
+    let tijd = 0
+    const klok = () => tijd
+    let eindtijdLaatste = 0
+    vi.mocked(categorizeArticles).mockImplementation(async (arts) => {
+      const eind = tijd + 60_000
+      await Promise.resolve()
+      tijd = Math.max(tijd, eind)
+      eindtijdLaatste = tijd
+      return new Map(arts.map((_, i) => [i, { category: 'macro', summary: 'x', potentialImpact: 'Geen directe impact' }]))
+    })
+    const { client, rijen } = maakClient()
+    const { summary } = await runNewsIngest(client as never, MODEL, { now: NU, klok, categorisatieTijdBudgetMs: 75_000 })
+    // Eerste golf: twee brokken tegelijk, klaar op 60 s. 60 + 60 > 75, dus
+    // geen tweede golf — vóór deze wijziging startte die op 60 s en liep de
+    // stap tot 120 s.
+    expect(vi.mocked(categorizeArticles)).toHaveBeenCalledTimes(2)
+    expect(summary.inserted).toBe(2 * CATEGORISATIE_BROK)
+    expect(summary.uitgesteld).toBe(100 - 2 * CATEGORISATIE_BROK)
+    expect(rijen).toHaveLength(2 * CATEGORISATIE_BROK)
+    expect(eindtijdLaatste).toBeLessThanOrEqual(75_000)
+  })
+
+  it('de schatting is de LANGSTE gemeten brok: een snelle brok daarna haalt hem niet omlaag', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [LIJST] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: veelLinks(100), finalUrl: LIJST.url })
+    vi.mocked(kiesArtikelLinks).mockImplementation(async (links) => ({ indexen: links.map((_, i) => i), geweigerd: 0, afgekapt: 0, ok: true }))
+    // Eerste call 50 s, alle volgende 5 s. Met de laatste meting als schatting
+    // (5 s) zou er tot ~70 s worden bijgestart; met het maximum (50 s) stopt de
+    // lus zodra nu + 50 > 75.
+    let tijd = 0
+    let n = 0
+    const eindes: number[] = []
+    vi.mocked(categorizeArticles).mockImplementation(async (arts) => {
+      const eind = tijd + (n++ === 0 ? 50_000 : 5_000)
+      await Promise.resolve()
+      tijd = Math.max(tijd, eind)
+      eindes.push(tijd)
+      return new Map(arts.map((_, i) => [i, { category: 'macro', summary: 'x', potentialImpact: 'Geen directe impact' }]))
+    })
+    const { client } = maakClient()
+    const { summary } = await runNewsIngest(client as never, MODEL, { now: NU, klok: () => tijd, categorisatieTijdBudgetMs: 75_000 })
+    expect(summary.inserted + summary.uitgesteld).toBe(100)
+    expect(summary.uitgesteld).toBeGreaterThan(0)
+    // Geen brok eindigt voorbij het budget.
+    expect(Math.max(...eindes)).toBeLessThanOrEqual(75_000)
+  })
+
+  it('het duidingsbudget wordt begrensd door wat er van de run over is', () => {
+    expect(begrensDuidingBudget(125_000, RUN_TIJDBUDGET_MS - 130_000)).toBe(125_000)
+    expect(begrensDuidingBudget(125_000, RUN_TIJDBUDGET_MS - 200_000)).toBe(70_000)
+    expect(begrensDuidingBudget(125_000, -5_000)).toBe(0)
+    expect(begrensDuidingBudget(undefined, 40_000)).toBe(40_000)
+  })
+
+  it('snelle brokken blijven doorlopen zolang de gemeten duur nog past', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [LIJST] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: veelLinks(100), finalUrl: LIJST.url })
+    vi.mocked(kiesArtikelLinks).mockImplementation(async (links) => ({ indexen: links.map((_, i) => i), geweigerd: 0, afgekapt: 0, ok: true }))
+    let tijd = 0
+    vi.mocked(categorizeArticles).mockImplementation(async (arts) => {
+      const eind = tijd + 20_000
+      await Promise.resolve()
+      tijd = Math.max(tijd, eind)
+      return new Map(arts.map((_, i) => [i, { category: 'macro', summary: 'x', potentialImpact: 'Geen directe impact' }]))
+    })
+    const { client } = maakClient()
+    const { summary } = await runNewsIngest(client as never, MODEL, { now: NU, klok: () => tijd, categorisatieTijdBudgetMs: 75_000 })
+    // Golven van twee brokken op 0, 20 en 40 s (40 + 20 ≤ 75); de golf op 60 s
+    // past niet meer (60 + 20 > 75). Zes brokken dus, de rest uitgesteld.
+    expect(vi.mocked(categorizeArticles)).toHaveBeenCalledTimes(6)
+    expect(summary.inserted).toBe(6 * CATEGORISATIE_BROK)
+    expect(summary.uitgesteld).toBe(100 - 6 * CATEGORISATIE_BROK)
   })
 
   it('een budget van 0 laat toch het eerste brok door: elke run legt iets vast', async () => {
@@ -546,7 +635,7 @@ describe('runNewsIngest — categorisatie per brok, met tijdbudget (H1)', () => 
     vi.mocked(kiesArtikelLinks).mockImplementation(async (links) => ({ indexen: links.map((_, i) => i), geweigerd: 0, afgekapt: 0, ok: true }))
     const { client } = maakClient()
     const { summary } = await runNewsIngest(client as never, MODEL, { now: NU, categorisatieTijdBudgetMs: 0 })
-    expect(summary.inserted).toBeGreaterThanOrEqual(20)
+    expect(summary.inserted).toBeGreaterThanOrEqual(CATEGORISATIE_BROK)
     expect(summary.inserted + summary.uitgesteld).toBe(30)
   })
 
@@ -606,7 +695,10 @@ describe('runNewsIngest — de duidingsstap', () => {
     const { client } = maakClient()
     await runNewsIngest(client as never, null, { now: NU, duidingMaxPerRun: 1 })
     const [, , opties] = vi.mocked(duidWachtendeArtikelen).mock.calls[0]
-    expect(opties).toEqual({ maxPerRun: 1, tijdBudgetMs: undefined })
+    // Zonder gevraagd budget krijgt de duiding sinds 29 sep wat er van de run
+    // over is (RUN_TIJDBUDGET_MS), niet meer een onbegrensde deadline.
+    expect(opties).toEqual({ maxPerRun: 1, tijdBudgetMs: expect.any(Number) })
+    expect((opties as { tijdBudgetMs: number }).tijdBudgetMs).toBeLessThanOrEqual(RUN_TIJDBUDGET_MS)
   })
 })
 
