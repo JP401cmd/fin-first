@@ -97,6 +97,24 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.13',
+    date: '2026-09-28',
+    title: 'Nieuws over kinderen beter herkend',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De nieuwe Krant leest "tot 18 jaar" goed',
+            description:
+              'Een bericht over kinderen tot 18 jaar werd achter de schermen soms ten onrechte afgewezen. Dat is hersteld. Voor jou nog geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.12',
     date: '2026-09-27',
     title: 'Koppelingen werken zichzelf bij',

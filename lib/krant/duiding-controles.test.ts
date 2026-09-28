@@ -173,6 +173,57 @@ describe('G6 op de doelgroep — hard afgewezen, want een lege doelgroep beteken
       ),
     ).toEqual({ ok: false, code: 'doelgroep:ongegrond:schulden' })
   })
+
+  // Meting 28 sep 2026: "Voorbeeld: mondzorg voor kinderen valt onder de
+  // basisverzekering" werd afgewezen op `doelgroep:ongegrond:kinderen` terwijl
+  // het fragment "kinderen tot 18 jaar" zegt — en het woord "18 jaar" van
+  // alleen-18-plus liet juist die minderjarigen-zin door, het tegendeel.
+  it('"kinderen tot 18 jaar" dekt de minderjarige leeftijden, niet alleen-18-plus', () => {
+    const basis = { ...GELDIGE_UITVOER, samenvatting: null, mechanisme: null, grond: [], ingangsdatum: null }
+    const mondzorg = bron(
+      'Mondzorg voor kinderen tot 18 jaar wordt grotendeels vergoed vanuit het basispakket. ' +
+        'Ook betaalt u voor de mondzorg voor kinderen geen eigen risico.',
+    )
+    expect(
+      controleerDuiding(
+        { ...basis, doelgroep: [{ veld: 'kinderen', op: 'in', waarden: ['jongste-0-3', 'jongste-4-11', 'jongste-12-17'] }] },
+        mondzorg,
+        META,
+      ).ok,
+    ).toBe(true)
+    expect(
+      controleerDuiding({ ...basis, doelgroep: [{ veld: 'kinderen', op: 'in', waarden: ['alleen-18-plus'] }] }, mondzorg, META),
+    ).toEqual({ ok: false, code: 'doelgroep:ongegrond:kinderen' })
+  })
+
+  // Zelfde patroon, gevonden bij het nalopen van het lexicon: een kwalificatie
+  // die als deelstring in het tegendeel van een andere waarde staat
+  // ("hypotheek" in "zonder hypotheek") gold als gedekt.
+  it.each([
+    ['wonen', 'koop-met-hypotheek', 'Wie een woning bezit zonder hypotheek, betaalt geen rente.'],
+    ['wonen', 'koop-met-hypotheek', 'Is uw woning hypotheekvrij, dan verandert er niets.'],
+    ['huishouden', 'fiscaal-partner', 'Samenwonende partners zonder fiscaal partner doen elk apart aangifte.'],
+    ['werk', 'uitkering', 'Wie werkt en daarnaast een pensioenuitkering ontvangt, betaalt meer.'],
+    ['pensioen_werkgever', 'ja', 'Werknemers met geen pensioenregeling bij de werkgever lopen achter.'],
+    ['pensioen_lijfrente', 'ja', 'Wie geen lijfrente heeft, merkt hier niets van.'],
+    ['pensioen_lijfrente', 'ja', 'Met geen jaarruimte is er geen aftrek.'],
+  ] as const)('%s = %s is niet gedekt door het tegendeel in "%s"', (veld, waarde, tekst) => {
+    const basis = { ...GELDIGE_UITVOER, samenvatting: null, mechanisme: null, grond: [], ingangsdatum: null }
+    expect(
+      controleerDuiding({ ...basis, doelgroep: [{ veld, op: 'in', waarden: [waarde] }] }, bron(tekst), META),
+    ).toEqual({ ok: false, code: `doelgroep:ongegrond:${veld}` })
+  })
+
+  it('het tegendeel elders in de bron wist een echte dekking niet uit', () => {
+    const basis = { ...GELDIGE_UITVOER, samenvatting: null, mechanisme: null, grond: [], ingangsdatum: null }
+    const beide = bron('Met een hypotheek op uw woning verandert de aftrek; zonder hypotheek verandert er niets.')
+    for (const waarde of ['koop-met-hypotheek', 'koop-zonder-hypotheek'] as const) {
+      expect(
+        controleerDuiding({ ...basis, doelgroep: [{ veld: 'wonen', op: 'in', waarden: [waarde] }] }, beide, META).ok,
+        waarde,
+      ).toBe(true)
+    }
+  })
 })
 
 describe('de tekstpoort (B26) — de rij blijft geduid, de samenvatting vervalt', () => {

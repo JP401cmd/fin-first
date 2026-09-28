@@ -41,6 +41,14 @@ export interface LexiconIngang {
   waarden: Readonly<Record<string, readonly string[]>>
 }
 
+/**
+ * "Kinderen tot 18 jaar" raakt elke minderjarige leeftijd, dus deze woorden
+ * dekken alle drie de `jongste-*`-waarden (bij `in` volstaat er één). De vormen
+ * mét "18 jaar" staan er bewust uitgeschreven: via `dektWaarde` houden ze het
+ * "18 jaar" van alleen-18-plus weg uit een zin die het tegendeel zegt.
+ */
+const MINDERJARIG = ['minderjarig', 'tot 18 jaar', 'onder de 18', 'onder de 18 jaar', 'jonger dan 18', 'jonger dan 18 jaar'] as const
+
 export const DOELGROEP_LEXICON: Record<DoelgroepSleutel, LexiconIngang> = {
   geboortejaar: {
     sleutel: ['geboortejaar', 'geboren', 'leeftijd', 'cohort', 'jaargang', 'aow', 'ouderen', 'jongeren'],
@@ -58,9 +66,9 @@ export const DOELGROEP_LEXICON: Record<DoelgroepSleutel, LexiconIngang> = {
     sleutel: ['kind', 'kinderen', 'gezin', 'kinderopvang', 'kinderbijslag', 'ouders'],
     waarden: {
       geen: ['geen kinderen', 'zonder kinderen', 'kinderloos'],
-      'jongste-0-3': ['kinderopvang', 'peuter', 'baby', 'jonge kinderen', '0 tot 3'],
-      'jongste-4-11': ['basisschool', 'basisonderwijs', 'schoolgaande', '4 tot 11'],
-      'jongste-12-17': ['middelbare school', 'voortgezet onderwijs', 'tiener', '12 tot 17'],
+      'jongste-0-3': ['kinderopvang', 'peuter', 'baby', 'jonge kinderen', '0 tot 3', ...MINDERJARIG],
+      'jongste-4-11': ['basisschool', 'basisonderwijs', 'schoolgaande', '4 tot 11', ...MINDERJARIG],
+      'jongste-12-17': ['middelbare school', 'voortgezet onderwijs', 'tiener', '12 tot 17', ...MINDERJARIG],
       'alleen-18-plus': ['18 jaar', 'volwassen kinderen', 'meerderjarig', 'studerende kinderen'],
     },
   },
@@ -170,6 +178,29 @@ export function normaliseerVoorLexicon(tekst: string): string {
 /** Staat één van `woorden` in de (genormaliseerde) tekst? */
 export function dektEenWoord(genormaliseerdeTekst: string, woorden: readonly string[]): boolean {
   return woorden.some((w) => genormaliseerdeTekst.includes(normaliseerVoorLexicon(w)))
+}
+
+/**
+ * Dekt de (genormaliseerde) tekst deze waarde van `sleutel`? Zoals
+ * `dektEenWoord`, maar een woord telt niet waar het alleen staat als deel van
+ * een langer woord van een ÁNDERE waarde van dezelfde sleutel: "hypotheek" in
+ * "zonder hypotheek", "18 jaar" in "tot 18 jaar", "lijfrente" in "geen
+ * lijfrente". Dat is het tegendeel, geen dekking. Die langere woorden worden
+ * eerst uit de tekst gehaald (langste eerst); een echte vermelding elders in de
+ * tekst blijft dus gewoon tellen. Welke woorden het tegendeel vormen volgt uit
+ * het lexicon zelf, zodat een nieuwe waarde dit vanzelf meekrijgt.
+ */
+export function dektWaarde(genormaliseerdeTekst: string, sleutel: DoelgroepSleutel, waarde: string): boolean {
+  const ingang = DOELGROEP_LEXICON[sleutel]
+  const eigen = (ingang.waarden[waarde] ?? []).map(normaliseerVoorLexicon)
+  const tegendeel = Object.entries(ingang.waarden)
+    .filter(([andere]) => andere !== waarde)
+    .flatMap(([, woorden]) => woorden.map(normaliseerVoorLexicon))
+    .filter((t) => eigen.some((e) => t !== e && t.includes(e)))
+    .sort((a, b) => b.length - a.length)
+  let tekst = genormaliseerdeTekst
+  for (const t of tegendeel) tekst = tekst.split(t).join(' ¦ ')
+  return eigen.some((e) => tekst.includes(e))
 }
 
 /** Het soort van een doelgroepsleutel — bepaalt of waarden een eigen lexicon hebben. */

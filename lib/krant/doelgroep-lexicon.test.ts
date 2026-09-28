@@ -3,6 +3,7 @@ import {
   DOELGROEP_LEXICON,
   KWALIFICATIE_WOORDEN,
   dektEenWoord,
+  dektWaarde,
   heeftWaardeLexicon,
   normaliseerVoorLexicon,
 } from './doelgroep-lexicon'
@@ -59,5 +60,46 @@ describe('matchen', () => {
     expect(KWALIFICATIE_WOORDEN).not.toContain('huishouden')
     expect(KWALIFICATIE_WOORDEN).not.toContain('inkomen')
     expect(new Set(KWALIFICATIE_WOORDEN).size).toBe(KWALIFICATIE_WOORDEN.length)
+  })
+})
+
+describe('dektWaarde — het tegendeel van een andere waarde is geen dekking', () => {
+  // Generieke eigenschap over het hele lexicon, zodat een nieuwe waarde of
+  // woord het vanzelf meekrijgt: staat een woord van waarde A als deelstring in
+  // een woord van waarde B ("hypotheek" ⊂ "zonder hypotheek"), dan dekt een
+  // tekst die alléén dat B-woord bevat waarde A niet.
+  it('geen waarde wordt gedekt door alleen een woord van een andere waarde dat het hare bevat', () => {
+    let gevallen = 0
+    for (const sleutel of DOELGROEP_SLEUTEL_LIJST) {
+      const waarden = DOELGROEP_LEXICON[sleutel].waarden
+      for (const [a, woordenA] of Object.entries(waarden)) {
+        for (const [b, woordenB] of Object.entries(waarden)) {
+          if (a === b) continue
+          for (const y of woordenB) {
+            const ny = normaliseerVoorLexicon(y)
+            const bevatA = woordenA.some((x) => normaliseerVoorLexicon(x) !== ny && ny.includes(normaliseerVoorLexicon(x)))
+            if (!bevatA) continue
+            gevallen++
+            expect(dektWaarde(`dit gaat over ${ny} en verder niets`, sleutel, a), `${sleutel}: ${a} via '${y}' (${b})`).toBe(false)
+          }
+        }
+      }
+    }
+    // Zes paren bij het schrijven (28 sep 2026) plus de minderjarigen-vormen
+    // met "18 jaar"; valt dit naar 0, dan test deze eigenschap niets meer.
+    expect(gevallen).toBeGreaterThan(6)
+  })
+
+  it('"kinderen tot 18 jaar" dekt de jongste-waarden en niet alleen-18-plus', () => {
+    const tekst = normaliseerVoorLexicon('Voor kinderen tot 18 jaar betaalt u geen eigen risico.')
+    for (const w of ['jongste-0-3', 'jongste-4-11', 'jongste-12-17']) expect(dektWaarde(tekst, 'kinderen', w), w).toBe(true)
+    expect(dektWaarde(tekst, 'kinderen', 'alleen-18-plus')).toBe(false)
+    expect(dektWaarde(normaliseerVoorLexicon('Kinderen van 18 jaar en ouder betalen wel.'), 'kinderen', 'alleen-18-plus')).toBe(true)
+  })
+
+  it('een echte vermelding naast het tegendeel blijft tellen', () => {
+    const tekst = normaliseerVoorLexicon('Met een hypotheek verandert de aftrek; zonder hypotheek niet.')
+    expect(dektWaarde(tekst, 'wonen', 'koop-met-hypotheek')).toBe(true)
+    expect(dektWaarde(tekst, 'wonen', 'koop-zonder-hypotheek')).toBe(true)
   })
 })

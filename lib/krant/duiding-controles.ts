@@ -84,6 +84,7 @@ import {
   DOELGROEP_LEXICON,
   KWALIFICATIE_WOORDEN,
   dektEenWoord,
+  dektWaarde,
   heeftWaardeLexicon,
   normaliseerVoorLexicon,
 } from './doelgroep-lexicon'
@@ -249,7 +250,7 @@ function doelgroepLexiconFout(uitvoer: DuidingModelUitvoer, grondslag: string): 
     if (!ingang) return `doelgroep:ongegrond:${regel.veld}`
     if (!dektEenWoord(grondslag, ingang.sleutel)) return `doelgroep:ongegrond:${regel.veld}`
     if (!heeftWaardeLexicon(sleutel)) continue
-    const gedekt = regel.waarden.map((w) => dektEenWoord(grondslag, ingang.waarden[w] ?? []))
+    const gedekt = regel.waarden.map((w) => dektWaarde(grondslag, sleutel, w))
     const genoeg = regel.op === 'bevat' ? gedekt.every(Boolean) : gedekt.some(Boolean)
     if (!genoeg) return `doelgroep:ongegrond:${regel.veld}`
   }
