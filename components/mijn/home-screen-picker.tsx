@@ -1,7 +1,7 @@
 'use client'
 
 import { Check } from 'lucide-react'
-import { useHomeScreen, type HomeScreen } from '@/lib/hooks/use-home-screen'
+import { useHomeScreen, type PickableHomeScreen } from '@/lib/hooks/use-home-screen'
 
 /**
  * HomeScreenPicker — de startscherm-keuze "Overzicht" ⇄ "Budgetteren" op
@@ -17,6 +17,12 @@ import { useHomeScreen, type HomeScreen } from '@/lib/hooks/use-home-screen'
  * `useHomeScreen()` — dezelfde optimistische state + `PUT /api/home-screen`
  * die de ⌘K-actie gebruikt, met rollback bij een mislukte call. Er komt hier
  * dus géén eigen fetch, geen localStorage-spiegel en geen tweede leespad bij.
+ *
+ * ALLEEN KIESBARE WAARDEN (ADR 0184): de kaarten zijn getypt op
+ * `PickableHomeScreen`, niet op `HomeScreen`. 'nieuws' is een persisteerbare
+ * waarde die alleen de server zet bij de productkeuze Krant; hij verschijnt
+ * hier nooit als optie. Staat de opgeslagen waarde op 'nieuws', dan is geen
+ * kaart ingedrukt.
  */
 
 type ScreenMeta = {
@@ -25,7 +31,7 @@ type ScreenMeta = {
   description: string
 }
 
-const SCREEN_META: Record<HomeScreen, ScreenMeta> = {
+const SCREEN_META: Record<PickableHomeScreen, ScreenMeta> = {
   overzicht: {
     label: 'Overzicht — alles bij elkaar',
     description:
@@ -40,7 +46,7 @@ const SCREEN_META: Record<HomeScreen, ScreenMeta> = {
 
 export function HomeScreenPicker() {
   const { homeScreen, setHomeScreen } = useHomeScreen()
-  const screens = Object.entries(SCREEN_META) as [HomeScreen, ScreenMeta][]
+  const screens = Object.entries(SCREEN_META) as [PickableHomeScreen, ScreenMeta][]
 
   return (
     <div className="space-y-3">

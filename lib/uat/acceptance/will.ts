@@ -131,7 +131,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     given: 'Desktopbrowser, chat geopend.',
     when: 'De gebruiker klikt het punaise-icoon "Vastzetten" en navigeert/herlaadt.',
-    then: 'De chat wordt een vaste kolom (420px) rechts; blijft staan bij navigatie en na herladen; "Losmaken" of sluiten-met-kruisje maakt automatisch los. Op mobiel is de knop niet aanwezig.',
+    then: 'De chat wordt een vaste kolom (420px) rechts; blijft staan bij navigatie en na herladen; "Losmaken" of sluiten-met-kruisje maakt automatisch los. Op mobiel is de knop niet aanwezig. Een Krant-account (Krant 2B, 29 sep 2026) heeft geen chat: een eerder vastgepinde stand in localStorage opent hem niet en reserveert geen zijbalkbreedte (`isOpen = finEnabled && …`) — WF-KRANT-08.',
     assertion: {
       kind: 'ui-only',
       source: 'components/app/chat/chat-provider.tsx (isPinned, localStorage trifinity-chat-pinned) — layout-gedrag, geen cijfermatige uitkomst',
@@ -172,7 +172,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Persona met alle in-depth apps actief; een "Bespreek met Fin"-knop bij een fase-analyse of vaste-lasten-analyse.',
     when: 'De gebruiker klikt de knop (en klikt snel nogmaals).',
-    then: 'De chat opent met het kick-off-bericht (onderwerp + toelichting) al verstuurd; een tweede snelle klik verstuurt niet nogmaals hetzelfde bericht (one-shot-guard).',
+    then: 'De chat opent met het kick-off-bericht (onderwerp + toelichting) al verstuurd; een tweede snelle klik verstuurt niet nogmaals hetzelfde bericht (one-shot-guard). Zonder Fin in de shell (Krant-account, Krant 2B — `finEnabled === false`) rendert de knop niet; buiten een ChatProvider blijft hij staan zoals voorheen (WF-KRANT-08).',
     assertion: {
       kind: 'ui-only',
       source: 'components/app/chat/bespreek-met-fin-button.tsx + openWithMessage (chat-provider.tsx) — procestoets, geen cijfermatige uitkomst',
@@ -239,7 +239,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Een ongelezen budgetmelding in de bel/berichtencentrum.',
     when: 'De gebruiker klikt op de melding zelf, of op de knop "Vraag Fin".',
-    then: 'Klik op de melding: gelezen gemarkeerd + navigatie naar de bestemmings-URL (indien aanwezig). Klik "Vraag Fin": gelezen gemarkeerd, paneel sluit, chat opent met een voorgeformuleerde vraag die het percentage/bedrag noemt. Legacy-actionUrl-doelen (/core/budgets, /core/cash, /horizon) moeten per doorklik op werkend/redirect/dood gecontroleerd worden (genoteerd risico).',
+    then: 'Klik op de melding: gelezen gemarkeerd + navigatie naar de bestemmings-URL (indien aanwezig). Klik "Vraag Fin": gelezen gemarkeerd, paneel sluit, chat opent met een voorgeformuleerde vraag die het percentage/bedrag noemt. Legacy-actionUrl-doelen (/core/budgets, /core/cash, /horizon) moeten per doorklik op werkend/redirect/dood gecontroleerd worden (genoteerd risico). Een Krant-account (Krant 2B, 29 sep 2026) ziet bij geen melding of bundel "Vraag Fin" (`finEnabled === false`) en krijgt de horizon-meldingen niet (WF-KRANT-08/09).',
     assertion: {
       kind: 'ui-only',
       source: 'components/app/notifications/notification-item.tsx (handleClick/handleAskAI) — navigatie/chat-start, geen cijfermatige uitkomst',
@@ -280,7 +280,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Gebruiker zonder eerdere edities (hoogste bestaand edition_nr = 0/geen); huidig kalenderjaar 2026.',
     when: 'De gebruiker opent /nieuws voor het eerst.',
-    then: 'Editienummer = 0 + 1 = 1; jaargang = 2026 − 2025 = 1. Colofon "N artikelen"/"M bronartikelen" zijn directe lengtes van de editie resp. het getoetste bronmateriaal (geen aparte formule). De artikeltekst zelf is AI-inhoud, niet deterministisch toetsbaar. BRONLINK PER 1F FASE 2 (ADR 0176): de "Bron"-link achter de datum verschijnt alléén wanneer de bron-URL een geldige http(s)-URL is (`safeHttpUrl`); een `javascript:`/`data:`-adres of onleesbare rommel uit een externe bron levert géén link — alleen de datum blijft staan, en er komt nooit een klikbaar niet-http-adres in de editie. Een artikel zonder "Bron"-link is dus een geldige uitkomst, geen storing.',
+    then: 'Editienummer = 0 + 1 = 1; jaargang = 2026 − 2025 = 1. Colofon "N artikelen"/"M bronartikelen" zijn directe lengtes van de editie resp. het getoetste bronmateriaal (geen aparte formule). De artikeltekst zelf is AI-inhoud, niet deterministisch toetsbaar. BRONLINK PER 1F FASE 2 (ADR 0176): de "Bron"-link achter de datum verschijnt alléén wanneer de bron-URL een geldige http(s)-URL is (`safeHttpUrl`); een `javascript:`/`data:`-adres of onleesbare rommel uit een externe bron levert géén link — alleen de datum blijft staan, en er komt nooit een klikbaar niet-http-adres in de editie. Een artikel zonder "Bron"-link is dus een geldige uitkomst, geen storing. KRANT-ACCOUNT (Krant 2B, 29 sep 2026) — BELANGRIJK voor de tester: /nieuws haalt nog `GET /api/news` op en die route is AI-gegate, dus een account met alleen de module nieuws ziet hier tot 1C/2C een lege Krant of een upsell; dat is een bekend gat, geen defect van dit scenario (WF-KRANT-04).',
     assertion: {
       kind: 'exact',
       expected: 'editionNr=1; jaargang=1',
@@ -322,7 +322,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Een artikel op de huidige editie van /nieuws (niet het archief).',
     when: 'De gebruiker klikt "Bespreek met Fin".',
-    then: 'De chat opent met een al-verstuurd bericht (kop + samenvatting + nieuws-zoeklink); het artikel wordt als gelezen gemarkeerd; op het archief (read-only) is de knop niet aanwezig.',
+    then: 'De chat opent met een al-verstuurd bericht (kop + samenvatting + nieuws-zoeklink); het artikel wordt als gelezen gemarkeerd; op het archief (read-only) is de knop niet aanwezig. Voor een Krant-account (Krant 2B, 29 sep 2026, `finEnabled === false`) staan "Bespreek met Fin" en "Maak actie" nergens; "Gelezen" blijft (WF-KRANT-08).',
     assertion: {
       kind: 'ui-only',
       source: 'components/berichten/news-components.tsx (handleDiscuss) + openWithMessage — procestoets, geen cijfermatige uitkomst',

@@ -7,6 +7,8 @@ import { useNotifications } from './notification-provider'
 import { NotificationRows } from './notification-bundle'
 import { X, ChevronRight } from 'lucide-react'
 import type { Notification } from '@/app/api/notifications/route'
+import { ALL_MODULES, type ModuleId } from '@/lib/module-registry'
+import { navSurfaceFor } from '@/lib/nav-config'
 
 // ── Day grouping helpers ─────────────────────────────────────────────
 
@@ -108,7 +110,21 @@ function CollapsedDayGroup({
 
 // ── Modal Component ──────────────────────────────────────────────────
 
-export function NotificationModal() {
+export function NotificationModal({
+  activeModules = ALL_MODULES,
+}: {
+  /**
+   * De actieve modules van het account (Krant 2B). Als prop, niet via
+   * `useNavSurface()`: deze modal hangt in de layout BUITEN de
+   * FeatureAccessProvider, dus de hook zou daar altijd "alle modules" lezen.
+   * Weggelaten = alle modules = het gedrag van vóór 2B.
+   */
+  activeModules?: readonly ModuleId[]
+} = {}) {
+  // Welke footer-links binnen de productgrens liggen — dezelfde beslissing als
+  // de rest van de navigatie (navSurfaceFor). Een Krant-account heeft geen
+  // /berichten.
+  const { isVisible } = navSurfaceFor(activeModules)
   const {
     history,
     unreadCount,
@@ -316,6 +332,7 @@ export function NotificationModal() {
             afgelopen 7 dagen
           </span>
           <div className="flex items-center gap-4">
+            {isVisible('/berichten') && (
             <a
               href="/berichten"
               onClick={closeModal}
@@ -323,6 +340,7 @@ export function NotificationModal() {
             >
               Bekijk alles &rarr;
             </a>
+            )}
             <a
               href="/mijn/notificaties"
               onClick={closeModal}

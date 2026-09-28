@@ -85,7 +85,10 @@ type Props = {
 
 export const NotificationItem = memo(function NotificationItem({ notification, onRead, onClose, density = 'ruim' }: Props) {
   const router = useRouter()
-  const { openWithMessage } = useChatContext()
+  const { openWithMessage, finEnabled } = useChatContext()
+  // Geen "Vraag Fin" zonder Fin (Krant-account, B11). `!== false`: een context
+  // zonder de vlag is het gedrag van vóór Krant 2B.
+  const canAskFin = finEnabled !== false && Boolean(notification.aiContext)
   const moduleInfo = MODULE_MAP[notification.type] ?? FALLBACK_MODULE_INFO
   const isCompact = density === 'compact'
 
@@ -218,7 +221,7 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
         )}
 
         {/* AI action button */}
-        {notification.aiContext && (
+        {canAskFin && (
           <button
             type="button"
             onClick={handleAskAI}

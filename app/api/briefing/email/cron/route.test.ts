@@ -22,7 +22,7 @@ vi.mock('@/lib/briefing/snapshot', async (importActual) => {
 
 // Configureerbare service-mock.
 interface ServiceConfig {
-  profiles: Array<{ id: string }>
+  profiles: Array<{ id: string; active_modules?: unknown }>
   profilesError: { message: string } | null
   gateValue: string | null
   email: string | null
@@ -189,5 +189,47 @@ describe('cron verwerking', () => {
     const res = await GET(req('cron-secret'))
     expect(res.status).toBe(200)
     expect(mockSendEmail).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('cron — Krant-grens (Krant 2B)', () => {
+  const KRANT = 'a1b2c3d4-0000-4000-8000-00000000000k'
+  const GEHEEL = 'a1b2c3d4-0000-4000-8000-00000000000g'
+
+  it('een Krant-account krijgt geen briefingmail en raakt snapshot, auth en week-gate niet', async () => {
+    cfg.profiles = [{ id: KRANT, active_modules: ['nieuws'] }]
+    const res = await GET(req('cron-secret'))
+    const body = await res.json()
+    expect(mockSendEmail).not.toHaveBeenCalled()
+    expect(mockReadSnapshot).not.toHaveBeenCalled()
+    expect(upserts).toHaveLength(0)
+    expect(body.summary.skipped_krant).toBe(1)
+    expect(body.summary.sent).toBe(0)
+  })
+
+  it.each([
+    ['null', null],
+    ['alle zes', ['budgetteren', 'vermogensregistratie', 'aandelenregistratie', 'inzicht_acties', 'toekomstplannen', 'nieuws']],
+    ['kolom afwezig', undefined],
+  ])('bestaand profiel (%s) krijgt de mail zoals voorheen', async (_label, modules) => {
+    cfg.profiles = [{ id: GEHEEL, active_modules: modules }]
+    const res = await GET(req('cron-secret'))
+    const body = await res.json()
+    expect(mockSendEmail).toHaveBeenCalledTimes(1)
+    expect(body.summary.sent).toBe(1)
+    expect(body.summary.skipped_krant).toBe(0)
+  })
+
+  it('gemengde batch: alleen het Krant-account valt eruit', async () => {
+    cfg.profiles = [
+      { id: KRANT, active_modules: ['nieuws'] },
+      { id: GEHEEL, active_modules: null },
+    ]
+    const res = await GET(req('cron-secret'))
+    const body = await res.json()
+    expect(mockSendEmail).toHaveBeenCalledTimes(1)
+    expect(mockReadSnapshot).toHaveBeenCalledTimes(1)
+    expect(mockReadSnapshot.mock.calls[0][1]).toBe(GEHEEL)
+    expect(body.summary).toMatchObject({ candidates: 2, sent: 1, skipped_krant: 1 })
   })
 })

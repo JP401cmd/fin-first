@@ -39,6 +39,11 @@ export function BesprekMetWillButton({
 }) {
   const chat = useChatContextOptional()
 
+  // Geen Fin in deze shell (Krant-account, B11): geen knop. Buiten een
+  // ChatProvider blijft de knop staan zoals vóór Krant 2B (de klik is daar al
+  // een no-op).
+  if (chat?.finEnabled === false) return null
+
   function handleClick(e: React.MouseEvent<HTMLButtonElement>) {
     if (stopPropagation) e.stopPropagation()
     if (!chat) return

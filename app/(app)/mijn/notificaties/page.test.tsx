@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import MijnNotificatiesPage from './page'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
-import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
+import { NOTIFICATION_TYPES, WEEKLY_BRIEFING_EMAIL_TOGGLE } from '@/lib/identity-constants'
+import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
+import { ALL_MODULES, type ModuleId } from '@/lib/module-registry'
+import type { FeatureAccessData } from '@/lib/compute-feature-access'
 
 /**
  * Smoke-tests voor /mijn/notificaties — geëxtraheerd uit
@@ -331,5 +334,51 @@ describe('MijnNotificatiesPage — Fins proactieve tips (W-016)', () => {
     })
     expect(screen.getByText(/praat daarnaast zelf/i)).toBeTruthy()
     expect(screen.queryByText(/push/i)).toBeNull()
+  })
+})
+
+/**
+ * Krant 2B — een Krant-account heeft geen weekbriefing (de cron slaat hem over)
+ * en geen Fin (B11). De twee schakelaars daarvoor tonen we hem dus niet, in
+ * beide weergavemodi. Een Geheel-account ziet ze zoals voorheen.
+ */
+describe('MijnNotificatiesPage — Krant-grens (Krant 2B)', () => {
+  const DATA = {
+    features: {},
+    phase: 'stability',
+    level: 1,
+    subscriptions: [],
+    netWorth: 0,
+    monthlyExpenses: 0,
+    freedomPct: 0,
+  } as unknown as FeatureAccessData
+
+  function renderMet(modules: ModuleId[], mode: DisplayMode) {
+    return render(
+      <FeatureAccessProvider data={DATA} activeModules={modules}>
+        <DisplayModeProvider initialMode={mode}>
+          <MijnNotificatiesPage />
+        </DisplayModeProvider>
+      </FeatureAccessProvider>,
+    )
+  }
+
+  it.each(['simple', 'full'] as const)('Krant-account (%s): geen briefing-mail en geen Fin-tips', async (mode) => {
+    setupMocksWithUser()
+    renderMet(['nieuws'], mode)
+    await waitFor(() => {
+      expect(screen.getByText('Maandelijkse geldcheck-in')).toBeTruthy()
+    })
+    expect(screen.queryByText(WEEKLY_BRIEFING_EMAIL_TOGGLE.label)).toBeNull()
+    expect(screen.queryByText('Tips van Fin uit zichzelf')).toBeNull()
+  })
+
+  it.each(['simple', 'full'] as const)('Geheel-account (%s): beide schakelaars zoals voorheen', async (mode) => {
+    setupMocksWithUser()
+    renderMet([...ALL_MODULES], mode)
+    await waitFor(() => {
+      expect(screen.getByText(WEEKLY_BRIEFING_EMAIL_TOGGLE.label)).toBeTruthy()
+    })
+    expect(screen.getByText('Tips van Fin uit zichzelf')).toBeTruthy()
   })
 })

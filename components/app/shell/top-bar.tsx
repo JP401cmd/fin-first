@@ -60,6 +60,21 @@ import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { LeverCompassMobile } from '@/components/app/shell/lever-compass'
 import { useLeverScores } from '@/components/app/shell/shell-contexts'
 import { useHomeScreen } from '@/lib/hooks/use-home-screen'
+import { useNavSurface } from '@/lib/hooks/use-nav-surface'
+import { HOME_SCREEN_HREFS } from '@/lib/home-screen'
+import { KRANT_HOME_HREF } from '@/lib/modules/krant-grens'
+
+/**
+ * Het label van de "← home"-knop, afgeleid van de BESTEMMING (`homeHref`) en
+ * niet van de opgeslagen homescherm-keuze. Die twee lopen uiteen bij een
+ * Krant-account (Krant 2B): de productgrens stuurt hem naar /nieuws, wat zijn
+ * `home_screen` ook zegt — het label moet zeggen waar de knop echt heen gaat.
+ */
+export function homeBackLabelFor(homeHref: string): string {
+  if (homeHref === KRANT_HOME_HREF) return 'Terug naar de Krant'
+  if (homeHref === HOME_SCREEN_HREFS.budget) return 'Terug naar budgetteren'
+  return 'Terug naar overzicht'
+}
 import { TAP_TARGET_EXTEND_BLOCK } from '@/components/editorial/tap-target'
 import { useTopbarColor } from '@/components/app/module-color-provider'
 import { ThemeColorSync } from './theme-color-sync'
@@ -138,6 +153,10 @@ type TopBarProps = {
 function TopBarUtilities({ email, initials, role }: { email: string; initials?: string; role?: string }) {
   const { unreadCount, openModal } = useNotifications()
   const leverScores = useLeverScores()
+  // Welke ingangen dit accountmenu toont, per product (Krant 2B): voor een
+  // Krant-account geen kompas, geen Rapportages, geen sync, en Mijn naar
+  // /mijn/account — zie navSurfaceFor.
+  const nav = useNavSurface()
   const [menuOpen, setMenuOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -172,7 +191,7 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
       <PerspectiveSwitcher compact menuAlign="right" />
 
       {/* Kompas: vier hefbomen + plan-stoplicht Toekomst — compact dots, expand on tap */}
-      <LeverCompassMobile scores={leverScores} />
+      {!nav.isKrant && <LeverCompassMobile scores={leverScores} />}
 
       {/* "Krant", niet "Nieuws" — dezelfde regel als de zijbalk-rij en het
           ⌘K-item (bevinding M14, één naam per concept). Dit icoon draagt geen
@@ -241,7 +260,7 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
               </Link>
             )}
             <Link
-              href="/mijn"
+              href={nav.mijn.href}
               role="menuitem"
               className="block px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
               onClick={() => setMenuOpen(false)}
@@ -254,6 +273,7 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
                   zonder dat dat pad nog bestaat. */}
               Mijn
             </Link>
+            {nav.isVisible('/rapportages') && (
             <Link
               href="/rapportages"
               role="menuitem"
@@ -262,9 +282,11 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
             >
               Rapportages
             </Link>
+            )}
 
             {/* Sync nu + Sync-rapport, side-by-side. GlobalSyncButton triggert globale
                 sync; "Rapport" opent SyncReportModal voor het laatste verslag. */}
+            {!nav.isKrant && (
             <div className="grid grid-cols-2 border-y border-[var(--border-ed)]">
               <div className="flex flex-col items-center justify-center gap-1 py-2 hover:bg-[var(--subtle)]">
                 <GlobalSyncButton
@@ -294,6 +316,7 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
                 </span>
               </button>
             </div>
+            )}
 
             <Link
               href="/logout"
@@ -345,7 +368,11 @@ export function TopBar({
   const { activeTab, currentStack, pop } = useNavStack()
   // Gekozen homescherm — voedt de "← home"-knop op de secundaire tab-roots.
   // Vóór de conditionele returns (rules of hooks).
-  const { homeScreen, homeHref } = useHomeScreen()
+  const { homeHref: gekozenHomeHref } = useHomeScreen()
+  // Een Krant-account gaat altijd naar de Krant, ook als de homescherm-bron
+  // (nog) iets anders zegt — de productgrens wint (Krant 2B).
+  const { isKrant } = useNavSurface()
+  const homeHref = isKrant ? KRANT_HOME_HREF : gekozenHomeHref
   const topbarColor = useTopbarColor()
 
   const top = currentStack[currentStack.length - 1]
@@ -383,8 +410,7 @@ export function TopBar({
   // tijdens een within-tab transitie blijft staan i.p.v. weg te flikkeren.
   const showHomeBack =
     !showBack && kind === 'rich' && (activeTab === 'horizon' || activeTab === 'identity')
-  const homeBackLabel =
-    homeScreen === 'budget' ? 'Terug naar budgetteren' : 'Terug naar overzicht'
+  const homeBackLabel = homeBackLabelFor(homeHref)
 
   // BELANGRIJK: NIET meer `sticky top-0`. TopBar zit binnen de tray-flex-
   // column van MobileStackShell — als hij sticky was zou hij over de
