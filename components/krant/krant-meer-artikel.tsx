@@ -83,7 +83,11 @@ export function KrantMeerArtikel({ isKrant }: { isKrant: boolean }) {
           </p>
           <p>
             Er wordt niets gewist. Je Krant, je nieuwsprofiel en je instellingen blijven staan. Terug naar alleen de
-            Krant kan via support; je gegevens blijven dan ook staan.
+            Krant kan via{' '}
+            <Link href="/contact" className="underline underline-offset-2 hover:text-[var(--ink)]">
+              support
+            </Link>
+            ; je gegevens blijven dan ook staan.
           </p>
           <p>Losse uitbreidingen, zoals een automatische bankkoppeling, staan daar los van.</p>
         </div>

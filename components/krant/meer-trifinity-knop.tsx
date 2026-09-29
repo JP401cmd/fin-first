@@ -95,8 +95,11 @@ export function MeerTriFinityKnop({
             wordt niets gewist.
           </p>
           <p>
-            Daarna vul je zelf aan wat nog ontbreekt. Terug naar alleen de Krant kan via support; je gegevens blijven
-            dan ook staan.
+            Daarna vul je zelf aan wat nog ontbreekt. Terug naar alleen de Krant kan via{' '}
+            <a href="/contact" className="underline underline-offset-2 hover:text-[var(--ink)]">
+              support
+            </a>
+            ; je gegevens blijven dan ook staan.
           </p>
         </div>
       </ShellOverlay>
