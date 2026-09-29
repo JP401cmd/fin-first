@@ -1,7 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { AlertOctagon, Check, RotateCcw } from 'lucide-react'
+import { foutenHref } from '@/lib/beheer/dashboard/doorklik'
+import { heeftFilter, leesFoutenFilter, zichtbareSoorten } from '@/lib/beheer/dashboard/fouten-filter'
 import type { ErrorGroup } from '@/lib/error-groups'
 
 /**
@@ -47,7 +51,22 @@ function meervoud(n: number, enkel: string, meer: string): string {
   return `${n} ${n === 1 ? enkel : meer}`
 }
 
+// `useSearchParams` vraagt een Suspense-grens; de inhoud zelf laadt client-side.
 export default function BeheerErrorsPage() {
+  return (
+    <Suspense fallback={<div className="h-24 animate-pulse bg-[var(--subtle)]" />}>
+      <Foutmeldingen />
+    </Suspense>
+  )
+}
+
+function Foutmeldingen() {
+  // Filter uit de URL (doorklik vanaf het beheerdashboard): één soort
+  // uitlichten, of alleen een context tonen. Werkt op de geladen lijst.
+  const searchParams = useSearchParams()
+  const filter = useMemo(() => leesFoutenFilter(searchParams), [searchParams])
+  const uitgelicht = useRef<HTMLElement | null>(null)
+
   const [data, setData] = useState<GroupsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -132,8 +151,14 @@ export default function BeheerErrorsPage() {
   }
 
   const groups = data?.groups ?? []
-  const zichtbaar = toonAfgehandeld ? groups : groups.filter((g) => g.open)
+  const zichtbaar = zichtbareSoorten(groups, filter, toonAfgehandeld)
   const summary = data?.summary
+  const uitgelichtGevonden = filter.soort !== null && groups.some((g) => g.signature === filter.soort)
+
+  // Breng de uitgelichte soort in beeld zodra de lijst er staat.
+  useEffect(() => {
+    if (!loading && uitgelichtGevonden) uitgelicht.current?.scrollIntoView({ block: 'center' })
+  }, [loading, uitgelichtGevonden])
 
   return (
     <div>
@@ -186,6 +211,32 @@ export default function BeheerErrorsPage() {
         </div>
       )}
 
+      {heeftFilter(filter) && (
+        <p
+          className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-[var(--border-ed)] pb-2 text-sm text-[var(--ink-2)]"
+          data-testid="fouten-filter"
+        >
+          <span>
+            {filter.context && (
+              <>
+                Alleen context <span className="font-mono text-xs text-[var(--ink)]">{filter.context}</span>
+              </>
+            )}
+            {filter.context && filter.soort && ' · '}
+            {filter.soort &&
+              (loading || uitgelichtGevonden
+                ? 'Eén foutsoort uitgelicht'
+                : 'De gevraagde foutsoort staat niet meer in het leesvenster')}
+          </span>
+          <Link
+            href={foutenHref()}
+            className="text-xs text-[var(--ink-3)] underline decoration-[var(--border-md)] underline-offset-2 hover:text-[var(--ink)]"
+          >
+            Toon alle foutsoorten
+          </Link>
+        </p>
+      )}
+
       <div className="mb-4">
         <button
           type="button"
@@ -204,22 +255,34 @@ export default function BeheerErrorsPage() {
           <p className="text-sm text-[var(--ink-3)]">
             {groups.length === 0
               ? 'Geen foutmeldingen geregistreerd.'
-              : 'Alles afgehandeld — geen open foutsoorten.'}
+              : filter.context
+                ? 'Geen open foutsoorten met deze context.'
+                : 'Alles afgehandeld — geen open foutsoorten.'}
           </p>
         </div>
       ) : (
         <div className="space-y-2">
           {zichtbaar.map((g) => {
             const teruggekomen = g.resolution !== null && g.open
+            const isUitgelicht = g.signature === filter.soort
             return (
               <article
                 key={g.signature}
+                ref={isUitgelicht ? uitgelicht : undefined}
+                data-uitgelicht={isUitgelicht ? 'true' : undefined}
                 className={`border p-3 ${
-                  g.open
-                    ? 'border-[var(--border-ed)] bg-[var(--paper)]'
-                    : 'border-[var(--border-ed)] bg-[var(--subtle)]/40'
+                  isUitgelicht
+                    ? 'border-l-2 border-[var(--ink)] bg-[var(--paper)]'
+                    : g.open
+                      ? 'border-[var(--border-ed)] bg-[var(--paper)]'
+                      : 'border-[var(--border-ed)] bg-[var(--subtle)]/40'
                 }`}
               >
+                {isUitgelicht && (
+                  <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-2)]">
+                    Uitgelicht vanaf het dashboard
+                  </p>
+                )}
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="font-medium text-[var(--ink)]">{g.sampleMessage}</h3>
                   <span className="font-mono text-xs tabular-nums text-[var(--ink-meta)]">

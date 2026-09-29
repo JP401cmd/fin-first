@@ -23,6 +23,7 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
 import { DUIDING_STATUSSEN } from '@/lib/krant/duiding-schema'
 import { LEVERAGE_STATUS_DOT } from '@/lib/leverage-status'
+import { bronKlasse, oorzaakVan, type BronKlasse } from '@/lib/news-bron-gezondheid'
 import { safeHttpUrl } from '@/lib/safe-url'
 
 // ── Types for news sources ───────────────────────────────────────────
@@ -174,11 +175,8 @@ function foutNaarRij(
 // Bij het laden van de pagina berekend: de Belastingplan-bron schuift met Prinsjesdag mee.
 const STANDAARD_BRONNEN: Bron[] = naarBronnen(standaardWebBronnen(), DEFAULT_RSS_FEEDS)
 
-/** De oorzaak van een gezondheidsregel, ook voor regels van vóór ADR 0176. */
-function oorzaakVan(s: SourceHealthEntry): BronOorzaak | null {
-  if (s.oorzaak) return s.oorzaak
-  return s.items > 0 ? 'ok' : null
-}
+// `oorzaakVan` en de indeling goed/let op/fout komen uit lib/news-bron-gezondheid.ts,
+// gedeeld met het beheerdashboard.
 
 function oorzaakTekst(s: SourceHealthEntry): string {
   const o = oorzaakVan(s)
@@ -187,14 +185,16 @@ function oorzaakTekst(s: SourceHealthEntry): string {
   return o === 'http_fout' && s.httpStatus ? `${basis} ${s.httpStatus}` : basis
 }
 
+const BRON_KLASSE_STIP: Record<BronKlasse, string> = {
+  goed: LEVERAGE_STATUS_DOT.good,
+  'let-op': LEVERAGE_STATUS_DOT.warn,
+  onbekend: LEVERAGE_STATUS_DOT.neutral,
+  fout: LEVERAGE_STATUS_DOT.bad,
+}
+
 /** Stoplichtsemantiek via de gedeelde status-tokens, niet via losse Tailwind-kleuren. */
 function oorzaakStip(s: SourceHealthEntry): string {
-  const o = oorzaakVan(s)
-  if (o === 'ok') return LEVERAGE_STATUS_DOT.good
-  // `storing`: de bron zelf ligt eruit (onderhoud) — aandacht, niets voor ons om te repareren.
-  if (o === 'leeg' || o === 'geen_model' || o === 'storing') return LEVERAGE_STATUS_DOT.warn
-  if (o === null) return LEVERAGE_STATUS_DOT.neutral
-  return LEVERAGE_STATUS_DOT.bad
+  return BRON_KLASSE_STIP[bronKlasse(s)]
 }
 
 interface IngestStatus {

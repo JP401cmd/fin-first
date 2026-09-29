@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from './admin'
 import type { BeheerInboxKey } from './beheer-sections'
-import { summarizeErrorGroups } from './error-groups'
+import { summarizeErrorGroups, type ErrorGroup } from './error-groups'
 import { ERROR_LOG_COLUMNS_LEAN, loadErrorGroups } from './error-groups-loader'
 
 /**
@@ -63,7 +63,20 @@ async function countOpenErrorGroups(supabase: SupabaseClient): Promise<number | 
   }
 }
 
-export async function loadBeheerInboxCounts(supabase: SupabaseClient): Promise<BeheerInboxCounts> {
+export interface BeheerInboxOpties {
+  /**
+   * Foutsoorten die de aanroeper AL uit het leesvenster heeft gelezen (het
+   * beheerdashboard leest dat venster zelf, mét de impact-kolom). Dan telt deze
+   * loader daaruit en leest hij het venster geen tweede keer. `null` = het
+   * venster was niet te lezen: de teller ontbreekt dan eerlijk.
+   */
+  errorGroups?: readonly ErrorGroup[] | null
+}
+
+export async function loadBeheerInboxCounts(
+  supabase: SupabaseClient,
+  opties: BeheerInboxOpties = {},
+): Promise<BeheerInboxCounts> {
   let admin = false
   try {
     admin = await isSuperAdmin(supabase)
@@ -72,8 +85,15 @@ export async function loadBeheerInboxCounts(supabase: SupabaseClient): Promise<B
   }
   if (!admin) return { ...EMPTY_BEHEER_INBOX_COUNTS }
 
+  const errorsUitVenster =
+    opties.errorGroups === undefined
+      ? countOpenErrorGroups(supabase)
+      : Promise.resolve(
+          opties.errorGroups === null ? null : summarizeErrorGroups(opties.errorGroups).openGroups,
+        )
+
   const [errors, feedback, calculator_reports] = await Promise.all([
-    countOpenErrorGroups(supabase),
+    errorsUitVenster,
     countByStatus(supabase, 'feedback', 'new'),
     countByStatus(supabase, 'calculator_reports', 'open'),
   ])

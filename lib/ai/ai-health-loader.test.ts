@@ -24,9 +24,16 @@ import { loadAiHealth } from './ai-health-loader'
 /** Thenable/awaitable query-chain: `.select().order().limit().maybeSingle()`
  *  (ai_token_usage) of `.select().like().order().limit()` — direct awaited
  *  zonder maybeSingle (error_logs). */
+const bovenkanten: { kolom: string; waarde: string }[] = []
+
 function chain(resolve: { data: unknown; error: unknown }) {
   const c: Record<string, unknown> = {}
   for (const m of ['select', 'order', 'limit', 'like']) c[m] = () => c
+  // De bovenkant van het leesvenster: vastgelegd, zodat de test kan zien dat hij er staat.
+  c.lte = (kolom: string, waarde: string) => {
+    bovenkanten.push({ kolom, waarde })
+    return c
+  }
   c.maybeSingle = () => Promise.resolve(resolve)
   c.then = (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
     Promise.resolve(resolve).then(onF, onR)
@@ -59,6 +66,29 @@ beforeEach(() => {
   mockIsSuperAdmin.mockReset()
   mockGetServiceClient.mockReset()
   mockFrom.mockReset()
+  bovenkanten.length = 0
+})
+
+describe('loadAiHealth — het leesvenster heeft een bovenkant', () => {
+  it('beide lezingen reiken tot nu plus een kleine klokmarge, niet verder', async () => {
+    // In error_logs mag een ingelogde gebruiker zelf schrijven, met een
+    // zelfgekozen tijdstip. Een foutregel uit 2099 ligt altijd na de laatste
+    // geslaagde aanroep en zou de gezondheid blijvend op "storing" houden.
+    mockIsSuperAdmin.mockResolvedValue(true)
+    mockTables({ successRow: { created_at: '2026-09-05T08:00:00Z' }, failureRows: [] })
+    const voor = Date.now()
+    await loadAiHealth(FAKE_SESSION)
+    const na = Date.now()
+
+    expect(bovenkanten).toHaveLength(2)
+    for (const b of bovenkanten) {
+      expect(b.kolom).toBe('created_at')
+      const ms = Date.parse(b.waarde)
+      expect(ms).toBeGreaterThanOrEqual(voor)
+      expect(ms).toBeLessThanOrEqual(na + 10 * 60 * 1000)
+      expect('2099-01-01T00:00:00.000Z' <= b.waarde).toBe(false)
+    }
+  })
 })
 
 describe('loadAiHealth — toegangscontrole', () => {

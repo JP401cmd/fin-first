@@ -11,6 +11,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { deriveAiHealth, type AiFailureSignal, type AiHealthResult } from '@/lib/ai/ai-health'
+import { leesvensterTotEnMet } from '@/lib/observability/leesvenster'
 
 export interface AiHealthSnapshot extends Omit<AiHealthResult, 'status'> {
   status: AiHealthResult['status'] | 'unknown'
@@ -43,11 +44,17 @@ export async function loadAiHealth(supabase: SupabaseClient): Promise<AiHealthSn
   }
 
   const service = getServiceClient()
+  // Bovenkant van het venster: in `error_logs` mag een ingelogde gebruiker zelf
+  // schrijven, met een zelfgekozen `created_at`. Een foutregel met een datum in
+  // de toekomst ligt altijd ná de laatste geslaagde aanroep en zou de
+  // gezondheid blijvend op "storing" houden (zie lib/observability/leesvenster.ts).
+  const totEnMet = leesvensterTotEnMet()
 
   const [successRes, failureRes] = await Promise.all([
     service
       .from('ai_token_usage')
       .select('created_at')
+      .lte('created_at', totEnMet)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -55,6 +62,7 @@ export async function loadAiHealth(supabase: SupabaseClient): Promise<AiHealthSn
       .from('error_logs')
       .select('created_at, message')
       .like('context', 'ai:%')
+      .lte('created_at', totEnMet)
       .order('created_at', { ascending: false })
       .limit(FAILURE_ROW_LIMIT),
   ])

@@ -8,11 +8,19 @@ import { usePathname } from 'next/navigation'
 // reserveert <main> al via lg:pl-[264px]).
 const FULL_WIDTH_PREFIXES = ['/beheer/architectuur']
 
+// Het dashboard zet kerncijfers en een statustabel naast elkaar en heeft daar
+// meer breedte voor nodig dan een leeskolom, maar niet de volle breedte: de
+// tekstregels blijven dan leesbaar.
+const BREDE_ROUTES = ['/beheer']
+
 export function BeheerContainer({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const wide = FULL_WIDTH_PREFIXES.some((p) => pathname?.startsWith(p))
+  const breed = BREDE_ROUTES.includes(pathname ?? '')
   return (
-    <div className={`mx-auto px-4 py-5 sm:px-6 sm:py-12 ${wide ? 'max-w-none' : 'max-w-4xl'}`}>
+    <div
+      className={`mx-auto px-4 py-5 sm:px-6 sm:py-12 ${wide ? 'max-w-none' : breed ? 'max-w-6xl' : 'max-w-4xl'}`}
+    >
       {children}
     </div>
   )

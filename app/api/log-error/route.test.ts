@@ -94,6 +94,26 @@ describe('POST /api/log-error', () => {
     expect(insert).not.toHaveBeenCalled()
   })
 
+  it('een browser kan geen AI-fout opgeven: de context krijgt client: ervoor', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production')
+    const { supabase, insert } = makeSupabase({ id: 'u1' })
+    mockCreateClient.mockResolvedValue(supabase)
+
+    await POST(request({ message: 'refused: credit balance too low', context: 'ai:chat' }))
+
+    expect(insert.mock.calls[0][0]).toMatchObject({ context: 'client:ai:chat' })
+  })
+
+  it('de eigen context van de browser blijft ongewijzigd', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production')
+    const { supabase, insert } = makeSupabase({ id: 'u1' })
+    mockCreateClient.mockResolvedValue(supabase)
+
+    await POST(request(VALID))
+
+    expect(insert.mock.calls[0][0]).toMatchObject({ context: 'window.onerror' })
+  })
+
   it('blijft 401 voor een uitgelogde melder', async () => {
     vi.stubEnv('VERCEL_ENV', 'production')
     const { supabase, insert } = makeSupabase(null)

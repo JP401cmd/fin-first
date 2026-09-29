@@ -25,6 +25,8 @@ export const BEHEER_FLOW: UatFlow = {
     // ── 0 · instap ────────────────────────────────────────────────────────
     { id: 'entry', label: 'Navigatie naar Beheer (/beheer)', kind: 'entry', stage: 0 },
     { id: 'toegang', scenarioId: 'UAT-BEHEER-01', label: 'WF-BEHEER-01 · Beheeromgeving betreden + toegangscontrole (superadmin-gate)', kind: 'screen', stage: 1 },
+    // Het dashboard ÍS de startpagina: het wijst de tools aan, het vervangt ze niet.
+    { id: 'dashboard', scenarioId: 'UAT-BEHEER-41', label: 'WF-BEHEER-41 · Beheerdashboard: aandacht, status, verloop, ingrepen', kind: 'screen', stage: 1 },
 
     // ── 2 · secties (sub-hubs) ────────────────────────────────────────────
     { id: 'sectie-tech', label: 'Technisch beheer', kind: 'screen', stage: 2, lane: 'technisch' },
@@ -84,6 +86,7 @@ export const BEHEER_FLOW: UatFlow = {
   edges: [
     // instap → toegang → secties
     { from: 'entry', to: 'toegang' },
+    { from: 'toegang', to: 'dashboard' },
     { from: 'toegang', to: 'sectie-tech' },
     { from: 'toegang', to: 'sectie-func' },
     { from: 'toegang', to: 'sectie-test' },

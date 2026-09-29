@@ -114,3 +114,38 @@ describe('loadBeheerInboxCounts', () => {
     expect((await loadBeheerInboxCounts(makeClient())).feedback).toBeNull()
   })
 })
+
+describe('loadBeheerInboxCounts — met een al gelezen foutvenster (beheerdashboard)', () => {
+  it('telt de open soorten uit het meegegeven venster en leest het geen tweede keer', async () => {
+    const counts = await loadBeheerInboxCounts(makeClient(), {
+      errorGroups: [group(true), group(false), group(true), group(true)],
+    })
+    expect(counts).toEqual({ errors: 3, feedback: 4, calculator_reports: 0 })
+    expect(mockLoadErrorGroups).not.toHaveBeenCalled()
+  })
+
+  it('een leeg venster is een echte 0', async () => {
+    expect((await loadBeheerInboxCounts(makeClient(), { errorGroups: [] })).errors).toBe(0)
+    expect(mockLoadErrorGroups).not.toHaveBeenCalled()
+  })
+
+  it('een venster dat niet te lezen was (null) geeft geen teller, en ook geen tweede leespoging', async () => {
+    const counts = await loadBeheerInboxCounts(makeClient(), { errorGroups: null })
+    expect(counts.errors).toBeNull()
+    // De andere tellers staan los van het foutvenster.
+    expect(counts.feedback).toBe(4)
+    expect(mockLoadErrorGroups).not.toHaveBeenCalled()
+  })
+
+  it('zonder de optie leest de loader het venster zelf, zoals voorheen', async () => {
+    await loadBeheerInboxCounts(makeClient(), {})
+    expect(mockLoadErrorGroups).toHaveBeenCalledTimes(1)
+  })
+
+  it('de rolcheck gaat vóór het meegegeven venster: zonder rol geen teller', async () => {
+    mockIsSuperAdmin.mockResolvedValue(false)
+    const counts = await loadBeheerInboxCounts(makeClient(), { errorGroups: [group(true)] })
+    expect(counts).toEqual({ errors: null, feedback: null, calculator_reports: null })
+    expect(touched).toEqual([])
+  })
+})

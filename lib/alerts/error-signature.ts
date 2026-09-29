@@ -74,5 +74,8 @@ export function errorSignature(
   return createHash('sha256').update(signatureBasis(context, message)).digest('hex').slice(0, 16)
 }
 
-/** Vorm van een geldige signature — gebruikt door de zod-validatie op de route. */
-export const ERROR_SIGNATURE_RE = /^[0-9a-f]{16}$/
+/**
+ * Vorm van een geldige signature — gebruikt door de zod-validatie op de route.
+ * Gedefinieerd in een importloze module, zodat ook clientcode hem kan lezen.
+ */
+export { ERROR_SIGNATURE_RE } from './error-signature-vorm'
