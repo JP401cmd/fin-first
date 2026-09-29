@@ -684,9 +684,9 @@ export function TijdlijnClient({
           ) : (
             <>
               <p>
-                Je tijdlijn blijft zoals hij is. {aiStilstand ? 'Zodra het kan' : 'Vanaf de volgende verversing'} schrijft een
-                AI-model onder elk bericht een korte toelichting van hoogstens {AI_TEKST_MAX_ZINNEN} zinnen, en het mag hoogstens{' '}
-                {AI_LAAG_MAX_TOEVOEGINGEN} berichten toevoegen. Die herken je aan het label &lsquo;met AI&rsquo;.
+                {/* Eén tekst, geen losse JSX-stukken: in de productie-build viel de
+                    spatie tussen het getal en "berichten" weg (live-run 29-09). */}
+                {`Je tijdlijn blijft zoals hij is. ${aiStilstand ? 'Zodra het kan' : 'Vanaf de volgende verversing'} schrijft een AI-model onder elk bericht een korte toelichting van hoogstens ${AI_TEKST_MAX_ZINNEN} zinnen, en het mag hoogstens ${AI_LAAG_MAX_TOEVOEGINGEN} berichten toevoegen. Die herken je aan het label ‘met AI’.`}
               </p>
               {aiStilstand && (
                 <p data-testid="bevestig-stilstand">
