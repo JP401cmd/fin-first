@@ -60,6 +60,9 @@ interface TokenRij {
   model: string
   input_tokens: number
   output_tokens: number
+  /** Deel van input_tokens uit/naar de prompt-cache (migratie 20261007120000). */
+  cache_read_tokens?: number | null
+  cache_write_tokens?: number | null
   created_at: string
 }
 
@@ -163,6 +166,7 @@ export function wijsTokensToe(
         rij.model,
         rij.input_tokens,
         rij.output_tokens,
+        { read: rij.cache_read_tokens ?? 0, write: rij.cache_write_tokens ?? 0 },
       )
       if (kosten === null) onbekend.add(rij.model)
       else if (agg.costUsd !== null) agg.costUsd += kosten
@@ -210,7 +214,7 @@ export async function loadRunTokens(
   for (let from = 0; ; from += 1000) {
     const { data, error } = await service
       .from('ai_token_usage')
-      .select('provider, model, input_tokens, output_tokens, created_at')
+      .select('provider, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, created_at')
       .is('user_id', null)
       .gte('created_at', vanaf)
       .lte('created_at', tot)

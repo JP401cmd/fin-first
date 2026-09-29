@@ -579,7 +579,7 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: 'VERNIEUW_INTERVAL_MS=600000; teSnelBinnenRem=true; magVerversenNaRem=true',
       source:
-        'lib/krant/tijdlijn-vernieuwen.ts#VERNIEUW_INTERVAL_MS + de tijdsvergelijking `now - vorige < VERNIEUW_INTERVAL_MS` (r67-69, gemirrord met een pure tijdsfunctie) + components/berichten/tijdlijn-client.tsx#doeVernieuwen (429-tekst) — zie will-checks.ts',
+        'app/api/krant/tijdlijn/vernieuwen/route.ts (429 + Retry-After) + lib/krant/tijdlijn-vernieuwen.ts#VERNIEUW_INTERVAL_MS + de ATOMAIRE claim op nieuwsprofiel.tijdlijn_vernieuwd_at (update … where null of ouder dan 10 min; de tijdsgrens gemirrord met een pure tijdsfunctie) + components/berichten/tijdlijn-client.tsx#doeVernieuwen (429-tekst) — zie will-checks.ts',
     },
   },
   {
@@ -655,7 +655,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source:
-        'lib/krant/tijdlijn-lezen.ts#heeftNieuw (Supabase-afhankelijk, niet gemirrord) + app/api/krant/tijdlijn/route.ts (`?peek=1`) + lib/hooks/use-news-unread.ts#fetchTijdlijnUnread/tijdlijnPeekForbidden — procestoets: de vergelijking zelf is triviaal deterministisch maar leunt op een live rij-lezing, dus geen pure engine-check',
+        'lib/krant/tijdlijn-lezen.ts#heeftNieuw (Supabase-afhankelijk, niet gemirrord) + app/api/krant/tijdlijn/route.ts (`?peek=1`) + app/api/krant/tijdlijn/gelezen/route.ts (zet tijdlijn_gelezen_tot) + lib/hooks/use-news-unread.ts#fetchTijdlijnUnread/tijdlijnPeekForbidden — procestoets: de vergelijking zelf is triviaal deterministisch maar leunt op een live rij-lezing, dus geen pure engine-check',
     },
   },
   {
