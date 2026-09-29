@@ -1252,3 +1252,11 @@
 
 - **API-routes** toegevoegd: /api/admin/krant-weekmeting
 - **Componenten (aantal)** toegevoegd: +2
+
+## 2026-09-29
+
+- Geen wijzigingen.
+
+## 2026-09-29
+
+- Geen wijzigingen.
