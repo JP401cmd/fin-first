@@ -201,6 +201,36 @@ export default function PrivacyPage() {
             cijfers van nu zetten.
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Je Krant en je nieuwsprofiel</strong>{' '}
+            &mdash; op Nieuws staat je Krant: een persoonlijke tijdlijn met
+            nieuws dat jouw situatie raakt. Per bericht bewaren we welk artikel
+            het is, wanneer het in je tijdlijn kwam, de regel die we er voor jou
+            bij schreven (soms met een bedrag in euro&apos;s dat laat zien wat
+            het bericht voor jouw situatie kan betekenen) en waarom je het ziet.
+            Die regel is een momentopname: verandert je situatie later, dan
+            blijft een oud bericht staan zoals het toen was.
+            <br />
+            <br />
+            Om te bepalen wat jou raakt, gebruiken we een nieuwsprofiel. Daarin
+            staan geen bedragen maar banden, zoals &ldquo;spaargeld tussen
+            €&nbsp;25.000 en €&nbsp;50.000&rdquo;. Het gaat om je geboortejaar,
+            of je alleen woont of een partner hebt, of je kinderen hebt (de
+            leeftijdsgroep van de jongste), je werk, je netto maandinkomen, huren
+            of kopen, je hypotheek (restschuld en rentevaste periode), een
+            koopplan, je spaargeld, je beleggingen (omvang en soort), je schulden
+            (studieschuld en consumptief krediet), of je pensioen opbouwt, en
+            welke rubrieken je graag leest. De banden leiden we af uit wat je al
+            in de app hebt vastgelegd: alleen je eigen gegevens, nooit die van je
+            partner. Wat we niet zeker weten, laten we leeg. Daarnaast gebruiken
+            we bij welke rubrieken je &ldquo;minder&rdquo; aangaf.
+            <br />
+            <br />
+            Ook maken we elke week op de achtergrond een proefeditie voor je.
+            Niemand ziet die, jij ook niet. Ons team ziet er alleen tellingen
+            van, zo grof dat ze niet tot één persoon te herleiden zijn. Daarmee
+            toetsen we of de Krant goed werkt voor verschillende situaties.
+          </li>
+          <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">Gebruik van de app</strong>{' '}
             — op welke dagen je de app opent, en welke onderdelen je die dag
             gebruikte, zoals Toekomst, Budget of Fin. Per dag staan er alleen
@@ -230,8 +260,9 @@ export default function PrivacyPage() {
           <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">Uitvoering van de overeenkomst</strong>{' '}
             (AVG art. 6 lid 1 sub b) — het leveren van de app zelf: je
-            overzicht, budgetten, prognoses en synchronisatie tussen
-            apparaten.
+            overzicht, budgetten, prognoses, synchronisatie tussen apparaten,
+            en je Krant op Nieuws: het nieuwsprofiel en de berichten in je
+            tijdlijn zijn nodig om je die Krant te geven.
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">Toestemming</strong>{' '}
@@ -249,12 +280,20 @@ export default function PrivacyPage() {
             gebruiksgegevens — hoe lang je een account hebt, op hoeveel dagen
             je de app opende, welk onderdeel je het meest gebruikt, of een groep
             waarin ons team je zette — nooit op je financiële gegevens. Met
-            &ldquo;Niet meer vragen&rdquo; stop je een uitnodiging.
+            &ldquo;Niet meer vragen&rdquo; stop je een uitnodiging. Eén
+            uitzondering noemen we liever eerlijk: voor de proefedities van de
+            Krant (sectie 2) leiden we op de achtergrond banden af uit je
+            financiële gegevens. Alleen tellingen verlaten je account. Wil je dat
+            niet, maak dan bezwaar onderaan je Krant of via het contactkanaal uit
+            sectie 1. Dan stoppen we het werk op de achtergrond, wissen we je
+            proefedities en vernieuw je je Krant voortaan zelf.
           </li>
         </ul>
         <p>
           We gebruiken je gegevens nooit voor advertenties, profilering voor
-          marketingdoeleinden of verkoop aan derden.
+          marketingdoeleinden of verkoop aan derden. Je nieuwsprofiel is wel een
+          profiel, maar het dient één doel: kiezen welk nieuws jou raakt. Het
+          neemt geen beslissingen over je en verlaat je account niet.
         </p>
       </MarketingSection>
 
@@ -285,7 +324,8 @@ export default function PrivacyPage() {
 
       <MarketingSection heading="5. Wat er naar AI gaat — eerlijk verhaal">
         <p>
-          De AI-functies (Fin — je coach, de briefing, categorisering van
+          De AI-functies (Fin — je coach, de briefing, de Krant met AI op
+          Nieuws, categorisering van
           transacties, de rekenhulp-bouwer en document-import) sturen de
           context die voor die taak nodig is naar de actieve AI-aanbieder.
           Daarbij geldt:
@@ -321,6 +361,15 @@ export default function PrivacyPage() {
             <strong className="font-semibold text-[var(--ink)]">Uitschakelbaar</strong>{' '}
             — zet je de AI-functies uit, dan gaat er niets naar een
             AI-aanbieder en werkt de app als puur financieel dashboard.
+          </li>
+          <li className="border-l-2 border-wil-300 pl-4">
+            <strong className="font-semibold text-[var(--ink)]">De Krant zonder AI</strong>{' '}
+            — voor je Krant op Nieuws gaat er niets van jou naar een
+            AI-aanbieder. Welke berichten je ziet en de regel die erbij staat,
+            maken we met vaste rekenregels en vaste zinnen. De artikelen zelf
+            zijn vooraf door een AI-model samengevat en ingedeeld, op basis van
+            de openbare tekst van het artikel en zonder iets over jou. Kies je de
+            Krant met AI, dan geldt deze hele sectie.
           </li>
         </ul>
         <p>
@@ -401,6 +450,17 @@ export default function PrivacyPage() {
             lang ze blijven (zie sectie 5).
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Je Krant en je nieuwsprofiel</strong>{' '}
+            — berichten in je tijdlijn bewaren we 120 dagen; daarna verdwijnen
+            ze automatisch, net als de artikelen zelf. Proefedities bewaren we
+            hoogstens 26 weken. Je nieuwsprofiel werken we bij met je actuele
+            gegevens en bewaren we zolang je account bestaat. Kies je de Krant
+            met AI, dan wissen we je tijdlijn direct. Maak je bezwaar (sectie 3),
+            dan wissen we je proefedities direct, en lees je de Krant met AI, dan
+            ook je nieuwsprofiel. Verwijder je je account, dan gaat alles direct
+            mee.
+          </li>
+          <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">Gebruik van de app</strong>{' '}
             — de dagen waarop je de app opende en de onderdelen die je die dag
             gebruikte bewaren we 400 dagen; daarna verdwijnen ze automatisch.
@@ -443,9 +503,9 @@ export default function PrivacyPage() {
           <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">Export (dataportabiliteit)</strong>{' '}
             — download je kern-financiële gegevens (transacties, budgetten,
-            vermogensverloop, bezittingen, schulden en doelen) als CSV,
-            rechtstreeks vanuit de app. Wil je een volledige kopie van ál je
-            gegevens, vraag die dan aan via het contactkanaal uit sectie 1.
+            vermogensverloop, bezittingen, schulden en doelen) als CSV, of al
+            je gegevens in één bestand, rechtstreeks vanuit de app. In dat
+            bestand zitten ook je nieuwsprofiel en je Krant.
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">Verwijdering</strong>{' '}
@@ -456,6 +516,11 @@ export default function PrivacyPage() {
             <strong className="font-semibold text-[var(--ink)]">Bezwaar tegen AI-verwerking</strong>{' '}
             — schakel de AI-functies uit in de app; de overige functies
             blijven werken.
+          </li>
+          <li className="border-l-2 border-[var(--border-md)] pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Bezwaar tegen de Krant op de achtergrond</strong>{' '}
+            — onderaan je Krant op Nieuws, of via het contactkanaal uit sectie
+            1 (zie sectie 3).
           </li>
         </ul>
         <p>
@@ -483,7 +548,8 @@ export default function PrivacyPage() {
           abonnement — niet je data.
         </p>
         <p className="font-serif text-sm italic text-[var(--ink-3)]">
-          Versie 2.3 — concept, 15 september 2026. Vragen? Gebruik de{' '}
+          Versie 2.4 — concept, 29 september 2026. Nieuw: je Krant op Nieuws
+          en het nieuwsprofiel (secties 2, 3, 5, 6 en 8). Vragen? Gebruik de{' '}
           <a
             href="/contact"
             className="font-semibold not-italic text-kern-700 underline hover:text-kern-800"
