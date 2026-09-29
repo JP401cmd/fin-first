@@ -13,6 +13,7 @@ import {
   toetsRegel,
   toetsThema,
   voldoetAanLeescontract,
+  NIEUWS_MAX_OUDERDOM_DAGEN,
   type KandidaatArtikel,
   type MatchContext,
 } from './matcher'
@@ -66,6 +67,23 @@ describe('matcher — leescontract (1A)', () => {
   it('een verlopen deadline houdt een oud artikel niet meer in het venster', () => {
     const ctx = context({ now: new Date('2026-11-15T06:00:00Z') })
     expect(voldoetAanLeescontract(fixture('a08-kinderopvangtoeslag'), ctx)).toBe(false)
+  })
+
+  // Given een artikel dat we deze week pas ophaalden, maar dat de bron lang geleden
+  // publiceerde (CBS-bericht van april, CPB-raming uit 2025), When de matcher het
+  // venster toetst, Then telt het niet als nieuw — tenzij er nog een deadline
+  // aankomt (eigenaarsbesluit 29 sep 2026: NIEUWS_MAX_OUDERDOM_DAGEN).
+  it('oud nieuws dat we nu pas ophaalden telt niet als nieuw (publicatiedatum > 45 dagen)', () => {
+    const ctx = context()
+    const vers = fixture('a02-box1-schijf1')
+    const dagenTerug = (d: number) => new Date(NU.getTime() - d * 24 * 60 * 60 * 1000).toISOString()
+    expect(NIEUWS_MAX_OUDERDOM_DAGEN).toBe(45)
+    expect(voldoetAanLeescontract({ ...vers, published_at: dagenTerug(46) }, ctx)).toBe(false)
+    expect(voldoetAanLeescontract({ ...vers, published_at: dagenTerug(44) }, ctx)).toBe(true)
+    // Geen publicatiedatum (eerste_gezien wordt als datum opgeslagen): de ophaaldatum beslist.
+    expect(voldoetAanLeescontract({ ...vers, published_at: null }, ctx)).toBe(true)
+    // Een aankomende deadline houdt ook een oud bericht in het venster.
+    expect(voldoetAanLeescontract({ ...fixture('a08-kinderopvangtoeslag'), published_at: dagenTerug(200) }, ctx)).toBe(true)
   })
 })
 
@@ -261,7 +279,7 @@ describe('matcher — uitkomst', () => {
 
   it('draagt de matcher- en sjabloonversie en het profieltype, zonder id', () => {
     const u = matchEditie(PROFIEL_DAAN, ARTIKELEN, context())
-    expect(u.matcherVersie).toBe(4)
+    expect(u.matcherVersie).toBe(5)
     expect(u.sjabloonVersie).toBe(2)
     expect(u.profielType).toBe('onder-35·wonen-onbekend·alleen')
     expect(JSON.stringify(u)).not.toMatch(/user_id|userId/)

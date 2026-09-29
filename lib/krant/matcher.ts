@@ -102,8 +102,10 @@ import {
  *   als één van zijn gegronde thema's dit profiel raakt (OF over de `raakt`-regels); waarom `thema:<id>`.
  * 4 (28-09-2026, Krant 1C · B37/B38): modus 'tijdlijn' (drempel 2 voor 'raakt', Achtergrond); in beide modi
  *   een bedrag van € 0 nooit als som (compliance-check §3a) en de relevant-tekst naar de grond.
+ * 5 (29-09-2026, eigenaarsbesluit): een publicatiedatum ouder dan NIEUWS_MAX_OUDERDOM_DAGEN telt niet als
+ *   nieuw, ook als het artikel binnen het venster is opgehaald; een aankomende deadline gaat voor.
  */
-export const MATCHER_VERSIE = 4
+export const MATCHER_VERSIE = 5
 
 /** Volgorde bij gelijke datum in het algemeen katern: wat vastligt of gemeten is, vóór verwachting en uitleg. */
 const KATERN_SOORT_RANG: Record<DuidingV1['soort'], number> = {
@@ -137,6 +139,14 @@ export const RUBRIEK_MAX = 3
 export const ALGEMEEN_MAX = 5
 /** Het editievenster in dagen: de weekeditie leest de afgelopen week. */
 export const WEEK_VENSTER_DAGEN = 7
+/**
+ * Een bericht dat de bron langer dan dit geleden publiceerde, telt niet als
+ * nieuw, ook als we het net ophaalden (eigenaarsbesluit 29 sep 2026: CBS-
+ * berichten van april en CPB-ramingen uit 2025 kwamen via nieuwe bronnen als
+ * "deze week" binnen). Een aankomende deadline gaat voor. Redactioneel, geen
+ * financiële aanname.
+ */
+export const NIEUWS_MAX_OUDERDOM_DAGEN = 45
 
 /**
  * Score op de ONDERGRENS van het bereik, per maand (jaarbedrag ÷ 12). Dit
@@ -264,11 +274,24 @@ export interface EditieUitkomst {
 const DAG_MS = 24 * 60 * 60 * 1000
 
 function inVenster(a: KandidaatArtikel, ctx: MatchContext): boolean {
+  const deadline = a.duiding?.deadline
+  if (deadline && isDeadlineToekomst(deadline, ctx.now)) return true
   const venster = ctx.weekVensterDagen ?? WEEK_VENSTER_DAGEN
   const grens = ctx.now.getTime() - venster * DAG_MS
-  if (new Date(a.fetched_at).getTime() >= grens) return true
-  const deadline = a.duiding?.deadline
-  return !!deadline && isDeadlineToekomst(deadline, ctx.now)
+  if (new Date(a.fetched_at).getTime() < grens) return false
+  return !isOudNieuws(a, ctx.now)
+}
+
+/**
+ * De bron publiceerde het lang geleden — dat we het nu pas ophalen (een nieuwe
+ * bron, een backfill) maakt het geen nieuws. Zonder bruikbare publicatiedatum
+ * beslist de ophaaldatum.
+ */
+function isOudNieuws(a: KandidaatArtikel, now: Date): boolean {
+  if (!a.published_at) return false
+  const t = Date.parse(a.published_at)
+  if (!Number.isFinite(t)) return false
+  return t < now.getTime() - NIEUWS_MAX_OUDERDOM_DAGEN * DAG_MS
 }
 
 function isDeadlineToekomst(deadline: Deadline, now: Date): boolean {
