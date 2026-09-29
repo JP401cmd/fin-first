@@ -33,7 +33,7 @@
 // matcher in de rij heeft gezet.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { AlgemeenItem, EditieVorm } from './matcher'
+import { REDEN_PER_REGEL, type AlgemeenItem, type EditieVorm } from './matcher'
 import { VELD_SJABLOON, renderSjabloon, type SjabloonId } from './sjablonen'
 
 /** Hoeveel berichten op de pagina, en per archief-pagina (B32). */
@@ -201,12 +201,20 @@ function uitCatalogus(id: string, slots: Record<string, string> = {}): string | 
  * (compliance-keuze 4). Alle andere codes vallen weg — ook
  * `redactie:spaarbuffer`: "weinig spaargeld" heeft geen zin in de catalogus en
  * krijgt er geen.
+ *
+ * Toegestaan is precies wat de matcher als reden kan schrijven
+ * (`REDEN_PER_REGEL`), niet elk catalogus-id dat toevallig met `reden-` begint:
+ * een later toegevoegde tekst verschijnt hier dus niet vanzelf (security H1).
  */
+const TOONBARE_REDENEN: ReadonlySet<string> = new Set(Object.values(REDEN_PER_REGEL))
+
 export function leesbaarWaarom(codes: readonly string[] | null | undefined): string[] {
   const zinnen: string[] = []
   for (const code of codes ?? []) {
-    if (typeof code !== 'string' || !code.startsWith('reden:reden-')) continue
-    const reden = uitCatalogus(code.slice('reden:'.length))
+    if (typeof code !== 'string' || !code.startsWith('reden:')) continue
+    const id = code.slice('reden:'.length)
+    if (!TOONBARE_REDENEN.has(id)) continue
+    const reden = uitCatalogus(id)
     const zin = reden ? uitCatalogus('raakt-reden', { reden }) : null
     if (zin && !zinnen.includes(zin)) zinnen.push(zin)
   }

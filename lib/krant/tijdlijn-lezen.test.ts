@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { REDEN_PER_REGEL } from './matcher'
 import { maakNepClient } from './nep-client.fixture'
 import { renderSjabloon } from './sjablonen'
 import {
@@ -218,6 +219,18 @@ describe('rijNaarBericht', () => {
 
     it('regel 2b: het bufferbericht heeft geen zichtbare reden', () => {
       expect(leesbaarWaarom(['thema:sparen-rente', 'redactie:spaarbuffer'])).toEqual([])
+    })
+
+    it('toegestaan is precies wat de matcher als reden kan schrijven — elke reden geeft een zin', () => {
+      const ids = [...new Set(Object.values(REDEN_PER_REGEL))]
+      expect(ids.length).toBeGreaterThan(15)
+      for (const id of ids) {
+        const zinnen = leesbaarWaarom([`reden:${id}`])
+        expect(zinnen, id).toHaveLength(1)
+        expect(zinnen[0], id).toMatch(/^Volgens je profiel .+\.$/)
+      }
+      // Een catalogustekst buiten die lijst verschijnt niet, ook niet met het voorvoegsel reden-.
+      expect(leesbaarWaarom(['reden:raakt-reden', 'reden:raakt-kop', 'reden:veld-spaargeld'])).toEqual([])
     })
 
     it('een onbekende of vervallen reden valt weg, en dubbelen tellen één keer', () => {
