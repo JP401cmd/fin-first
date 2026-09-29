@@ -97,6 +97,24 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.17',
+    date: '2026-09-29',
+    title: 'Achterstand in het nieuws inhalen',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Een achterstand in de nieuwe Krant is sneller in te halen',
+            description:
+              'Loopt de duiding van het nieuws achter, dan kunnen we die nu gericht inhalen, met dezelfde controles als altijd. Voor jou geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.16',
     date: '2026-09-29',
     title: 'De weekmeting van de Krant bijgesteld',
