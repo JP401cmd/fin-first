@@ -202,3 +202,39 @@ het resultaat gaat opnieuw door zod en `controleerDuiding`.
 "met thema" per week op /beheer/nieuws; de uitgeklapte duiding toont de thema's met citaat.
 Geen migratie (jsonb), geen nieuwe route; het pad blijft `getModel(service, 'nieuws_duiding')`
 met kill-switch en token-logging.
+
+## Aanvulling 29 sep 2026 — de weekmeting in de app (B41)
+
+De K1-maat werd tot nu toe op maandag met de hand gemeten (draaiboek op kaart 1G). Een cloud-routine kon
+dat niet overnemen: Supabase is geen claude.ai-connector. Daarom meet de app zichzelf.
+
+**Besluit.** De weekcron (`/api/krant/cron`, maandag 06:00 UTC) roept na de editierun
+`legWeekmetingVast` aan (`lib/krant/weekmeting-run.ts`). Die meet de **afgesloten** Amsterdamse
+ISO-week ervoor en schrijft één record in `job_runs` onder de eigen taak `krant-weekmeting`:
+G1–G6 (afgeleid uit `bouwDuidingMeting`, geen tweede telling), dekking per bronsoort, artikelpagina's
+en resterende backfill, lege edities (echte lezers alleen als totaal, testaccounts per profieltype) en tokens per
+AI-feature. `/beheer/nieuws` toont de weekreeks via `GET /api/admin/krant-weekmeting`, dat alleen
+`job_runs` leest.
+
+- **Geen nieuwe cron en geen nieuwe tabel.** Een eigen taak-key in dezelfde cron houdt de meting los
+  van de editie-uitkomst op `/beheer/jobs`, zonder een Vercel-wijziging. `job_runs` staat al op
+  `VRIJ_LEESBAAR`; de ADR 0146-gate hoeft niet te verruimen.
+- **Herleiden, niet ophogen.** Elk getal is een telling over rijen tussen de weekgrenzen
+  (`amsterdamWeekGrenzen`, dezelfde indeling als `amsterdamWeekKey`). Een tweede run in dezelfde week
+  meet dezelfde week, herleid op het meetmoment; de weekreeks houdt per week de laatste run.
+- **Alleen tellingen.** De runner leest smalle kolomlijsten met de service-client: geen artikeltekst
+  (samenvattingen worden geteld met een count-query), geen `user_id` uit `ai_token_usage`, van
+  `krant_edities` alleen `user_id, profiel_type, leeg`. Er komt geen id, titel of URL in het record.
+- **Drempel = `partial`, geen melding.** Een waarschuwing (G1–G5 > 0, een fout getal bij een rekenend
+  mechanisme, 0 rekenend, het aandeel met samenvatting ≥ 5 procentpunt gedaald, een afgekapte of
+  mislukte lezing) staat in het record en maakt de run `partial` (ADR 0178). De runner werpt nooit.
+
+**Voorlopig (nacht 29 sep, eigenaar kan omdraaien):** G1–G3 waarschuwen net als G4/G5, zoals de kaart
+vraagt. G1–G3 betekenen dat de tekstpoort iets tegenhield, dus ze zullen vaak afgaan; blijkt dat ruis,
+dan worden ze een telling zonder waarschuwing. De dalingsdrempel van 5 procentpunt is ook voorlopig.
+
+**Eén publicatie per populatie.** De verdeling per profieltype van echte lezers staat al k=5-onderdrukt
+in de `krant-editie`-summary. De weekmeting publiceert haar niet nog een keer: twee correct onderdrukte
+tabellen over een net iets andere populatie (een herhaalde run in dezelfde week) geven samen de
+ongedrukte cel van het verschil prijs (security-run 29 sep). Het weekrecord draagt daarom alleen de
+totalen en de ongedrukte verdeling van de vijf testaccounts.

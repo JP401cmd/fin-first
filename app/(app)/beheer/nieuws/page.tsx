@@ -18,6 +18,7 @@ import { NewsFeedbackPanel } from '@/components/app/beheer/news-feedback-panel'
 import { NewsDuidingDetail, DUIDING_STATUS_LABEL, statusKleur, type DuidingVelden } from '@/components/app/beheer/news-duiding-detail'
 import { NewsDuidingMetingPanel } from '@/components/app/beheer/news-duiding-meting-panel'
 import { KrantMetingPanel } from '@/components/app/beheer/krant-meting-panel'
+import { KrantWeekmetingPanel } from '@/components/app/beheer/krant-weekmeting-panel'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
 import { DUIDING_STATUSSEN } from '@/lib/krant/duiding-schema'
@@ -830,6 +831,9 @@ export default function BeheerNieuwsPage() {
 
       {/* ── Section: Meting schaduweditie (K1-poort kaart 1B, ADR 0173) ── */}
       <KrantMetingPanel ververs={metingVervers} />
+
+      {/* ── Section: Weekmeting Krant (B41) ─────────────────────────── */}
+      <KrantWeekmetingPanel ververs={metingVervers} />
 
       {/* ── Section: Nieuws Database ──────────────────────────────── */}
       <div className="mb-8">

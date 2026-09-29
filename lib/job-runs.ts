@@ -10,7 +10,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *   AI-calls geweigerd terwijl de rest doordraaide). Dit is GEEN harde fout en
  *   alarmeert bewust niet; de reden hoort in de `summary`, de zichtbaarheid
  *   zit op /beheer/jobs. Een `partial` telt voor de stilte-drempel als "de taak
- *   draaide" — zie `loadLastSuccessByJob` (lib/alerts/store.ts).
+ *   draaide" — zie `loadLastSuccessByJob` (lib/alerts/store.ts). Een meet-taak
+ *   (`krant-weekmeting`, B41) gebruikt `partial` ook voor een overschreden
+ *   drempel in haar record: niets verloren, wel iets om naar te kijken.
  * - `error` — harde fout; dit is de enige waarde die een melding afvuurt.
  */
 export type JobStatus = 'success' | 'partial' | 'error'
@@ -24,6 +26,7 @@ export type JobKey =
   | 'holdings-prices'
   | 'snapshots'
   | 'news-ingest'
+  | 'krant-weekmeting'
   | 'integraties-health'
   | 'briefing-email'
   | 'web-vitals-retention'

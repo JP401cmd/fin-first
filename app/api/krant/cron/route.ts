@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { errorResponse, serverError } from '@/lib/api/respond'
 import { getServiceClient } from '@/lib/supabase/service'
 import { recordJobRun } from '@/lib/job-runs'
+import { legWeekmetingVast } from '@/lib/krant/weekmeting-run'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { mapWithConcurrency } from '@/lib/concurrency'
@@ -201,6 +202,12 @@ export async function GET(request: Request) {
       summary,
       error: summary.fouten > 0 ? `${summary.fouten} gebruiker(s) faalden` : summary.tijdBudgetOp ? 'tijdbudget op — rest volgt bij de volgende run' : null,
     })
+    // B41: de weekmeting van de afgesloten week, als eigen job_run. Ná de
+    // editierun, zodat de lege edities van deze week al bestaan; werpt nooit.
+    // Was het tijdbudget op, dan overslaan: de run staat dan al dicht bij
+    // maxDuration en de lege edities zijn onvolledig. De herhaling die de rest
+    // afmaakt, meet dezelfde week (de laatste run per week wint).
+    if (!summary.tijdBudgetOp) await legWeekmetingVast(service, now, { editieOnvolledig: summary.fouten > 0 })
     return NextResponse.json({ success: true, summary })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'

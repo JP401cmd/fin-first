@@ -97,6 +97,29 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.15',
+    date: '2026-09-29',
+    title: 'De nieuwe Krant, achter de schermen',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Het nieuws wordt sneller verwerkt',
+            description:
+              'Het ophalen van nieuws blijft nu binnen zijn tijd, zodat de rest van de ronde niet meer uitloopt. Voor jou geen zichtbare verandering.',
+          },
+          {
+            title: 'We meten de nieuwe Krant elke week',
+            description:
+              'Elke maandag leggen we vast hoe goed de nieuwe Krant die week werkte, zodat we hem gericht kunnen verbeteren. Voor jou geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.14',
     date: '2026-09-28',
     title: 'Nieuws leest het hele bericht',
