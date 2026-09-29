@@ -100,6 +100,28 @@ function keuze<K extends DoelgroepSleutel>(sleutel: K) {
 const nullable = <T extends z.ZodTypeAny>(s: T) => s.nullable()
 
 /**
+ * Hoogstens zoveel rubrieken — gelijk aan de DB-CHECK
+ * `nieuwsprofiel_rubrieken_grootte_check` (cardinality ≤ 20, migratie 20261004120000).
+ */
+export const RUBRIEKEN_MAX = 20
+
+/**
+ * Een lijst zonder dubbelen, hoogstens `max` lang (Krant 3A, review 🟡3 / security G3):
+ * de meerkeuzevelden kunnen niet meer waarden hebben dan hun vocabulaire, en
+ * een dubbele waarde betekent niets. `uniqueItems` zegt hetzelfde in de OpenAPI.
+ * De afleiding bouwt deze lijsten al uit een Set of losse pushes, dus die raakt dit niet.
+ */
+function uniekeLijst<T extends z.ZodTypeAny>(item: T, max: number) {
+  return z
+    .array(item)
+    .max(max)
+    .refine((lijst) => new Set(lijst).size === lijst.length, { message: 'Dubbele waarde' })
+    .meta({ uniqueItems: true })
+}
+
+const aantalWaarden = (sleutel: DoelgroepSleutel) => DOELGROEP_SLEUTELS[sleutel].waarden.length
+
+/**
  * Het profiel zoals de matcher het leest en het scherm het schrijft. Elk veld
  * is `null` voor "weet ik niet". Samengestelde velden (hypotheek, beleggingen,
  * pensioenopbouw) dragen hun dimensies apart, in lijn met DOELGROEP_SLEUTELS.
@@ -112,7 +134,7 @@ export const nieuwsprofielV1Schema = z.strictObject({
   geboortejaar: nullable(z.number().int().min(GEBOORTEJAAR_MIN).max(GEBOORTEJAAR_MAX)),
   huishouden: nullable(keuze('huishouden')),
   kinderen: nullable(keuze('kinderen')),
-  werk: nullable(z.array(keuze('werk')).min(1)),
+  werk: nullable(uniekeLijst(keuze('werk'), aantalWaarden('werk')).min(1)),
   inkomen: nullable(keuze('inkomen')),
   wonen: nullable(keuze('wonen')),
   hypotheek: z.strictObject({
@@ -123,14 +145,14 @@ export const nieuwsprofielV1Schema = z.strictObject({
   spaargeld: nullable(keuze('spaargeld')),
   beleggingen: z.strictObject({
     band: nullable(keuze('beleggingen')),
-    vorm: nullable(z.array(keuze('beleggingen_vorm'))),
+    vorm: nullable(uniekeLijst(keuze('beleggingen_vorm'), aantalWaarden('beleggingen_vorm'))),
   }),
-  schulden: nullable(z.array(keuze('schulden')).min(1)),
+  schulden: nullable(uniekeLijst(keuze('schulden'), aantalWaarden('schulden')).min(1)),
   pensioenopbouw: z.strictObject({
     werkgever: nullable(keuze('pensioen_werkgever')),
     lijfrente: nullable(keuze('pensioen_lijfrente')),
   }),
-  rubrieken: nullable(z.array(z.string().min(1).max(40))),
+  rubrieken: nullable(uniekeLijst(z.string().min(1).max(40), RUBRIEKEN_MAX)),
 })
 
 export type NieuwsprofielV1 = z.infer<typeof nieuwsprofielV1Schema>

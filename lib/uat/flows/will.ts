@@ -99,6 +99,16 @@ export const WILL_FLOW: UatFlow = {
     { id: 'tijdlijn-naar-ai', scenarioId: 'UAT-WILL-38', label: 'WF-WILL-38 · Naar de AI-Krant wist de tijdlijn; terug kan altijd', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
     { id: 'nieuwsstip', scenarioId: 'UAT-WILL-39', label: 'WF-WILL-39 · Nieuwsstip in de zijbalk (tijdlijnlezer)', kind: 'screen', stage: 3, lane: 'krant' },
 
+    // Krant 3A fase 1 (ADR 0187): een NATIVE ingang naast /nieuws — geen
+    // scherm (de app zelf is Krant 3B), maar wél dezelfde krant-gegevens via
+    // Bearer-JWT i.p.v. de cookiesessie. Los van 'bronkeuze' getekend: een
+    // toekomstige native-appgebruiker komt hier nooit via /nieuws binnen.
+    { id: 'v1-api', label: 'Native API (v1): config/profiel/feedback via Authorization: Bearer <jwt>', kind: 'action', stage: 3, lane: 'krant' },
+    { id: 'v1-poort', scenarioId: 'UAT-WILL-40', label: 'WF-WILL-40 · Weigert zonder token en bij een niet-leesbare JWT', kind: 'action', stage: 3, lane: 'krant', subOf: 'v1-api' },
+    { id: 'v1-modulepoort', scenarioId: 'UAT-WILL-41', label: 'WF-WILL-41 · Weigert geblokkeerd account / zonder module nieuws', kind: 'action', stage: 3, lane: 'krant', subOf: 'v1-api' },
+    { id: 'v1-profiel', scenarioId: 'UAT-WILL-42', label: 'WF-WILL-42 · PUT profiel alleen voor tijdlijnlezers + begrensde rubriekenlijst', kind: 'action', stage: 3, lane: 'krant', subOf: 'v1-api' },
+    { id: 'v1-openapi', scenarioId: 'UAT-WILL-43', label: 'WF-WILL-43 · OpenAPI-contract blijft in sync met de bron', kind: 'action', stage: 3, lane: 'krant', subOf: 'v1-api' },
+
     // ── 4 · uitkomst ──────────────────────────────────────────────────────
     { id: 'uitkomst', label: 'Tips/acties/meldingen/krant bijgewerkt', kind: 'outcome', stage: 4 },
 
@@ -179,6 +189,13 @@ export const WILL_FLOW: UatFlow = {
     { from: 'krant', to: 'tijdlijn', kind: 'branch', label: '"Naar de tijdlijn" (TerugNaarTijdlijn) als de bèta openstaat' },
     { from: 'bronkeuze', to: 'nieuwsstip', label: 'de zijbalkstip leest dezelfde bronkeuze via /api/krant/tijdlijn?peek=1' },
 
+    // native API v1 (Krant 3A fase 1) — eigen ingang, geen scherm
+    { from: 'nav', to: 'v1-api', label: 'toekomstige native app (Krant 3B) — nog geen scherm, wél al de API' },
+    { from: 'v1-api', to: 'v1-poort' },
+    { from: 'v1-api', to: 'v1-modulepoort' },
+    { from: 'v1-api', to: 'v1-profiel' },
+    { from: 'v1-api', to: 'v1-openapi' },
+
     // samenvloeien → uitkomst
     { from: 'tip', to: 'uitkomst' },
     { from: 'actie', to: 'uitkomst' },
@@ -200,6 +217,7 @@ export const WILL_FLOW: UatFlow = {
     { from: 'archief', to: 'uitkomst' },
     { from: 'artikelactie', to: 'uitkomst' },
     { from: 'minderhierover', to: 'uitkomst' },
+    { from: 'v1-api', to: 'uitkomst' },
 
     // uitkomst → cross-doorwerking (OUTPUT)
     { from: 'uitkomst', to: 'x-ovz', kind: 'cross' },

@@ -239,7 +239,9 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+# 10 minuten: inloggen in de app met een e-mailcode (Krant 3A, besluit eigenaar 29-09, ADR 0187).
+# Lokale config; productie volgt via het Dashboard — change-request in docs/beheerders-runbook.md.
+otp_expiry = 600
 
 # Productie-SMTP voor auth-mails (bevestiging + wachtwoordreset) staat BEWUST NIET in dit
 # basisblok: het basisblok geldt óók voor lokaal `supabase start`, en dat moet de inbucket-

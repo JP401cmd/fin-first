@@ -9,7 +9,7 @@
  *
  * WILL is — net als SCHULD/TOEK — NIET aaneengesloten op WF-nummer: WF-WILL-21/22
  * hebben geen eigen UAT-WILL-scenario (→ gedekt door UAT-OVZ-19/20/21) en
- * ontbreken dus terecht in de catalogus voor zone WILL. De 36 criteria hier
+ * ontbreken dus terecht in de catalogus voor zone WILL. De 40 criteria hier
  * zijn wél 1-op-1 met de catalogus-scenario's UAT-WILL-01..20 + UAT-WILL-23
  * (lokaal actievoorstel, backlog #886 C2c) + UAT-WILL-24 (melding maken vanuit
  * de chat, release 8 aug 2026) + UAT-WILL-25 (chat blokkeert vóóraf bij AI
@@ -19,7 +19,10 @@
  * opslagkeuze, de privacyvloer en de suggestievragen in de lege staat) +
  * UAT-WILL-32 (een vragenlijst invullen in de chat, sep 2026) + UAT-WILL-33
  * t/m 39 (Krant 1C fase 2 — B40, ADR 0183: bronkeuze, de tijdlijn-rem,
- * archief/cursor, katerndrempel, bezwaar, AI-keuze wist de tijdlijn, nieuwsstip).
+ * archief/cursor, katerndrempel, bezwaar, AI-keuze wist de tijdlijn, nieuwsstip) +
+ * UAT-WILL-40 t/m 43 (Krant 3A fase 1 — ADR 0187: de native API v1 met Bearer —
+ * de auth-/module-poort, PUT profiel alleen voor tijdlijnlezers + de begrensde
+ * rubriekenlijst, en het OpenAPI-contract in sync).
  */
 
 import { describe, it, expect } from 'vitest'

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T07:23:33.252Z",
+  "generatedAt": "2026-09-29T10:09:36.665Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
@@ -191,10 +191,10 @@
   "stats": {
     "routes": 136,
     "routesProduction": 90,
-    "api": 342,
+    "api": 345,
     "tables": 105,
     "migrations": 269,
-    "integrations": 25,
+    "integrations": 24,
     "components": 1251,
     "providers": 19,
     "contextBuilders": 9,
@@ -4634,6 +4634,31 @@
       ]
     },
     {
+      "url": "/api/v1/krant/config",
+      "file": "app/api/v1/krant/config/route.ts",
+      "domain": "v1",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/v1/krant/feedback",
+      "file": "app/api/v1/krant/feedback/route.ts",
+      "domain": "v1",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/v1/krant/profiel",
+      "file": "app/api/v1/krant/profiel/route.ts",
+      "domain": "v1",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/valuations",
       "file": "app/api/valuations/route.ts",
       "domain": "valuations",
@@ -6895,6 +6920,38 @@
           "domain": "recurring",
           "methods": [
             "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "v1",
+      "label": "v1",
+      "count": 3,
+      "routes": [
+        {
+          "url": "/api/v1/krant/config",
+          "file": "app/api/v1/krant/config/route.ts",
+          "domain": "v1",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/v1/krant/feedback",
+          "file": "app/api/v1/krant/feedback/route.ts",
+          "domain": "v1",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/v1/krant/profiel",
+          "file": "app/api/v1/krant/profiel/route.ts",
+          "domain": "v1",
+          "methods": [
+            "GET",
+            "PUT"
           ]
         }
       ]
@@ -10850,10 +10907,6 @@
       "category": "AI"
     },
     {
-      "name": "OpenRouter",
-      "category": "AI"
-    },
-    {
       "name": "Vercel AI SDK",
       "category": "AI"
     },
@@ -12605,6 +12658,12 @@
           "write": false
         }
       ],
+      "v1": [
+        {
+          "name": "news_feedback",
+          "write": true
+        }
+      ],
       "valuations": [
         {
           "name": "valuations",
@@ -14235,6 +14294,14 @@
           "routes": [
             "/api/news",
             "/api/news/feedback"
+          ]
+        },
+        {
+          "domain": "v1",
+          "label": "v1",
+          "write": true,
+          "routes": [
+            "/api/v1/krant/feedback"
           ]
         },
         {
@@ -15880,6 +15947,7 @@
       "goals",
       "investment_holdings",
       "life_events",
+      "news_feedback",
       "profiles",
       "questionnaire_invitations",
       "questionnaire_sessions",
@@ -19145,6 +19213,22 @@
       ],
       "summary": "Na een week meten had geen enkele geduide Krant-duiding een rekenend mechanisme. Tarieven, grenzen en percentages staan zelden in een nieuwsbericht; ze staan in wetteksten, pdf's en sleuteltabellen. Besluit B34 (27 sep): rekenende berichten komen uit een gecureerde kalender van r",
       "file": "docs/adr/0185-de-regelkalender-als-tweeling-van-de-fiscale-wijzigingslog.md"
+    },
+    {
+      "id": "0187-api-v1-met-bearer",
+      "title": "API v1 met Bearer: een native ingang naar de Krant, als de lezer onder RLS, met het contract als bron",
+      "status": "voorgesteld",
+      "date": "2026-09-29",
+      "elements": [
+        "as-nieuws",
+        "do-krant",
+        "app-comp",
+        "t-supabase",
+        "t-platform",
+        "ext-supabase"
+      ],
+      "summary": "De Krant krijgt een eigen app (Krant 3B, Expo; B16/B17). Die app heeft geen cookies: hij logt in bij Supabase Auth met een e-mailcode (B19) en stuurt daarna het access token mee als `Authorization: Bearer <jwt>`. Tot nu toe kende de server alleen cookie-auth (`lib/supabase/server",
+      "file": "docs/adr/0187-api-v1-met-bearer.md"
     }
   ],
   "churn": {
@@ -20425,27 +20509,24 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-28",
+    "previousDate": "2026-09-29",
     "hasChanges": true,
     "sections": [
       {
         "label": "API-routes",
         "added": [
-          "/api/admin/krant-weekmeting",
-          "/api/krant/bezwaar",
-          "/api/krant/tijdlijn",
-          "/api/krant/tijdlijn/gelezen",
-          "/api/krant/tijdlijn/vernieuwen",
-          "/api/krant/variant"
+          "/api/v1/krant/config",
+          "/api/v1/krant/feedback",
+          "/api/v1/krant/profiel"
         ],
         "removed": []
       },
       {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+8"
-        ],
-        "removed": []
+        "label": "Integraties",
+        "added": [],
+        "removed": [
+          "OpenRouter"
+        ]
       }
     ]
   },
@@ -20942,7 +21023,7 @@
     },
     {
       "date": "2026-09-29",
-      "api": 342,
+      "api": 345,
       "components": 1251,
       "tables": 105,
       "routesProduction": 90

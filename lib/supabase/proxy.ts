@@ -57,6 +57,9 @@ export async function updateSession(request: NextRequest) {
     return new NextResponse(null, { status: 404 })
   }
 
+  // Native API (ADR 0187): Bearer i.p.v. cookies — vóór er een cookie-client is.
+  if (isV1Path(request.nextUrl.pathname)) return v1Poort(request)
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -260,4 +263,37 @@ async function lookupHomeHref(
   } catch {
     return HOME_SCREEN_HREFS.overzicht
   }
+}
+
+/**
+ * De native API (`/api/v1/**`, Krant 3A, ADR 0187) authenticeert met
+ * `Authorization: Bearer <jwt>`, nooit met cookies. Deze poort draait VÓÓR
+ * `createServerClient`: geen cookie-refresh, geen sessie-lookup. Hij doet
+ * alleen de goedkope vormcheck; de handler verifieert het token echt
+ * (`vereisBearer` in lib/supabase/bearer.ts).
+ *
+ *   - geen Bearer-header          → 401 (envelope zoals `unauthorized()`)
+ *   - mutatie mét `Origin`-header → 403: de native app stuurt geen Origin, een
+ *     browser wel. Geen CORS-headers, dus ook geen preflight die slaagt.
+ *
+ * De envelope staat hier inline i.p.v. via lib/api/respond.ts: die trekt de
+ * foutlogging (service-client) mee de proxy-bundel in. proxy.v1.test.ts pint
+ * dat de vorm gelijk is aan `unauthorized()`/`forbidden()`.
+ */
+export const API_V1_PREFIX = '/api/v1/'
+
+const V1_MUTATIES: readonly string[] = ['POST', 'PUT', 'PATCH', 'DELETE']
+
+export function isV1Path(pathname: string): boolean {
+  return pathname === '/api/v1' || pathname.startsWith(API_V1_PREFIX)
+}
+
+export function v1Poort(request: NextRequest): NextResponse {
+  if (V1_MUTATIES.includes(request.method.toUpperCase()) && request.headers.has('origin')) {
+    return NextResponse.json({ error: 'Geen toegang', code: 'forbidden' }, { status: 403 })
+  }
+  if (!/^bearer\s+\S+$/i.test(request.headers.get('authorization')?.trim() ?? '')) {
+    return NextResponse.json({ error: 'Niet ingelogd', code: 'unauthorized' }, { status: 401 })
+  }
+  return NextResponse.next({ request })
 }
