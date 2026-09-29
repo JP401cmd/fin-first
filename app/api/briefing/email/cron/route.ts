@@ -6,6 +6,7 @@ import { buildBriefingEmail } from '@/lib/briefing/email-template'
 import { signUnsubscribeToken } from '@/lib/briefing/email-token'
 import { sendEmail } from '@/lib/email'
 import { unauthorized, serverError } from '@/lib/api/respond'
+import { receivesBriefing } from '@/lib/modules/krant-grens'
 
 /**
  * GET /api/briefing/email/cron
@@ -110,13 +111,17 @@ export async function GET(request: Request) {
     skipped_no_snapshot: 0,
     skipped_no_email: 0,
     skipped_no_resend: 0,
+    // Krant 2B: een Krant-account heeft geen briefing (`receivesBriefing`).
+    skipped_krant: 0,
     errors: 0,
   }
 
   try {
     const { data: profiles, error: profilesError } = await service
       .from('profiles')
-      .select('id')
+      // `active_modules` voor de Krant-grens — dezelfde kolom en dezelfde
+      // helper als de rest van de app, geen eigen lezing.
+      .select('id, active_modules')
       .eq('onboarding_completed', true)
       .eq('weekly_briefing_email', true)
 
@@ -134,6 +139,13 @@ export async function GET(request: Request) {
 
     for (const profile of profiles ?? []) {
       const userId = profile.id as string
+      // Vóór elke lees- of schrijfstap: een Krant-account raakt ook de
+      // week-gate niet, zodat een later "Meer TriFinity" gewoon een eerste
+      // briefing krijgt.
+      if (!receivesBriefing(profile)) {
+        counters.skipped_krant++
+        continue
+      }
       try {
         // ── Idempotentie-gate per ISO-week ──
         const weekGateKey = `briefing_email_sent_week_${userId}`

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ACTIVITY_MODULES } from '@/lib/activity/modules'
+import { HOME_SCREEN_VALUES } from '@/lib/home-screen'
 
 /**
  * De vorm die `admin_gebruik_analyse(p_dagen, p_intern, p_config)` teruggeeft
@@ -131,8 +132,11 @@ export const GebruikAnalyseRuwSchema = z
         uitgesteld: z.array(z.object({ veld: z.enum(['income', 'assets', 'spaardoel']), gebruikers: n }).strict()),
         briefing_mail_aan: n,
         checkin_minstens_een: n,
-        // Beide kolommen hebben een CHECK in de database.
-        home_screen: z.array(z.object({ waarde: z.enum(['overzicht', 'budget']), gebruikers: n }).strict()),
+        // Beide kolommen hebben een CHECK in de database. home_screen volgt de
+        // PERSISTEERBARE lijst (spiegel van die CHECK, incl. 'nieuws' sinds
+        // migratie 20261006120000 / ADR 0184) — niet de kiesbare: het eerste
+        // Krant-profiel mag /beheer/gebruik niet fail-closed breken.
+        home_screen: z.array(z.object({ waarde: z.enum(HOME_SCREEN_VALUES), gebruikers: n }).strict()),
         display_mode: z.array(z.object({ waarde: z.enum(['simple', 'full']), gebruikers: n }).strict()),
       })
       .strict(),

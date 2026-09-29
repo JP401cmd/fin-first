@@ -82,6 +82,15 @@ describe('PUT /api/home-screen', () => {
     expect(mockFrom).not.toHaveBeenCalled()
   })
 
+  // Krant 2A fase 2 (ADR 0184): 'nieuws' is persisteerbaar (CHECK), niet
+  // kiesbaar — alleen PUT /api/modules zet hem bij de productkeuze Krant.
+  it("400 bij 'nieuws' — een Geheel-gebruiker kan de Krant niet als startscherm kiezen", async () => {
+    const res = await PUT(putRequest({ screen: 'nieuws' }))
+
+    expect(res.status).toBe(400)
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
   it('400 bij een ontbrekend scherm', async () => {
     const res = await PUT(putRequest({}))
 

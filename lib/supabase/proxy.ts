@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { HOME_SCREEN_HREFS, resolveHomeHref } from '@/lib/home-screen'
+import { PATHNAME_HEADER } from '@/lib/modules/krant-grens'
 
 /**
  * Cron-routes: headless aangeroepen, dus GEEN sessiecookie. Het echte auth-slot
@@ -49,6 +50,22 @@ export function isDevOnlyPathBlocked(
   return DEV_ONLY_PATHS.includes(pathname) && nodeEnv !== 'development'
 }
 
+/**
+ * De request-headers die de proxy doorgeeft aan de route: de binnenkomende
+ * headers (inclusief de door `setAll` ververste cookies — daarom per aanroep
+ * opnieuw opgebouwd, nooit één keer vooraf) plus het pad onder
+ * `PATHNAME_HEADER`. De server-layout leest dat pad voor de Krant-grens
+ * (`lib/modules/krant-grens.ts`); zonder header kent hij zijn eigen pad niet.
+ *
+ * `set`, niet `append`: een door de client meegestuurde waarde wordt altijd
+ * overschreven, zodat de layout alleen het pad van de proxy ziet.
+ */
+export function forwardedRequest(request: NextRequest): { headers: Headers } {
+  const headers = new Headers(request.headers)
+  headers.set(PATHNAME_HEADER, request.nextUrl.pathname)
+  return { headers }
+}
+
 export async function updateSession(request: NextRequest) {
   // Dev-harness buiten `next dev`: 404 vóór er een Supabase-client of sessie
   // aan te pas komt (zie DEV_ONLY_PATHS). Bewust een kale 404, geen envelope:
@@ -58,7 +75,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   let supabaseResponse = NextResponse.next({
-    request,
+    request: forwardedRequest(request),
   })
 
   const supabase = createServerClient(
@@ -74,7 +91,7 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value)
           )
           supabaseResponse = NextResponse.next({
-            request,
+            request: forwardedRequest(request),
           })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)

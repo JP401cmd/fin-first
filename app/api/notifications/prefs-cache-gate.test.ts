@@ -86,7 +86,14 @@ describe('meldingen-route — generatie staat los van de voorkeur (WF-WILL-13 bu
       return code.slice(gateIndex, code.indexOf('\n', gateIndex)).trim()
     }
 
-    expect(gateVoor('const briefingWeekKey'), 'weekbriefing (4c)').toBe('if (computeSlow) try {')
+    // De weekbriefing draagt sinds Krant 2B één extra conditie: de PRODUCTgrens
+    // (`receivesBriefing`, een Krant-account heeft geen briefing). Dat is geen
+    // voorkeur die de gebruiker in dat 15-min-venster omzet, dus niet de bug
+    // van WF-WILL-13; de eerste test hierboven (geen `computeSlow && prefs`)
+    // blijft de echte grendel. Precies deze vorm, zodat er niets bij sluipt.
+    expect(gateVoor('const briefingWeekKey'), 'weekbriefing (4c)').toBe(
+      'if (computeSlow && receivesBriefing(ownModulesRow)) try {',
+    )
     expect(gateVoor('const spendLimitGateKey'), 'grenzenpotten (4d)').toBe('if (computeSlow) try {')
     expect(gateVoor('const milestoneCutoff'), 'mijlpaal (4e)').toBe('if (computeSlow) try {')
   })

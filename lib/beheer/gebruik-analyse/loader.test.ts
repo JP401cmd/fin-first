@@ -406,6 +406,31 @@ describe('laadGebruikAnalyse', () => {
     spy.mockRestore()
   })
 
+  // Krant 2A fase 2 (ADR 0184): de CHECK kent sinds migratie 20261006120000
+  // ook 'nieuws'. Het fail-closed schema mag bij het eerste Krant-profiel de
+  // hele pagina niet op 'fout' zetten — maar een onbekende waarde nog steeds wél.
+  it("home_screen 'nieuws' (Krant) wordt geaccepteerd; een onbekende waarde blijft een fout", async () => {
+    const ok = ruw()
+    ok.eerste_ervaring.home_screen = [
+      { waarde: 'overzicht', gebruikers: 20 },
+      { waarde: 'nieuws', gebruikers: null },
+    ]
+    const { client } = service({ data: ok })
+    const res = await laadGebruikAnalyse(client, { dagen: 90, intern: false })
+    expect(res.status).toBe('ok')
+    expect(res.status === 'ok' && res.data.eersteErvaring.homeScreen.verdeling.map((h) => h.waarde)).toEqual([
+      'overzicht',
+      'nieuws',
+    ])
+
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const fout = ruw() as unknown as { eerste_ervaring: { home_screen: unknown[] } }
+    fout.eerste_ervaring.home_screen = [{ waarde: 'toekomst', gebruikers: 5 }]
+    const { client: c2 } = service({ data: fout })
+    expect((await laadGebruikAnalyse(c2, { dagen: 90, intern: false })).status).toBe('fout')
+    spy.mockRestore()
+  })
+
   it('bouwt op de opgeslagen indeling en geeft die door aan de RPC', async () => {
     const eigen = { stromen: [{ id: 'alles', naam: 'Alles', modules: ['overzicht', 'toekomst'] }] }
     const data = ruw({

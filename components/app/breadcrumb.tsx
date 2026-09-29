@@ -7,6 +7,7 @@ import type { DomainColor } from '@/lib/navigation'
 import { ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
 import { resolveRouteTitle } from '@/lib/nav-config'
+import { useNavSurface } from '@/lib/hooks/use-nav-surface'
 
 /**
  * Breadcrumb segment type — each crumb in the trail.
@@ -127,7 +128,14 @@ export function Breadcrumb({
   const pathname = usePathname()
   const accent = colorAccent[color]
 
-  const segments: BreadcrumbSegment[] = overrideSegments ?? buildBreadcrumbs(pathname)
+  // Productgrens (Krant 2B): een crumb die naar een pagina buiten de grens
+  // linkt valt weg (voor een Krant-account op /mijn/account is dat "Mijn" →
+  // /mijn), waarna de ≤1-regel hieronder het kruimelpad als geheel laat vallen.
+  // De laatste crumb linkt niet en blijft altijd staan. Voor elk ander account
+  // is `isVisible` altijd waar: niets verandert.
+  const { isVisible } = useNavSurface()
+  const allSegments: BreadcrumbSegment[] = overrideSegments ?? buildBreadcrumbs(pathname)
+  const segments = allSegments.filter((s, i) => i === allSegments.length - 1 || isVisible(s.href))
 
   // Don't show breadcrumbs for top-level module pages (e.g., /core, /will)
   // They only have 1 segment which would be redundant with the header

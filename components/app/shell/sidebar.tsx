@@ -36,7 +36,6 @@ import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import {
   SIMPLE_HIDDEN_NAV_HREFS,
-  menuNav,
   isMenuEntryActive,
   type MenuEntry,
   type NavColor,
@@ -62,6 +61,7 @@ import { useNotifications } from '@/components/app/notifications/notification-pr
 import { useNewsUnread } from '@/lib/hooks/use-news-unread'
 import { hasSubscription } from '@/lib/feature-registry'
 import { useCashflowStatusContext } from '@/components/app/cashflow-status-provider'
+import { useNavSurface } from '@/lib/hooks/use-nav-surface'
 import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
@@ -207,6 +207,12 @@ const OVERIGE_BASE: OverigeEntry[] = [
 type FooterLink = {
   label: string
   href: string
+  /**
+   * De Mijn-ingang: zijn href komt uit de navigatie van het product
+   * (`useNavSurface().mijn.href`) — /mijn, of /mijn/account voor een
+   * Krant-account (Krant 2B). De href hieronder is de standaard.
+   */
+  isMijn?: boolean
 }
 
 const FOOTER_LINKS: FooterLink[] = [
@@ -215,7 +221,7 @@ const FOOTER_LINKS: FooterLink[] = [
   // Mijn. De ingang zit sindsdien als kaart in het /mijn-grid — let op: haal je
   // die kaart weg, dan heeft desktop géén Account-ingang meer (de mobiele
   // nav-pill met `open-account` is `lg:hidden`).
-  { label: 'Mijn', href: '/mijn' },
+  { label: 'Mijn', href: '/mijn', isMijn: true },
   { label: 'Uitloggen', href: '/logout' },
 ]
 
@@ -253,6 +259,8 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname() ?? '/'
   const [collapsed, setCollapsed] = useSidebarCollapsed()
+  // Wat deze zijbalk toont, per product (Krant 2B) — zie navSurfaceFor.
+  const nav = useNavSurface()
 
   // Width drives both sidebar shell and `<main>`-offset in DesktopSidebarShell
   // via data-collapsed. Hier alleen layout van sidebar zelf.
@@ -275,6 +283,7 @@ export function Sidebar({
           schakelaars zitten in het zoekmenu (⌘K), de SearchTrigger hierboven. */}
 
       <MenuSection
+        entries={nav.menu}
         collapsed={collapsed}
         pathname={pathname}
         activeAppKeys={activeAppKeys}
@@ -288,12 +297,13 @@ export function Sidebar({
       <OverigeSection
         collapsed={collapsed}
         sidebarSignals={sidebarSignals}
+        isVisible={nav.isVisible}
       />
 
       {/* De kompas-status staat als stip naast elke hefboom-rij (zie
           MenuRow). Ingeklapt zijn er geen labels om een stip naast te zetten,
           dus daar houden we onderaan een compacte indicator. */}
-      {collapsed && <LeverCompassCollapsed scores={leverScores} />}
+      {collapsed && !nav.isKrant && <LeverCompassCollapsed scores={leverScores} />}
 
       <div className="flex-1" aria-hidden />
 
@@ -302,6 +312,8 @@ export function Sidebar({
         userInitials={userInitials}
         userName={userName}
         role={role}
+        mijnHref={nav.mijn.href}
+        showSync={!nav.isKrant}
       />
     </aside>
   )
@@ -395,6 +407,7 @@ function SearchTrigger() {
 // ─────────────────────────────────────────────────────────────────
 
 function MenuSection({
+  entries,
   collapsed,
   pathname,
   activeAppKeys,
@@ -402,6 +415,8 @@ function MenuSection({
   leverScores,
   sidebarSignals,
 }: {
+  /** Het hoofdmenu van dit product (`useNavSurface().menu`). */
+  entries: MenuEntry[]
   collapsed: boolean
   pathname: string
   activeAppKeys: string[]
@@ -426,7 +441,7 @@ function MenuSection({
 
   return (
     <div className="flex flex-col gap-0.5 px-2 py-3">
-      {menuNav.map((entry) => {
+      {entries.map((entry) => {
         const isActive = isMenuEntryActive(pathname, entry.href)
         const expanded = branchOverride[entry.href] ?? isActive
         return (
@@ -917,9 +932,12 @@ function AppTagStrip({
 function OverigeSection({
   collapsed,
   sidebarSignals,
+  isVisible,
 }: {
   collapsed: boolean
   sidebarSignals?: SidebarSignals
+  /** `useNavSurface().isVisible` — voor een Krant-account blijft alleen de Krant staan. */
+  isVisible: (href: string) => boolean
 }) {
   // Nieuws-freshness: ÉÉN gedeelde bron (perf fase 1). Voorheen riep elke
   // OverigeRow `useNewsUnread()` aan (Rules of Hooks: onvoorwaardelijk) →
@@ -934,7 +952,7 @@ function OverigeSection({
     <div className="flex flex-col px-2 py-3">
       {!collapsed && <OverigeSectionLabel />}
       <div className="flex flex-col">
-        {OVERIGE_BASE.map((entry) => (
+        {OVERIGE_BASE.filter((entry) => isVisible(entry.href)).map((entry) => (
           <OverigeRow
             key={entry.signal}
             entry={entry}
@@ -1061,11 +1079,17 @@ function FooterSection({
   userInitials,
   userName,
   role,
+  mijnHref,
+  showSync,
 }: {
   collapsed: boolean
   userInitials: string
   userName: string
   role?: string
+  /** Bestemming van de profiel-pill en de Mijn-link (`useNavSurface().mijn.href`). */
+  mijnHref: string
+  /** Sync nu + Sync-rapport; niet voor een Krant-account (geen koppelingen). */
+  showSync: boolean
 }) {
   // Beheer-link is alleen voor superadmin. Krijgt kern-700 accent zodat hij
   // visueel onderscheidt van neutrale FOOTER_LINKS (Identiteit/Instellingen/Uitloggen).
@@ -1074,13 +1098,14 @@ function FooterSection({
   // Sync-rapport-modal state — leeft binnen FooterSection zodat we de modal
   // hier kunnen renderen en zowel Sync nu als de Rapport-knop hem kunnen openen.
   const [reportOpen, setReportOpen] = useState(false)
+  const footerLinks = FOOTER_LINKS.map((link) => (link.isMijn ? { ...link, href: mijnHref } : link))
 
   if (collapsed) {
     return (
       <>
         <div className="flex flex-col items-center border-t border-[var(--border-ed)] py-2">
           <Link
-            href="/mijn"
+            href={mijnHref}
             aria-label={`Account — ${userName}`}
             title={userName}
             className="flex items-center justify-center h-10 w-10 hover:bg-[var(--subtle)]/50 transition-colors duration-150"
@@ -1101,6 +1126,8 @@ function FooterSection({
           )}
           {/* Sync-knop — collapsed icon-only. GlobalSyncButton rendert zijn
               eigen icon (refresh-arrows) + state-indicators. */}
+          {showSync && (
+          <>
           <div className="flex items-center justify-center h-9 w-full text-[var(--ink-3)] hover:bg-[var(--subtle)]/50 hover:text-[var(--ink-2)] transition-colors duration-150">
             <GlobalSyncButton onOpenReport={() => setReportOpen(true)} />
           </div>
@@ -1114,7 +1141,9 @@ function FooterSection({
           >
             <Activity className="h-3.5 w-3.5" aria-hidden />
           </button>
-          {FOOTER_LINKS.map((link) => (
+          </>
+          )}
+          {footerLinks.map((link) => (
             <Link
               key={link.label}
               href={link.href}
@@ -1146,7 +1175,7 @@ function FooterSection({
           geen zichtbare naamtekst, dus geen tegenspraak.
         */}
         <Link
-          href="/mijn"
+          href={mijnHref}
           className="flex items-center gap-2.5 w-full px-2 h-10 hover:bg-[var(--subtle)]/50 transition-colors duration-150"
         >
           <span
@@ -1169,7 +1198,7 @@ function FooterSection({
               Beheer
             </Link>
           )}
-          {FOOTER_LINKS.map((link) => (
+          {footerLinks.map((link) => (
             <Link
               key={link.label}
               href={link.href}
@@ -1182,6 +1211,7 @@ function FooterSection({
               avatar-dropdown op mobile, zodat sidebar (desktop) dezelfde
               functionaliteit heeft. Plaatsing onder de FOOTER_LINKS zodat
               de visuele hiërarchie identiek aan mobile blijft. */}
+          {showSync && (
           <div className="grid grid-cols-2 mt-2 border-t border-[var(--border-ed)]">
             <div className="flex flex-col items-center justify-center gap-1 py-2 hover:bg-[var(--subtle)]/50 transition-colors duration-150">
               <GlobalSyncButton onOpenReport={() => setReportOpen(true)} />
@@ -1202,6 +1232,7 @@ function FooterSection({
               </span>
             </button>
           </div>
+          )}
         </div>
       </div>
       <SyncReportModal open={reportOpen} onClose={() => setReportOpen(false)} />

@@ -35,19 +35,26 @@ import {
   HOME_SCREEN_HREFS,
   resolveHomeHref,
   type HomeScreen,
+  type PickableHomeScreen,
 } from '@/lib/home-screen'
 import type { ModuleId } from '@/lib/module-registry'
 
-export type { HomeScreen }
+export type { HomeScreen, PickableHomeScreen }
 
 interface HomeScreenContextValue {
-  /** Huidige profiel-brede homescherm-keuze. */
+  /**
+   * Huidige profiel-brede homescherm-waarde. Kan 'nieuws' zijn (door de
+   * server gezet bij de productkeuze Krant, ADR 0184) — geen kiesbare waarde.
+   */
   homeScreen: HomeScreen
   /** De route die bij de keuze hoort — consumeer deze, map nooit zelf. */
   homeHref: string
-  /** Zet een specifieke keuze (optimistisch + server-persist met rollback). */
-  setHomeScreen: (next: HomeScreen) => void
-  /** Flip tussen 'overzicht' en 'budget'. */
+  /**
+   * Zet een specifieke keuze (optimistisch + server-persist met rollback).
+   * Alleen kiesbare waarden: `PUT /api/home-screen` weigert 'nieuws'.
+   */
+  setHomeScreen: (next: PickableHomeScreen) => void
+  /** Flip tussen 'overzicht' en 'budget' ('nieuws' → 'overzicht'). */
   toggle: () => void
 }
 
@@ -57,7 +64,7 @@ const HomeScreenContext = createContext<HomeScreenContextValue | null>(null)
  * Persisteer de keuze naar de eigen profielrij. Fire-and-forget vanuit de
  * caller; geeft `true` bij succes zodat de caller bij falen kan terugrollen.
  */
-async function persistHomeScreen(screen: HomeScreen): Promise<boolean> {
+async function persistHomeScreen(screen: PickableHomeScreen): Promise<boolean> {
   try {
     const res = await fetch('/api/home-screen', {
       method: 'PUT',
@@ -89,7 +96,7 @@ export function HomeScreenProvider({
   // Seed uit de server-prop (NIET altijd-default) zodat SSR == client → geen flash.
   const [homeScreen, setHomeScreenState] = useState<HomeScreen>(initialHomeScreen)
 
-  const setHomeScreen = useCallback((next: HomeScreen) => {
+  const setHomeScreen = useCallback((next: PickableHomeScreen) => {
     setHomeScreenState((prev) => {
       if (next === prev) return prev
       // Optimistisch zetten; bij een mislukte PUT terugrollen naar `prev`.

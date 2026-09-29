@@ -123,6 +123,7 @@ export const UITGESTELD_LABEL: Record<string, string> = {
 export const HOMESCHERM_LABEL: Record<string, string> = {
   overzicht: 'Overzicht',
   budget: 'Budget',
+  nieuws: 'Nieuws (Krant)',
 }
 
 export const WEERGAVE_LABEL: Record<string, string> = {

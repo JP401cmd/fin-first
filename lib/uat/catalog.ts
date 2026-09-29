@@ -23,6 +23,7 @@ export type UatZone =
   | 'KRUIS'
   | 'CANON'
   | 'BEHEER'
+  | 'KRANT'
 
 export interface UatScenario {
   id: string
@@ -49,7 +50,7 @@ export interface UatZoneMeta {
 export const UAT_BANDEN: { id: UatBand; label: string; zones: UatZone[] }[] = [
   { id: 'kennismaken', label: 'Kennismaken', zones: ['START'] },
   { id: 'fundament', label: 'Fundament', zones: ['BEZIT', 'SCHULD', 'CASH', 'BUDGET'] },
-  { id: 'dagelijks', label: 'Dagelijks gebruik', zones: ['OVZ', 'WILL', 'NAV'] },
+  { id: 'dagelijks', label: 'Dagelijks gebruik', zones: ['OVZ', 'WILL', 'NAV', 'KRANT'] },
   { id: 'vooruitkijken', label: 'Vooruitkijken', zones: ['TOEK', 'REKEN', 'BELAST', 'RAPP'] },
   { id: 'randvoorwaarden', label: 'Randvoorwaarden', zones: ['MIJN', 'BEHEER'] },
   { id: 'verbinding', label: 'Cross-module', zones: ['KRUIS', 'CANON'] },
@@ -76,6 +77,10 @@ export const UAT_ZONES: UatZoneMeta[] = [
   { zone: 'KRUIS', naam: "Cross-module consistentie", band: 'verbinding' },
   { zone: 'CANON', naam: "Canonieke getallen", band: 'verbinding' },
   { zone: 'BEHEER', naam: "Beheer (admin)", band: 'randvoorwaarden' },
+  // Krant 2B (29 sep 2026, ADR 0184): de Krant als afgesloten product — wat een
+  // account met alleen de module 'nieuws' wél en níét ziet. De INHOUD van de
+  // Krant blijft WILL; dit is de shell en de productgrens eromheen.
+  { zone: 'KRANT', naam: 'Krant-product: shell en productgrens', band: 'dagelijks' },
 ]
 
 export const UAT_SCENARIOS: UatScenario[] = [
@@ -594,6 +599,18 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-BEHEER-38', wf: 'WF-BEHEER-38', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'AI-gezondheid (storing/hapering) zichtbaar op /beheer en /beheer/ai', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 38, duurMin: 6 },
   { id: 'UAT-BEHEER-39', wf: 'WF-BEHEER-39', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Gebruik per waardestroom bekijken — geanonimiseerd, k-anoniem (ADR 0153)', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 39, duurMin: 8 },
   { id: 'UAT-BEHEER-40', wf: 'WF-BEHEER-40', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Tekstpoort van de duiding meten (G1–G5) en de wekelijkse steekproef (G7) vastleggen', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 40, duurMin: 8 },
+  { id: 'UAT-KRANT-01', wf: 'WF-KRANT-01', zone: 'KRANT', band: 'dagelijks', naam: 'Een Krant-account landt na het inloggen op /nieuws', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 1, duurMin: 4 },
+  { id: 'UAT-KRANT-02', wf: 'WF-KRANT-02', zone: 'KRANT', band: 'dagelijks', naam: 'Direct naar een route buiten de grens: server-redirect naar /nieuws', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 2, duurMin: 5 },
+  { id: 'UAT-KRANT-03', wf: 'WF-KRANT-03', zone: 'KRANT', band: 'dagelijks', naam: 'Een in-app link buiten de grens (client-navigatie) toont de pagina niet', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 3, duurMin: 4 },
+  { id: 'UAT-KRANT-04', wf: 'WF-KRANT-04', zone: 'KRANT', band: 'dagelijks', naam: 'De routes binnen de grens laden zonder redirect en zonder lus', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 4, duurMin: 4 },
+  { id: 'UAT-KRANT-05', wf: 'WF-KRANT-05', zone: 'KRANT', band: 'dagelijks', naam: 'Een superadmin met een Krant-account bereikt /beheer, een gewone gebruiker niet', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 5, duurMin: 4 },
+  { id: 'UAT-KRANT-06', wf: 'WF-KRANT-06', zone: 'KRANT', band: 'dagelijks', naam: 'De desktop-zijbalk toont alleen Krant en Mijn', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 6, duurMin: 3 },
+  { id: 'UAT-KRANT-07', wf: 'WF-KRANT-07', zone: 'KRANT', band: 'dagelijks', naam: 'Mobiele nav-sheet, TopBar-accountmenu, /mijn-tabbalk en ⌘K volgen de grens', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'c'], volgorde: 7, duurMin: 6 },
+  { id: 'UAT-KRANT-08', wf: 'WF-KRANT-08', zone: 'KRANT', band: 'dagelijks', naam: 'Geen Fin en geen AI-keuze in de shell van een Krant-account', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 8, duurMin: 6 },
+  { id: 'UAT-KRANT-09', wf: 'WF-KRANT-09', zone: 'KRANT', band: 'dagelijks', naam: 'Een Krant-account krijgt geen maandagmail en geen horizon-meldingen', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 9, duurMin: 5 },
+  { id: 'UAT-KRANT-10', wf: 'WF-KRANT-10', zone: 'KRANT', band: 'dagelijks', naam: 'Elke AI-route en het aanzetten van een add-on weigeren een Krant-account', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 10, duurMin: 6 },
+  { id: 'UAT-KRANT-11', wf: 'WF-KRANT-11', zone: 'KRANT', band: 'dagelijks', naam: 'Productkeuze Krant ⇄ Geheel via PUT /api/modules, zonder iets te wissen', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 11, duurMin: 8 },
+  { id: 'UAT-KRANT-12', wf: 'WF-KRANT-12', zone: 'KRANT', band: 'dagelijks', naam: 'REGRESSIE: een account zonder moduleset of met alle zes ziet alles zoals vroeger', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 12, duurMin: 10 },
 ]
 
 /** Alle scenario-ID's die tot de canonieke rooktest (§2.6) behoren. */

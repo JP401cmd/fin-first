@@ -69,4 +69,31 @@ describe('HomeScreenPicker', () => {
 
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  // Krant 2A fase 2 (ADR 0184): 'nieuws' is persisteerbaar, niet kiesbaar.
+  it("toont nooit een 'Nieuws'-optie — precies de twee kiesbare startschermen", () => {
+    vi.stubGlobal('fetch', vi.fn())
+    renderPicker('overzicht')
+    expect(screen.getAllByRole('button')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /Nieuws|Krant/i })).toBeNull()
+  })
+
+  it("met opgeslagen waarde 'nieuws' is geen kaart ingedrukt, en kiezen schrijft een kiesbare waarde", async () => {
+    const fetchMock = vi.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve({ ok: true }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    renderPicker('nieuws')
+
+    for (const btn of screen.getAllByRole('button')) {
+      expect(btn.getAttribute('aria-pressed')).toBe('false')
+    }
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Overzicht/ }))
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify({ screen: 'overzicht' }))
+  })
 })

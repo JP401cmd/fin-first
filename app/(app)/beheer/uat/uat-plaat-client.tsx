@@ -20,6 +20,7 @@ import { RAPP_FLOW } from '@/lib/uat/flows/rapp'
 import { REKEN_FLOW } from '@/lib/uat/flows/reken'
 import { MIJN_FLOW } from '@/lib/uat/flows/mijn'
 import { BEHEER_FLOW } from '@/lib/uat/flows/beheer'
+import { KRANT_FLOW } from '@/lib/uat/flows/krant'
 import { computeFlowLayout } from '@/lib/uat/flows/flow-layout'
 import { explainZoneStatus, type ZoneStatusExplanation } from '@/lib/uat/flows/zone-status'
 import type { UatFlow } from '@/lib/uat/flows/types'
@@ -48,7 +49,7 @@ import { UatDetailPanel } from './uat-detail-panel'
 
 // Zones met een gecureerd procesmodel (laag 2) worden klikbaar (drill-in).
 // Overige zone-titels zijn inert tot hun flow bestaat.
-const FLOW_BY_ZONE: Partial<Record<UatZone, UatFlow>> = { BEZIT: BEZIT_FLOW, SCHULD: SCHULD_FLOW, TOEK: TOEK_FLOW, BELAST: BELAST_FLOW, BUDGET: BUDGET_FLOW, KRUIS: KRUIS_FLOW, CANON: CANON_FLOW, START: START_FLOW, WILL: WILL_FLOW, CASH: CASH_FLOW, OVZ: OVZ_FLOW, NAV: NAV_FLOW, RAPP: RAPP_FLOW, REKEN: REKEN_FLOW, MIJN: MIJN_FLOW, BEHEER: BEHEER_FLOW }
+const FLOW_BY_ZONE: Partial<Record<UatZone, UatFlow>> = { BEZIT: BEZIT_FLOW, SCHULD: SCHULD_FLOW, TOEK: TOEK_FLOW, BELAST: BELAST_FLOW, BUDGET: BUDGET_FLOW, KRUIS: KRUIS_FLOW, CANON: CANON_FLOW, START: START_FLOW, WILL: WILL_FLOW, CASH: CASH_FLOW, OVZ: OVZ_FLOW, NAV: NAV_FLOW, RAPP: RAPP_FLOW, REKEN: REKEN_FLOW, MIJN: MIJN_FLOW, BEHEER: BEHEER_FLOW, KRANT: KRANT_FLOW }
 const DRILLABLE_ZONES: ReadonlySet<UatZone> = new Set(Object.keys(FLOW_BY_ZONE) as UatZone[])
 const ZONE_META_BY_ID = new Map(UAT_ZONES.map((z) => [z.zone, z]))
 

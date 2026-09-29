@@ -1,6 +1,8 @@
 import type { ComponentType } from 'react'
 import { Wallet, Compass, User, Newspaper, Bell, MessageCircle, Settings, Zap, BarChart3, Home } from 'lucide-react'
 import { HEFBOOM_CONFIG } from '@/lib/hefboom-config'
+import type { ModuleId } from '@/lib/module-registry'
+import { KRANT_MIJN_HREF, isKrantAccount, isKrantRoute } from '@/lib/modules/krant-grens'
 
 /**
  * Unified nav-config — single source of truth voor sidebar (desktop) én
@@ -344,6 +346,72 @@ export const globalNav: GlobalNavItem[] = [
   { label: 'Vraag Fin', icon: MessageCircle, action: 'open-chat' },
   { label: 'Account', icon: Settings, action: 'open-account' },
 ]
+
+/**
+ * NAVIGATIE PER PRODUCT (Krant 2B) — de énige plek die beslist wat een
+ * navigatie-oppervlak toont voor de moduleset van het account.
+ *
+ * Desktop-zijbalk, mobiele nav-sheet, TopBar-accountmenu, de /mijn-tabbalk en
+ * het commandopalet lezen allemaal `navSurfaceFor(activeModules)` (client-side
+ * via `useNavSurface()`); geen van hen filtert zelf op modules. Wie een ingang
+ * toevoegt aan een van die oppervlakken hoeft dus alleen hier na te denken of
+ * een Krant-account hem ziet.
+ *
+ * - Elk account behalve de Krant: exact de lijsten van vóór Krant 2B —
+ *   dezelfde instanties (`menuNav`, `globalNav`), dezelfde Mijn-tak, en een
+ *   `isVisible` die altijd `true` geeft.
+ * - Krant-account (`isKrantAccount`): Krant en Mijn, verder niets. Het
+ *   hoofdmenu is leeg; de Krant staat waar hij altijd stond (zijbalk "overige",
+ *   sheet "overal beschikbaar"), met zijn eigen ongelezen-stip. Mijn wijst naar
+ *   `/mijn/account` en toont alleen zijn onderdelen binnen de grens. Geen
+ *   "Vraag Fin", geen Tips, Berichten of Rapportages.
+ *
+ * Het label blijft "Krant", niet "Nieuws": één naam per route (M14,
+ * `nav-config.naamconsistentie.test.ts`).
+ */
+export type NavSurface = {
+  /** `true` voor een Krant-account — voor oppervlakken met een eigen tak (kompas, sync). */
+  isKrant: boolean
+  /** Het hoofdmenu (zijbalk-menu, bovenste takken van de nav-sheet). */
+  menu: MenuEntry[]
+  /** De Mijn-tak: href + onderdelen (nav-sheet, zijbalk-footer, TopBar-menu). */
+  mijn: MenuEntry
+  /** "Overal beschikbaar"-items van de nav-sheet. */
+  globalNav: GlobalNavItem[]
+  /** Toont dit oppervlak een ingang naar `href`? Voor lijsten die elders wonen (zijbalk "overige", palet, /mijn-tabbalk). */
+  isVisible: (href: string) => boolean
+}
+
+const MIJN_ENTRY: MenuEntry = {
+  ...mainNav[2]!,
+  icon: mainNav[2]!.icon!,
+  children: navGroups[2]!.items,
+}
+
+const GEHEEL_SURFACE: NavSurface = {
+  isKrant: false,
+  menu: menuNav,
+  mijn: MIJN_ENTRY,
+  globalNav,
+  isVisible: () => true,
+}
+
+const KRANT_SURFACE: NavSurface = {
+  isKrant: true,
+  menu: [],
+  mijn: {
+    ...MIJN_ENTRY,
+    href: KRANT_MIJN_HREF,
+    description: 'Je account en meldingen',
+    children: (MIJN_ENTRY.children ?? []).filter((item) => isKrantRoute(item.href)),
+  },
+  globalNav: globalNav.filter((item) => item.href != null && isKrantRoute(item.href)),
+  isVisible: isKrantRoute,
+}
+
+export function navSurfaceFor(modules: readonly ModuleId[]): NavSurface {
+  return isKrantAccount(modules) ? KRANT_SURFACE : GEHEEL_SURFACE
+}
 
 /**
  * Canonieke subpagina-titels die NIET in de nav-structuur (mainNav/navGroups/

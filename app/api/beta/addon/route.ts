@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
-import { errorResponse, serverError, unauthorized } from '@/lib/api/respond'
+import { errorResponse, forbidden, serverError, unauthorized } from '@/lib/api/respond'
+import { KRANT_GEEN_ADDON_MESSAGE, isKrantProfile } from '@/lib/modules/krant-grens'
 import { parseBody } from '@/lib/api/parse-body'
 import { recordAiConsent } from '@/lib/ai/consent-record'
 import {
@@ -93,6 +94,21 @@ export async function POST(req: Request) {
   const { tier, active, source } = parsed.data
 
   try {
+    // Krant-grens (Krant 2B, B11/B12): een Krant-account zet geen add-on aan —
+    // AI en de bankkoppeling horen bij het volledige TriFinity. UITzetten mag
+    // wél: een eerder gezet abonnement intrekken (en bij AI de toestemming
+    // als `withdrawn` vastleggen) blijft altijd mogelijk. Eigen rij via de
+    // ingelogde client; een leesfout is een 500, nooit een stille doorlaat.
+    if (active) {
+      const { data: ownProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('active_modules')
+        .eq('id', claims.sub)
+        .maybeSingle()
+      if (profileError) return serverError(profileError, 'beta-addon:POST:krant')
+      if (isKrantProfile(ownProfile)) return forbidden(KRANT_GEEN_ADDON_MESSAGE)
+    }
+
     const service = getServiceClient()
 
     // Noodstop zonder deploy: `app_settings.beta_addons_closed = 'true'`.

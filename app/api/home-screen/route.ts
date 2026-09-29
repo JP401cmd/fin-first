@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getVerifiedUser } from '@/lib/supabase/cached-user'
 import { parseBody } from '@/lib/api/parse-body'
 import { serverError, unauthorized } from '@/lib/api/respond'
-import { HOME_SCREEN_VALUES } from '@/lib/home-screen'
+import { HOME_SCREEN_PICKABLE } from '@/lib/home-screen'
 
 /**
  * PUT /api/home-screen
@@ -20,7 +20,14 @@ import { HOME_SCREEN_VALUES } from '@/lib/home-screen'
  * Cross-device: de keuze staat op `profiles.home_screen` (scalar) en wordt
  * door de layout-render server-side ingelezen om de provider te seeden (geen
  * flash); de edge-middleware leest 'm om de login-landing en /dashboard naar
- * het gekozen scherm te sturen. Deze route is het enige schrijfpad.
+ * het gekozen scherm te sturen. Deze route is het enige schrijfpad voor een
+ * KEUZE van de gebruiker.
+ *
+ * ALLEEN KIESBARE WAARDEN (Krant 2A fase 2, ADR 0184): de zod-enum is
+ * `HOME_SCREEN_PICKABLE`, niet `HOME_SCREEN_VALUES`. De kolom mag sinds
+ * migratie 20261006120000 ook 'nieuws' bevatten, maar die zet uitsluitend
+ * `PUT /api/modules` bij de productkeuze Krant — een Geheel-gebruiker kan de
+ * Krant hier niet als startscherm kiezen (→ 400).
  *
  * SECURITY: own-row update via de anon RLS-client (`.eq('id', user.id)`),
  * NOOIT service-role. Op `profiles` staat RLS aan met één eigen-rij
@@ -33,7 +40,7 @@ import { HOME_SCREEN_VALUES } from '@/lib/home-screen'
  */
 
 const HomeScreenBodySchema = z.object({
-  screen: z.enum(HOME_SCREEN_VALUES),
+  screen: z.enum(HOME_SCREEN_PICKABLE),
 })
 
 export async function PUT(request: Request) {
