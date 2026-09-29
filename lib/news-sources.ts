@@ -877,7 +877,9 @@ export type DetailUitkomst =
  *     link en elke redirect-hop blijven op die site, niet op de site van de link;
  *  4. content-type `streng`: alleen een expliciete HTML-header; anders wordt
  *     de body niet gelezen → `geen_html`;
- *  5. een storingspagina of een pagina zonder artikeltekst → `terugval`.
+ *  5. het adres waar de hops EINDIGEN moet zelf ook `detailToegestaan` zijn;
+ *     anders → `terugval` (doorverwezen) en wordt de tekst niet bewaard;
+ *  6. een storingspagina of een pagina zonder artikeltekst → `terugval`.
  *
  * De tekst is `artikelTekst` (zonder kader), geknipt op
  * `DETAIL_FRAGMENT_MAX_TEKENS`. De datums komen uit de metadata van de pagina.
@@ -890,6 +892,10 @@ export async function fetchDetailPagina(detailUrl: string, ankerUrl: string): Pr
     if (r.oorzaak === 'geen_html') return { uitkomst: 'geen_html' }
     return { uitkomst: 'terugval', oorzaak: r.oorzaak, ...(r.httpStatus !== undefined ? { httpStatus: r.httpStatus } : {}) }
   }
+  // De hops blijven op de site van het anker, maar niet vanzelf op een
+  // toegestaan PAD: stuurt `/actueel/nieuws/…` door naar `/onderwerpen/…`, dan
+  // is wat er staat een uitlegpagina en geen artikel (security G1, 30-09-2026).
+  if (!detailToegestaan(r.finalUrl)) return { uitkomst: 'terugval', oorzaak: 'doorverwezen' }
   if (isStoringspagina(r.body)) return { uitkomst: 'terugval', oorzaak: 'storing' }
   const tekst = knipTekens(artikelTekst(r.body), DETAIL_FRAGMENT_MAX_TEKENS)
   if (tekst.length < DETAIL_MIN_TEKENS) return { uitkomst: 'terugval', oorzaak: 'leeg' }

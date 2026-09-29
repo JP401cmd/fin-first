@@ -47,17 +47,33 @@ pagina zien, geeft óók elke sectie een rij. Die twee waren niet te onderscheid
   de volgende run terug op een pagina die dan bekend is, dus als `gewijzigd`.
 - Bekende beperking: een pagina met meer dan `MAX_SECTIES_PER_PAGINA` (12) secties. Verdwijnt er
   bovenaan een sectie, dan schuift sectie 13 in beeld en telt die als wijziging.
+- Een gewijzigde sectie draagt de datum van de hele pagina uit de metadata, niet de datum van de
+  wijziging (gemeten op 30 sep: de twee Belastingdienst-pagina's dragen 3 februari en 14 april).
+  Voor zo'n sectie geldt die datum daarom niet als echte publicatiedatum
+  (`heeftEchteArtikelDatum`): de lezer ziet "gezien op", en de regel "ouder dan 45 dagen" geldt
+  niet; het venster op de ophaaldatum beslist. Zonder deze uitzondering viel een echte wijziging
+  stil weg als oud nieuws.
+- Nog niet opgelost: verandert het sjabloon van een site of onze extractor, dan wordt elke sectie
+  van een bekende pagina `gewijzigd` (tot 12 per pagina). Een drempel ("meer dan de helft nieuw
+  in één run is basis") is een vervolgpunt.
 
 ### 2. Het bericht past bij de lezer
 
 **2a. Caribisch Nederland.** Het nieuwsprofiel kent geen woonplaats en alle lezers wonen in
 Europees Nederland. Een bericht over Caribisch Nederland of de landen Aruba, Curaçao en Sint
 Maarten haalt het leescontract niet: het komt in geen enkele tijdlijn, niet in Achtergrond en niet
-in het katern. De drempel is een treffer in de **kop**, of minstens **twee** treffers in de
+in het katern. De drempel is een treffer in de **kop**, of minstens **twee vermeldingen** in de
 **aanhef** (de eerste 600 tekens van het fragment). Een bericht dat over Caribisch Nederland gaat,
-zegt dat in de kop of noemt het in de aanhef meer dan eens. Een Nederlands bericht dat Bonaire
-terloops noemt (één keer, of diep in de tekst) blijft staan. Woordgrenzen: "Sint Maartensdijk" en
-"WolBES" zijn geen treffer, en "BES" telt alleen als hoofdletterwoord.
+zegt dat in de kop of komt er in de aanhef op terug. Een Nederlands bericht dat het gebied één
+keer noemt (of diep in de tekst) blijft staan. Treffers binnen 80 tekens van elkaar zijn één
+vermelding: "Caribisch Nederland (BES)", een opsomming van de drie eilanden en de vaste
+voorbehoudzin van een overheidspagina ("Woont u in Caribisch Nederland (Bonaire, Sint Eustatius of
+Saba)?") tellen dus één keer. Woordgrenzen: "Sint Maartensdijk" en "WolBES" zijn geen treffer, en
+"BES" telt alleen als hoofdletterwoord.
+
+Gemeten op productie (30 sep 2026, 243 artikelen): de kopregel vangt alle vier de Caribische
+berichten. De aanhefregel vangt er op dit moment geen extra; hij is er voor een bericht met een
+neutrale kop.
 
 **2b. Spaarbuffer.** Het thema `sparen-rente` raakt spaarders vanaf € 5.000. Een bericht over een
 kleine of ontbrekende buffer ("Blog: betaal jezelf eerst: spaarbuffer", huishoudens met minder dan
@@ -71,7 +87,14 @@ Wat verandert is alleen de koppeling thema → lezer, deterministisch op kop en 
 
 Een bufferbericht raakt `spaargeld hoogstens tot-5k`, zonder zichtbare reden-zin: "heb je weinig
 spaargeld" is een gevoelige reden, net als inkomen en krediet. De catalogus krijgt geen tekst
-bij. In `waarom` staat `redactie:spaarbuffer`.
+bij. In `waarom` staat `redactie:spaarbuffer`, voor beheer en de meting.
+
+De lezer ziet die code niet. Onder "Waarom zie ik dit?" stonden tot deze release de codes van de
+matcher letterlijk (`thema:sparen-rente`, `impact:ontbreekt`). Dat is hersteld in het leespad
+(`leesbaarWaarom` en `leesbaarWatMist` in `lib/krant/tijdlijn-lezen.ts`): de lezer ziet alleen de
+redenen, als zin uit de geattesteerde catalogus, en de namen van de velden die ontbreken. De
+gevoelige redenen (inkomen, uitkering, krediet) staan daar wel, achter de klik, zoals
+compliance-keuze 4 bedoelde. De catalogus is niet gewijzigd.
 
 **2c. Landelijke cijfers.** Cijfers, verwachtingen en marktbewegingen zonder rekenregel kwamen al
 nooit als "Over jouw situatie" of als persoonlijk bericht in de tijdlijn, en ook niet in
@@ -114,16 +137,39 @@ de kop van die kaart als kop, en niet de hele kaarttekst met teaser.
 `DETAIL_HOSTS` krijgt `www.rijksoverheid.nl` met twee paden: `/actueel/nieuws/` en
 `/documenten/`. De structuur wordt meerdere paden per host. De veiligheidstoetsen blijven gelijk:
 exacte hostnaam, geen doorstuurvorm, `isVeiligeBronUrl`, content-type vóór de body en de cap van
-4.000 tekens. Een ander pad op rijksoverheid.nl wordt niet opgehaald. De Tweede Kamer staat bewust
-níet in `DETAIL_HOSTS`: een nieuwe host is een eigen besluit, dus alleen de kop.
+4.000 tekens. Een ander pad op rijksoverheid.nl wordt niet bewaard: ook het adres waar een
+doorverwijzing eindigt, moet op een toegestaan pad en de exacte host liggen, anders is het een
+terugval (`doorverwezen`). De Tweede Kamer staat bewust níet in `DETAIL_HOSTS`: een nieuwe host is
+een eigen besluit, dus alleen de kop en de tekst van de lijstregel.
+
+Bekend van de eerste meting (30 sep 2026): Algemene Zaken levert vooral niet-financieel nieuws, en
+de Kamerbrieven hebben geen datum in de lijst. De eerste run haalt brieven van ongeveer twee weken
+oud binnen; die tonen "gezien op". Twaalf webbronnen op rijksoverheid.nl tegelijk kan een 429
+geven; dat volgen we op /beheer/nieuws.
+
+### De Krant met AI volgt dezelfde regels
+
+Wat de matcher buiten houdt, mag het model niet binnenhalen (ADR 0190). Een basissectie is geen
+kandidaat voor een toevoeging, een bufferbericht (thema `sparen-rente`) alleen voor de laagste
+spaarband, en Caribisch Nederland zit al in het leescontract. Een bericht dat het model toevoegt,
+toont alleen een echte publicatiedatum, anders "gezien op". De volgorde van de kandidaten volgt de
+datum die de lezer ziet.
 
 ## Gevolgen
 
 - Migratie `20261009120000_news_articles_redactieregels` (één transactie, herhaalbaar). Die voegt
   de kolom en de CHECK's toe, verruimt de CHECK op `published_bron`, en doet drie backfills:
   basis/gewijzigd per pagina op de eerste `fetched_at`, de datum uit het bewaarde fragment en de
-  momentopnamen (`gezienOp`). **Migratie vóór de code**: de loader leest `bron_wijziging`. De
-  ingest overleeft de omgekeerde volgorde wel (PGRST204/23514 → de vorm van vóór de migratie).
+  momentopnamen (`gezienOp`). **Migratie vóór de code**: de loader leest `bron_wijziging`. Het
+  schrijven van nieuwe rijen overleeft de omgekeerde volgorde (PGRST204/23514 → de vorm van vóór
+  de migratie); het bijwerken van bestaande rijen met een datum uit de pagina niet, dat telt dan
+  als fout en komt de volgende run terug.
+- **De migratie draait twee keer**: vóór de deploy, en direct erna nog een keer. Wat de oude code
+  tussen de migratie en de deploy schreef (een sectie zonder `bron_wijziging`, een momentopname
+  zonder `gezienOp`) wordt anders nooit hersteld. De migratie is herhaalbaar; de tweede run raakt
+  alleen die rijen.
+- Bij de uitrol staat de registratie in `schema_migrations` vóór `commit;`, in dezelfde
+  transactie.
 - `MATCHER_VERSIE` 6. De goldens veranderden alleen van versie en kregen het veld `gezienOp`. De
   selectie is gelijk, want de fixtures dragen een feeddatum en zijn nieuwsberichten.
 - De ingest haalt per run vijf pagina's meer op. Er komen hooguit een paar Rijksoverheid-

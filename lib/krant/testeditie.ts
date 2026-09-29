@@ -56,6 +56,8 @@ export interface TesteditieItem {
   bronnaam: string | null
   url: string | null
   gepubliceerd: string | null
+  /** ADR 0191 regel 3: zonder echte publicatiedatum wanneer wij het zagen. */
+  gezienOp: string | null
   /** De door 1A gecontroleerde samenvatting; null als de matcher hem liet vallen. */
   samenvatting: string | null
   /** null zodra het bronartikel is opgeruimd (on delete set null). */
@@ -108,6 +110,7 @@ function itemUitRij(rij: Record<string, unknown>): TesteditieItem {
     bronnaam: tekstOfNull(snapshot.bron),
     url: tekstOfNull(snapshot.url),
     gepubliceerd: tekstOfNull(snapshot.gepubliceerd),
+    gezienOp: tekstOfNull(snapshot.gezienOp),
     samenvatting: tekstOfNull(snapshot.samenvatting),
     artikelId: tekstOfNull(rij.article_id),
   }

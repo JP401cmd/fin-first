@@ -145,9 +145,22 @@ describe('kiesAiKandidaten (K3)', () => {
       expect(ids(kiesAiKandidaten([caribisch], leeg, ctx()))).toEqual([])
     })
 
+    // Regel 2b geldt, net als in de matcher, alleen binnen het thema sparen-rente.
+    const metThema = (k: AiKandidaat, thema: DuidingV1['themas'][number]['thema']): AiKandidaat => ({
+      ...k,
+      duiding: { ...k.duiding, themas: [{ thema, citaat: 'een citaat uit de bron' }] },
+    })
+
+    it('regel 2b: een buffer in de kop buiten het thema sparen-rente is geen spaarbufferbericht (eindreview Y2)', () => {
+      const kapitaal = metThema(kandidaat({ id: 'kapitaal', ...recent, title: 'DNB: banken moeten grotere kapitaalbuffer aanhouden' }), 'eigen-woning')
+      const zonderThema = { ...kandidaat({ id: 'pensioen', ...recent, title: 'Pensioenfondsen: buffers gegroeid' }) }
+      zonderThema.duiding = { ...zonderThema.duiding, themas: [] }
+      expect(ids(kiesAiKandidaten([kapitaal, zonderThema], leeg, ctx(), { ...PROFIEL_TESSA, spaargeld: '50k-100k' })).sort()).toEqual(['kapitaal', 'pensioen'])
+    })
+
     it('regel 2b: een bufferbericht alleen voor de laagste spaarband; onbekend spaargeld sluit niets uit', () => {
-      const buffer = kandidaat({ id: 'buffer', ...recent, title: 'Blog: betaal jezelf eerst: spaarbuffer' })
-      const rente = kandidaat({ id: 'rente', ...recent, title: 'Spaarrente stijgt, ook voor wie een buffer aanhoudt' })
+      const buffer = metThema(kandidaat({ id: 'buffer', ...recent, title: 'Blog: betaal jezelf eerst: spaarbuffer' }), 'sparen-rente')
+      const rente = metThema(kandidaat({ id: 'rente', ...recent, title: 'Spaarrente stijgt, ook voor wie een buffer aanhoudt' }), 'sparen-rente')
       const met = (spaargeld: typeof PROFIEL_TESSA.spaargeld) => ids(kiesAiKandidaten([buffer, rente], leeg, ctx(), { ...PROFIEL_TESSA, spaargeld })).sort()
       expect(met('tot-5k')).toEqual(['buffer', 'rente'])
       expect(met('5k-25k')).toEqual(['rente'])
@@ -155,6 +168,12 @@ describe('kiesAiKandidaten (K3)', () => {
       expect(met(null)).toEqual(['buffer', 'rente'])
       // Zonder profiel (oude aanroep): geen bufferfilter.
       expect(ids(kiesAiKandidaten([buffer, rente], leeg, ctx())).sort()).toEqual(['buffer', 'rente'])
+    })
+
+    it('regel 3: de volgorde volgt de lezersdatum — een verse wijziging op een oude pagina gaat vóór ouder nieuws', () => {
+      const wijziging = kandidaat({ id: 'wijziging', bron_soort: 'web_pagina', bron_wijziging: 'gewijzigd', published_at: '2026-02-03T00:00:00.000Z', published_bron: 'meta', fetched_at: NU.toISOString() })
+      const nieuws = kandidaat({ id: 'nieuws', bron_soort: 'rss', published_at: new Date(NU.getTime() - 3 * 86_400_000).toISOString(), published_bron: 'feed', fetched_at: new Date(NU.getTime() - 3 * 86_400_000).toISOString() })
+      expect(ids(kiesAiKandidaten([nieuws, wijziging], leeg, ctx()))).toEqual(['wijziging', 'nieuws'])
     })
 
     it('regel 3: een toegevoegd bericht draagt alleen een echte publicatiedatum, anders "gezien op"', () => {

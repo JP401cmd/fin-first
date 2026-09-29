@@ -7,11 +7,14 @@ import { PAGINA_DATUM_PATRONEN } from '@/lib/news-sources'
 import {
   AANHEF_TEKENS,
   CARIBISCH_MIN_TREFFERS_AANHEF,
+  CARIBISCH_VERMELDING_AFSTAND,
+  heeftEchteArtikelDatum,
   heeftEchteDatum,
   isBasisSectie,
   isBufferBericht,
   isCaribischBericht,
   lezersDatum,
+  telCaribischeVermeldingen,
 } from './redactie'
 
 describe('regel 1 — isBasisSectie', () => {
@@ -39,13 +42,37 @@ describe('regel 2a — isCaribischBericht', () => {
     expect(isCaribischBericht('Minimumloon BES stijgt', null)).toBe(true)
   })
 
-  it('in het fragment: pas vanaf twee treffers in de aanhef', () => {
-    const tweeKeer = 'De huurtoeslag verandert. Dat geldt voor Bonaire, Sint Eustatius en Saba.'
-    expect(isCaribischBericht('Huurtoeslag verandert per 2027', tweeKeer)).toBe(true)
-    // Precies één treffer: terloops, niet uitsluiten.
+  it('in het fragment: pas vanaf twee vermeldingen in de aanhef', () => {
+    const tweeKeer =
+      'De koopkracht op Bonaire steeg in 2024. Het Centraal Bureau voor de Statistiek meldt dat op basis van nieuwe cijfers over inkomens. Ook op Saba en Sint Eustatius ging het besteedbaar inkomen omhoog.'
+    expect(telCaribischeVermeldingen(tweeKeer)).toBe(2)
+    expect(isCaribischBericht('Koopkracht gestegen', tweeKeer)).toBe(true)
+    // Precies één vermelding: terloops, niet uitsluiten.
     const eenKeer = 'Het minimumloon stijgt per 1 januari met 2 procent. Ook op Bonaire gelden nieuwe bedragen.'
     expect(isCaribischBericht('Minimumloon stijgt per 1 januari', eenKeer)).toBe(false)
     expect(CARIBISCH_MIN_TREFFERS_AANHEF).toBe(2)
+  })
+
+  // Eindreview Y1 (30-09-2026): één vermelding telde als twee of vier.
+  it('treffers in één adem zijn één vermelding: een Nederlands bericht blijft staan', () => {
+    const kop = 'Huurtoeslag verandert per 2027'
+    for (const eenVermelding of [
+      'De huurtoeslag verandert. Dit geldt ook op de BES-eilanden.',
+      'De huurtoeslag verandert. Niet in Caribisch Nederland (BES).',
+      'De huurtoeslag verandert. Dat geldt ook voor Bonaire, Sint Eustatius en Saba.',
+      'Woont u in Caribisch Nederland (Bonaire, Sint Eustatius of Saba)? Dan gelden andere regels. De huurtoeslag verandert per 1 januari.',
+    ]) {
+      expect(telCaribischeVermeldingen(eenVermelding), eenVermelding).toBe(1)
+      expect(isCaribischBericht(kop, eenVermelding), eenVermelding).toBe(false)
+    }
+  })
+
+  it('de grens van één vermelding: 80 tekens tussen twee treffers is nog dezelfde, 81 niet', () => {
+    const met = (tussen: number) => `Bonaire${' '.repeat(tussen - 'Bonaire'.length)}Saba`
+    expect(CARIBISCH_VERMELDING_AFSTAND).toBe(80)
+    expect(telCaribischeVermeldingen(met(80))).toBe(1)
+    expect(telCaribischeVermeldingen(met(81))).toBe(2)
+    expect(telCaribischeVermeldingen('')).toBe(0)
   })
 
   it('treffers diep in een lang artikel (na de aanhef) sluiten niets uit', () => {
@@ -103,6 +130,20 @@ describe('regel 3 — de echte datum', () => {
     expect(lezersDatum({ published_at: null, published_bron: 'feed', fetched_at })).toEqual({ gepubliceerd: null, gezienOp: fetched_at })
     expect(lezersDatum({ published_at: fetched_at, fetched_at })).toEqual({ gepubliceerd: null, gezienOp: fetched_at })
   })
+
+  // Eindreview Y3 (30-09-2026): de datum van de pagina is niet die van de wijziging.
+  it('een gewijzigde sectie van een uitlegpagina toont "gezien op", ook met een datum uit de metadata', () => {
+    const fetched_at = '2026-09-30T05:10:00.000Z'
+    const pagina = { published_at: '2026-02-03T00:00:00.000Z', published_bron: 'meta', fetched_at, bron_soort: 'web_pagina' }
+    expect(heeftEchteArtikelDatum({ ...pagina, bron_wijziging: 'gewijzigd' })).toBe(false)
+    expect(lezersDatum({ ...pagina, bron_wijziging: 'gewijzigd' })).toEqual({ gepubliceerd: null, gezienOp: fetched_at })
+    // De basissectie houdt de datum van de pagina: daar ís dat de stand van zaken.
+    expect(heeftEchteArtikelDatum({ ...pagina, bron_wijziging: 'basis' })).toBe(true)
+    expect(lezersDatum({ ...pagina, bron_wijziging: 'basis' })).toEqual({ gepubliceerd: pagina.published_at, gezienOp: null })
+    // Een nieuwsbericht (rss, web_lijst) kent geen "gewijzigd"; de status telt daar niet.
+    expect(heeftEchteArtikelDatum({ published_bron: 'feed', bron_soort: 'rss', bron_wijziging: 'gewijzigd' })).toBe(true)
+    expect(heeftEchteArtikelDatum({ published_bron: 'eerste_gezien', bron_soort: 'web_lijst', bron_wijziging: null })).toBe(false)
+  })
 })
 
 describe('migratie 20261009120000 — tekstueel: herhaalbaar en gelijk aan de code', () => {
@@ -150,7 +191,25 @@ describe('migratie 20261009120000 — tekstueel: herhaalbaar en gelijk aan de co
   it('de momentopnamen: alleen items zonder gezienOp (herhaalbaar)', () => {
     const blok = sql.slice(sql.indexOf('── 5.'))
     expect(blok).toContain("and not (i.snapshot ? 'gezienOp')")
-    expect(blok).toContain("x ? 'gezienOp' then x")
+    expect(blok).toContain("x ? 'gezienOp' or a.id is null then x")
     expect(blok).toContain('e.algemeen is distinct from')
+  })
+
+  it('de momentopnamen lezen de datum zoals de code: een gewijzigde sectie is geen echte datum', () => {
+    const blok = sql.slice(sql.indexOf('── 5.'))
+    // Eén definitie, en geen losse toets op published_bron ernaast.
+    expect(blok.match(/create or replace function pg_temp\.echte_datum/g)).toHaveLength(1)
+    expect(blok).toContain("coalesce(published_bron in ('feed', 'meta', 'pagina'), false)")
+    expect(blok).toContain("and not coalesce(bron_soort = 'web_pagina' and bron_wijziging = 'gewijzigd', false)")
+    expect(blok.match(/case when a\.published_bron in/g)).toBeNull()
+    expect(blok.match(/pg_temp\.echte_datum\(a\.published_bron, a\.bron_soort, a\.bron_wijziging\)/g)).toHaveLength(4)
+    // De functie bestaat vóór haar eerste gebruik, en stap 3 (bron_wijziging) gaat eraan vooraf.
+    expect(blok.indexOf('function pg_temp.echte_datum')).toBeLessThan(blok.indexOf('update public.krant_editie_items'))
+    expect(sql.indexOf('── 3.')).toBeLessThan(sql.indexOf('── 5.'))
+  })
+
+  it('een item waarvan het artikel is opgeruimd houdt zijn datum (geen lege datum erbij)', () => {
+    const blok = sql.slice(sql.indexOf('── 5.'))
+    expect(blok).not.toContain("when a.id is null then 'null'::jsonb")
   })
 })

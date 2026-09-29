@@ -198,7 +198,7 @@ function TestItem({ item }: { item: TesteditieItem }) {
       <p className="mt-2 text-[11px] text-[var(--ink-4)]">
         {item.bronnaam ?? 'onbekende bron'}
         {item.rubriek ? ` · ${item.rubriek}` : ''}
-        {item.gepubliceerd ? ` · ${item.gepubliceerd.slice(0, 10)}` : ''}
+        {item.gepubliceerd ? ` · ${item.gepubliceerd.slice(0, 10)}` : item.gezienOp ? ` · gezien op ${item.gezienOp.slice(0, 10)}` : ''}
         {safeHttpUrl(item.url) && (
           <>
             {' · '}

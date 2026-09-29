@@ -62,7 +62,7 @@
 import { type DuidingV1, type DoelgroepRegel, type Deadline } from './duiding-schema'
 import { vindWftOvertreding } from './wft-woordenlijst'
 import { THEMAS, type ThemaDefinitie, type ThemaId } from './themas'
-import { SPAARBUFFER_RAAKT, heeftEchteDatum, isBasisSectie, isBufferBericht, isCaribischBericht, lezersDatum } from './redactie'
+import { SPAARBUFFER_RAAKT, heeftEchteArtikelDatum, isBasisSectie, isBufferBericht, isCaribischBericht, lezersDatum } from './redactie'
 import { DOELGROEP_SLEUTELS, type DoelgroepSleutel } from './profiel-velden'
 import type { MechanismeId, MechanismeVorm } from './mechanismen'
 import {
@@ -312,7 +312,9 @@ function inVenster(a: KandidaatArtikel, ctx: MatchContext): boolean {
  * is dan al uitgesloten door regel 1.
  */
 function isOudNieuws(a: KandidaatArtikel, now: Date): boolean {
-  if (!a.published_at || !heeftEchteDatum(a.published_bron)) return false
+  // Een gewijzigde sectie van een uitlegpagina draagt de datum van de hele
+  // pagina, niet van de wijziging: daar beslist het venster op de ophaaldatum.
+  if (!a.published_at || !heeftEchteArtikelDatum(a)) return false
   const t = Date.parse(a.published_at)
   if (!Number.isFinite(t)) return false
   return t < now.getTime() - NIEUWS_MAX_OUDERDOM_DAGEN * DAG_MS

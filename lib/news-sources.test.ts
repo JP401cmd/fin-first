@@ -668,6 +668,37 @@ describe('fetchDetailPagina — grenzen vóór en tijdens het ophalen', () => {
     expect(await fetchDetailPagina('https://www.cpb.nl/mev-2027', CPB)).toMatchObject({ uitkomst: 'gelezen' })
   })
 
+  // Security G1 (30-09-2026): de hops bleven op de site, maar niet op een toegestaan pad.
+  describe('het adres waar de hops eindigen moet zelf ook toegestaan zijn', () => {
+    const RIJK = 'https://www.rijksoverheid.nl/ministeries/ministerie-van-financien'
+    const NIEUWS = 'https://www.rijksoverheid.nl/actueel/nieuws/2026/09/29/voorstellen-op-box-3'
+
+    it('een artikel dat doorstuurt naar een uitlegpagina (ander pad) wordt niet bewaard', async () => {
+      const uitleg = pagina({ body: ARTIKEL })
+      const f = vi.fn()
+        .mockResolvedValueOnce(pagina({ status: 301, location: '/onderwerpen/inkomstenbelasting/box-3' }))
+        .mockResolvedValueOnce(uitleg)
+      vi.stubGlobal('fetch', f)
+      expect(await fetchDetailPagina(NIEUWS, RIJK)).toEqual({ uitkomst: 'terugval', oorzaak: 'doorverwezen' })
+    })
+
+    it('ook niet naar de kale host zonder www: de hostnaam is exact', async () => {
+      const f = vi.fn()
+        .mockResolvedValueOnce(pagina({ status: 301, location: 'https://rijksoverheid.nl/actueel/nieuws/2026/09/29/voorstellen-op-box-3' }))
+        .mockResolvedValueOnce(pagina({ body: ARTIKEL }))
+      vi.stubGlobal('fetch', f)
+      expect(await fetchDetailPagina(NIEUWS, RIJK)).toMatchObject({ uitkomst: 'terugval', oorzaak: 'doorverwezen' })
+    })
+
+    it('een doorverwijzing binnen de toegestane paden blijft gelezen', async () => {
+      const f = vi.fn()
+        .mockResolvedValueOnce(pagina({ status: 301, location: '/documenten/kamerstukken/2026/09/29/voorstellen-op-box-3' }))
+        .mockResolvedValueOnce(pagina({ body: ARTIKEL }))
+      vi.stubGlobal('fetch', f)
+      expect(await fetchDetailPagina(NIEUWS, RIJK)).toMatchObject({ uitkomst: 'gelezen' })
+    })
+  })
+
   it('een storingspagina is terugval, geen artikel', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => pagina({ body: BELASTINGDIENST_STORING_HTML })))
     expect(await fetchDetailPagina('https://www.cpb.nl/x', CPB)).toMatchObject({ uitkomst: 'terugval', oorzaak: 'storing' })

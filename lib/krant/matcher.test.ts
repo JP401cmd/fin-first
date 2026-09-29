@@ -579,11 +579,26 @@ describe('matcher v6 — redactieregels (ADR 0191)', () => {
       expect(matchEditie(koper, [leidraad], context()).algemeen.items).toEqual([])
     })
 
-    it('fragment: twee treffers in de aanhef sluiten uit; één terloopse vermelding niet', () => {
-      const tweeKeer = art({ themas: HUUR }, { id: 'r-frag', title: 'Huurtoeslag verandert', bron_fragment: 'De huurtoeslag verandert voor Bonaire, Sint Eustatius en Saba.' })
+    it('fragment: twee vermeldingen in de aanhef sluiten uit; één vermelding niet, ook niet als opsomming', () => {
+      const tweeKeer = art(
+        { themas: HUUR },
+        {
+          id: 'r-frag',
+          title: 'Huurtoeslag verandert',
+          bron_fragment:
+            'De huurtoeslag op Bonaire verandert per 1 januari. De staatssecretaris schrijft dat in een brief aan de Tweede Kamer over het nieuwe stelsel. Op Saba en Sint Eustatius gaat de regeling een jaar later in.',
+        },
+      )
       const terloops = art({ themas: HUUR }, { id: 'r-terloops', title: 'Huurtoeslag verandert', bron_fragment: 'De huurtoeslag verandert per 1 januari. Ook op Bonaire gelden nieuwe bedragen.' })
+      const opsomming = art({ themas: HUUR }, { id: 'r-opsomming', title: 'Huurtoeslag verandert', bron_fragment: 'De huurtoeslag verandert, ook voor Bonaire, Sint Eustatius en Saba.' })
+      const voorbehoud = art(
+        { themas: HUUR },
+        { id: 'r-voorbehoud', title: 'Huurtoeslag verandert', bron_fragment: 'Woont u in Caribisch Nederland (Bonaire, Sint Eustatius of Saba)? Dan gelden andere regels. De huurtoeslag verandert per 1 januari.' },
+      )
       expect(voldoetAanLeescontract(tweeKeer, context())).toBe(false)
       expect(voldoetAanLeescontract(terloops, context())).toBe(true)
+      expect(voldoetAanLeescontract(opsomming, context())).toBe(true)
+      expect(voldoetAanLeescontract(voorbehoud, context())).toBe(true)
       expect(matchEditie(huurder, [terloops], tijdlijn()).items.map((i) => i.artikelId)).toEqual(['r-terloops'])
     })
   })
@@ -658,6 +673,22 @@ describe('matcher v6 — redactieregels (ADR 0191)', () => {
       expect(voldoetAanLeescontract(art({}, { published_at: oud, published_bron: 'pagina' }), context())).toBe(false)
       expect(voldoetAanLeescontract(art({}, { published_at: oud, published_bron: 'eerste_gezien' }), context())).toBe(true)
       expect(voldoetAanLeescontract(art({}, { published_at: oud, published_bron: undefined }), context())).toBe(true)
+    })
+
+    // Eindreview Y3 (30-09-2026): de Belastingdienst-pagina's dragen 3 februari en 14 april.
+    it('een gewijzigde sectie met een oude paginadatum blijft nieuws, en toont "gezien op"', () => {
+      const paginaDatum = '2026-02-03T00:00:00.000Z'
+      const sectie = (bron_wijziging: 'basis' | 'gewijzigd') =>
+        art({ themas: HUUR }, { id: `r-${bron_wijziging}`, bron_soort: 'web_pagina', bron_wijziging, published_at: paginaDatum, published_bron: 'meta' })
+      expect(voldoetAanLeescontract(sectie('gewijzigd'), context())).toBe(true)
+      const t = matchEditie(huurder, [sectie('gewijzigd')], tijdlijn())
+      expect(t.items.map((i) => i.artikelId)).toEqual(['r-gewijzigd'])
+      expect(t.items[0]).toMatchObject({ gepubliceerd: null, gezienOp: RECENT })
+      // De basissectie met dezelfde datum is gewoon oud: niet in Achtergrond, niet in het katern.
+      expect(voldoetAanLeescontract(sectie('basis'), context())).toBe(false)
+      // Buiten het venster op de ophaaldatum is ook een wijziging geen nieuws meer.
+      const lang = { ...sectie('gewijzigd'), fetched_at: '2026-08-01T05:10:00Z' }
+      expect(voldoetAanLeescontract(lang, context())).toBe(false)
     })
   })
 })

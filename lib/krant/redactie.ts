@@ -57,7 +57,8 @@ const CARIBISCH_TERMEN: readonly RegExp[] = [
   /\bstatia\b/giu,
   /\bsaba\b/giu,
   /\bbes[\s-]eilanden\b/giu,
-  /\bBES\b/gu,
+  // Niet "BES-eilanden": dat telt de regel hierboven al.
+  /\bBES\b(?![\s-]eilanden)/gu,
   /\baruba\b/giu,
   /\bcura[cç]ao\b/giu,
   /\bsint[\s-]maarten\b/giu,
@@ -65,12 +66,35 @@ const CARIBISCH_TERMEN: readonly RegExp[] = [
 
 /** Het deel van het fragment dat als "aanhef" telt: kop, datum en eerste alinea. */
 export const AANHEF_TEKENS = 600
-/** Zoveel treffers in de aanhef maken een bericht Caribisch, ook zonder treffer in de kop. */
+/** Zoveel VERMELDINGEN in de aanhef maken een bericht Caribisch, ook zonder treffer in de kop. */
 export const CARIBISCH_MIN_TREFFERS_AANHEF = 2
+/**
+ * Treffers die zo dicht op elkaar staan, zijn één vermelding: "Caribisch
+ * Nederland (BES)", "de BES-eilanden Bonaire, Sint Eustatius en Saba" en de
+ * vaste voorbehoudzin "Woont u in Caribisch Nederland (Bonaire, Sint Eustatius
+ * of Saba)?" noemen het gebied één keer, in één adem.
+ */
+export const CARIBISCH_VERMELDING_AFSTAND = 80
 
-function telTreffers(tekst: string): number {
+/** Beginposities van alle treffers in de tekst, oplopend. */
+function trefferPosities(tekst: string): number[] {
+  const posities: number[] = []
+  for (const re of CARIBISCH_TERMEN) for (const m of tekst.matchAll(re)) posities.push(m.index ?? 0)
+  return posities.sort((a, b) => a - b)
+}
+
+/**
+ * Het aantal vermeldingen: treffers binnen `CARIBISCH_VERMELDING_AFSTAND`
+ * tekens van de vorige tellen als dezelfde vermelding (eindreview Y1,
+ * 30-09-2026 — "BES-eilanden" telde dubbel, en één opsomming telde als vier).
+ */
+export function telCaribischeVermeldingen(tekst: string): number {
   let n = 0
-  for (const re of CARIBISCH_TERMEN) n += tekst.match(re)?.length ?? 0
+  let vorige = Number.NEGATIVE_INFINITY
+  for (const p of trefferPosities(tekst)) {
+    if (p - vorige > CARIBISCH_VERMELDING_AFSTAND) n++
+    vorige = p
+  }
   return n
 }
 
@@ -78,18 +102,19 @@ function telTreffers(tekst: string): number {
  * Gaat dit bericht over Caribisch Nederland (of Aruba, Curaçao, Sint Maarten)?
  *
  * DE DREMPEL: een treffer in de KOP, óf minstens
- * `CARIBISCH_MIN_TREFFERS_AANHEF` treffers in de eerste `AANHEF_TEKENS` tekens
- * van het fragment. Waarom zo: een bericht dát over Caribisch Nederland gaat,
- * zegt dat in de kop ("Inflatie Caribisch Nederland", "Caribisch Nederland:
- * leidraad…") of noemt het in de aanhef meer dan eens ("in Bonaire, Sint
- * Eustatius en Saba"). Een Nederlands bericht dat Bonaire terloops noemt ("ook
- * op Bonaire geldt…", onderaan een lang artikel) haalt geen van beide — één
- * vermelding, of een vermelding diep in de tekst, sluit niets uit.
+ * `CARIBISCH_MIN_TREFFERS_AANHEF` vermeldingen in de eerste `AANHEF_TEKENS`
+ * tekens van het fragment. Waarom zo: een bericht dát over Caribisch Nederland
+ * gaat, zegt dat in de kop ("Inflatie Caribisch Nederland", "Caribisch
+ * Nederland: leidraad…") of komt er in de aanhef op terug. Een Nederlands
+ * bericht dat het gebied één keer noemt — ook als opsomming van de drie
+ * eilanden, of in de vaste voorbehoudzin van een overheidspagina — blijft staan.
+ * Gemeten op productie (30-09-2026, 243 artikelen): de kopregel vangt alle vier
+ * de Caribische berichten; de aanhefregel alleen zou er geen extra vangen.
  */
 export function isCaribischBericht(kop: string, fragment: string | null | undefined): boolean {
-  if (telTreffers(kop) > 0) return true
+  if (trefferPosities(kop).length > 0) return true
   if (!fragment) return false
-  return telTreffers(fragment.slice(0, AANHEF_TEKENS)) >= CARIBISCH_MIN_TREFFERS_AANHEF
+  return telCaribischeVermeldingen(fragment.slice(0, AANHEF_TEKENS)) >= CARIBISCH_MIN_TREFFERS_AANHEF
 }
 
 // ── Regel 2b — spaarbuffer ───────────────────────────────────────────────────
@@ -135,16 +160,36 @@ export function heeftEchteDatum(publishedBron: string | null | undefined): boole
   return publishedBron != null && (ECHTE_DATUM_BRONNEN as readonly string[]).includes(publishedBron)
 }
 
+/** Wat de datumregels van een artikel moeten weten. */
+export interface DatumBron {
+  published_at: string | null
+  published_bron?: string | null
+  fetched_at: string
+  bron_soort?: string | null
+  bron_wijziging?: string | null
+}
+
+/**
+ * Draagt dit ARTIKEL een echte publicatiedatum? Eén uitzondering op
+ * `heeftEchteDatum`: een GEWIJZIGDE sectie van een uitlegpagina (regel 1). Haar
+ * datum is de wijzigingsdatum van de hele pagina uit de metadata, en die zegt
+ * niets over déze sectie: gemeten op 30-09-2026 dragen de twee
+ * Belastingdienst-pagina's 3 februari en 14 april. Wat we van zo'n sectie
+ * weten, is wanneer wij de wijziging zagen. Zonder deze uitzondering viel een
+ * echte wijziging weg als "ouder dan 45 dagen", of kreeg ze een datum van
+ * maanden terug (eindreview Y3).
+ */
+export function heeftEchteArtikelDatum(a: Pick<DatumBron, 'published_bron' | 'bron_soort' | 'bron_wijziging'>): boolean {
+  if (a.bron_soort === 'web_pagina' && a.bron_wijziging === 'gewijzigd') return false
+  return heeftEchteDatum(a.published_bron)
+}
+
 /**
  * De datum die de lezer ziet: een publicatiedatum als die echt is, anders het
  * moment waarop wij het bericht zagen ("gezien op …"). Nooit beide; nooit het
  * ophaalmoment als publicatiedatum.
  */
-export function lezersDatum(a: {
-  published_at: string | null
-  published_bron?: string | null
-  fetched_at: string
-}): { gepubliceerd: string | null; gezienOp: string | null } {
-  if (heeftEchteDatum(a.published_bron) && a.published_at) return { gepubliceerd: a.published_at, gezienOp: null }
+export function lezersDatum(a: DatumBron): { gepubliceerd: string | null; gezienOp: string | null } {
+  if (heeftEchteArtikelDatum(a) && a.published_at) return { gepubliceerd: a.published_at, gezienOp: null }
   return { gepubliceerd: null, gezienOp: a.fetched_at }
 }

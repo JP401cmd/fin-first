@@ -124,6 +124,17 @@ export function legeTellers(): AiLaagTellers {
 
 export type AiKandidaat = KandidaatArtikel & { duiding: DuidingV1 }
 
+/** Regel 2b zoals de matcher hem leest: het thema sparen-rente én een buffer in kop of aanhef. */
+function isSpaarbufferBericht(a: AiKandidaat): boolean {
+  return a.duiding.themas.some((t) => t.thema === 'sparen-rente') && isBufferBericht(a.title, a.bron_fragment)
+}
+
+/** De publicatiedatum als die echt is, anders het moment waarop wij het bericht zagen. */
+function lezersMoment(a: AiKandidaat): string | null {
+  const { gepubliceerd, gezienOp } = lezersDatum(a)
+  return gepubliceerd ?? gezienOp
+}
+
 function tijd(iso: string | null): number {
   if (!iso) return Number.NEGATIVE_INFINITY
   const t = Date.parse(iso)
@@ -143,7 +154,10 @@ function tijd(iso: string | null): number {
  * wat de matcher net buiten hield: een basissectie van een uitlegpagina is
  * nooit een kandidaat (regel 1), en een bufferbericht niet voor een lezer met
  * meer dan de laagste spaarband (regel 2b; onbekend spaargeld sluit niets uit).
- * Caribisch Nederland (2a) zit al in het leescontract.
+ * Net als in de matcher geldt 2b alleen binnen het thema `sparen-rente`: een
+ * kop over de kapitaalbuffer van banken of de buffers van pensioenfondsen is
+ * geen bericht over spaargeld (eindreview Y2). Caribisch Nederland (2a) zit al
+ * in het leescontract.
  */
 export function kiesAiKandidaten(
   artikelen: readonly KandidaatArtikel[],
@@ -160,11 +174,13 @@ export function kiesAiKandidaten(
   return artikelen
     .filter((a): a is AiKandidaat => voldoetAanLeescontract(a, ctx))
     .filter((a) => !isBasisSectie(a))
-    .filter((a) => !(bufferRaaktNiet && isBufferBericht(a.title, a.bron_fragment)))
+    .filter((a) => !(bufferRaaktNiet && isSpaarbufferBericht(a)))
     .filter((a) => !gekozen.has(a.id))
     .filter((a) => !(a.category != null && ctx.gedemptRubrieken.has(a.category)))
     .filter((a) => AI_KANDIDAAT_SOORTEN.has(a.duiding.soort))
-    .sort((a, b) => tijd(b.published_at) - tijd(a.published_at) || tijd(b.fetched_at) - tijd(a.fetched_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    // Recency op de datum die de lezer ziet (regel 3): een gewijzigde sectie
+    // sorteert op wanneer wij de wijziging zagen, niet op de datum van de pagina.
+    .sort((a, b) => tijd(lezersMoment(b)) - tijd(lezersMoment(a)) || tijd(b.fetched_at) - tijd(a.fetched_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .slice(0, AI_LAAG_MAX_KANDIDATEN)
 }
 

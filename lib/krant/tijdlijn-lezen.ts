@@ -34,7 +34,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AlgemeenItem, EditieVorm } from './matcher'
-import { renderSjabloon } from './sjablonen'
+import { VELD_SJABLOON, renderSjabloon, type SjabloonId } from './sjablonen'
 
 /** Hoeveel berichten op de pagina, en per archief-pagina (B32). */
 export const TIJDLIJN_PAGINA = 20
@@ -70,9 +70,9 @@ export interface TijdlijnBericht {
   aiTekst: string | null
   /** Krant 1E: het model koos dit bericht (label "door AI toegevoegd"). */
   aiToegevoegd: boolean
-  /** "Waarom zie ik dit?" — grep-bare regels van de matcher. */
+  /** "Waarom zie ik dit?" — leesbare zinnen uit de catalogus (`leesbaarWaarom`), nooit de codes van de matcher. */
   waarom: string[]
-  /** Profielvelden die ontbraken voor een bedrag. */
+  /** Profielvelden die ontbraken voor een bedrag — leesbare namen uit de catalogus (`leesbaarWatMist`). */
   watMist: string[]
   deadline: unknown
   titel: string | null
@@ -180,6 +180,50 @@ interface ItemRij {
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null)
 
+/** Een catalogustekst, of null als het id niet (meer) bestaat of een slot mist. */
+function uitCatalogus(id: string, slots: Record<string, string> = {}): string | null {
+  try {
+    return renderSjabloon(id as SjabloonId, 0, slots) || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * De rij bewaart in `waarom` de CODES van de matcher (`thema:sparen-rente`,
+ * `impact:ontbreekt`, `reden:reden-spaargeld-5k`, `redactie:spaarbuffer`, …).
+ * Die zijn voor beheer en de meting; de lezer zag ze tot 30-09-2026 letterlijk
+ * onder "Waarom zie ik dit?" (security G2 — de schermtest gebruikte zinnen en
+ * zag het niet). De lezer krijgt alleen de REDENEN, als de zin uit de
+ * geattesteerde catalogus ("Volgens je profiel heb je € 5.000 of meer
+ * spaargeld."). Dat zijn ook de gevoelige redenen (inkomen, uitkering,
+ * krediet): die staan bewust niet in de regel maar wél hier, achter een klik
+ * (compliance-keuze 4). Alle andere codes vallen weg — ook
+ * `redactie:spaarbuffer`: "weinig spaargeld" heeft geen zin in de catalogus en
+ * krijgt er geen.
+ */
+export function leesbaarWaarom(codes: readonly string[] | null | undefined): string[] {
+  const zinnen: string[] = []
+  for (const code of codes ?? []) {
+    if (typeof code !== 'string' || !code.startsWith('reden:reden-')) continue
+    const reden = uitCatalogus(code.slice('reden:'.length))
+    const zin = reden ? uitCatalogus('raakt-reden', { reden }) : null
+    if (zin && !zinnen.includes(zin)) zinnen.push(zin)
+  }
+  return zinnen
+}
+
+/** De profielsleutels van `wat_mist` als leesbare namen ("je spaargeld"); een onbekende sleutel valt weg. */
+export function leesbaarWatMist(velden: readonly string[] | null | undefined): string[] {
+  const namen: string[] = []
+  for (const veld of velden ?? []) {
+    if (typeof veld !== 'string' || !Object.hasOwn(VELD_SJABLOON, veld)) continue
+    const naam = uitCatalogus(VELD_SJABLOON[veld as keyof typeof VELD_SJABLOON])
+    if (naam && !namen.includes(naam)) namen.push(naam)
+  }
+  return namen
+}
+
 export function rijNaarBericht(r: ItemRij): TijdlijnBericht {
   const s = r.snapshot ?? {}
   const editie = Array.isArray(r.krant_edities) ? r.krant_edities[0] : r.krant_edities
@@ -194,8 +238,8 @@ export function rijNaarBericht(r: ItemRij): TijdlijnBericht {
     tekst: r.tekst,
     aiTekst: str(r.ai_tekst),
     aiToegevoegd: r.ai_toegevoegd === true,
-    waarom: r.waarom ?? [],
-    watMist: r.wat_mist ?? [],
+    waarom: leesbaarWaarom(r.waarom),
+    watMist: leesbaarWatMist(r.wat_mist),
     deadline: r.deadline ?? null,
     titel: str(s.titel),
     rubriek: str(s.rubriek),

@@ -199,11 +199,22 @@ end $$;
 -- Een echte datum (feed/meta/pagina) blijft of wordt de publicatiedatum; anders
 -- wordt gepubliceerd null en gezienOp het ophaalmoment. Alleen items zonder
 -- de sleutel gezienOp (van vóór ADR 0191).
+--
+-- Eén uitzondering, gelijk aan heeftEchteArtikelDatum in lib/krant/redactie.ts:
+-- een GEWIJZIGDE sectie van een uitlegpagina draagt de datum van de hele
+-- pagina, niet van de wijziging, en toont dus "gezien op" (eindreview Y3).
+-- Stap 3 hierboven heeft bron_wijziging dan al gezet.
+
+create or replace function pg_temp.echte_datum(published_bron text, bron_soort text, bron_wijziging text) returns boolean
+language sql immutable as $f$
+  select coalesce(published_bron in ('feed', 'meta', 'pagina'), false)
+     and not coalesce(bron_soort = 'web_pagina' and bron_wijziging = 'gewijzigd', false)
+$f$;
 
 update public.krant_editie_items i
 set snapshot = i.snapshot || jsonb_build_object(
-      'gepubliceerd', case when a.published_bron in ('feed', 'meta', 'pagina') then to_jsonb(a.published_at) else 'null'::jsonb end,
-      'gezienOp', case when a.published_bron in ('feed', 'meta', 'pagina') then 'null'::jsonb else to_jsonb(a.fetched_at) end
+      'gepubliceerd', case when pg_temp.echte_datum(a.published_bron, a.bron_soort, a.bron_wijziging) then to_jsonb(a.published_at) else 'null'::jsonb end,
+      'gezienOp', case when pg_temp.echte_datum(a.published_bron, a.bron_soort, a.bron_wijziging) then 'null'::jsonb else to_jsonb(a.fetched_at) end
     )
 from public.news_articles a
 where a.id = i.article_id
@@ -211,14 +222,17 @@ where a.id = i.article_id
   and jsonb_typeof(i.snapshot) = 'object'
   and not (i.snapshot ? 'gezienOp');
 
+-- Een item waarvan het artikel is opgeruimd (a.id is null) blijft zoals het
+-- is: we weten de herkomst van zijn datum niet meer, dus we raken hem niet aan
+-- (security G5 — gelijk aan de items hierboven, die de join dan overslaat).
 create or replace function pg_temp.redactie_items(items jsonb) returns jsonb
 language sql stable as $f$
   select coalesce(jsonb_agg(
     case
-      when jsonb_typeof(x) <> 'object' or x ? 'gezienOp' then x
+      when jsonb_typeof(x) <> 'object' or x ? 'gezienOp' or a.id is null then x
       else x || jsonb_build_object(
-        'gepubliceerd', case when a.published_bron in ('feed', 'meta', 'pagina') then to_jsonb(a.published_at) else 'null'::jsonb end,
-        'gezienOp', case when a.published_bron in ('feed', 'meta', 'pagina') then 'null'::jsonb when a.id is null then 'null'::jsonb else to_jsonb(a.fetched_at) end
+        'gepubliceerd', case when pg_temp.echte_datum(a.published_bron, a.bron_soort, a.bron_wijziging) then to_jsonb(a.published_at) else 'null'::jsonb end,
+        'gezienOp', case when pg_temp.echte_datum(a.published_bron, a.bron_soort, a.bron_wijziging) then 'null'::jsonb else to_jsonb(a.fetched_at) end
       )
     end
     order by t.nr), '[]'::jsonb)

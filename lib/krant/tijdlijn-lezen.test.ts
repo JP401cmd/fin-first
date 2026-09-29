@@ -11,6 +11,8 @@ import {
   heeftNieuw,
   laadTijdlijn,
   laadTijdlijnPagina,
+  leesbaarWaarom,
+  leesbaarWatMist,
   rijNaarBericht,
   zonderAiVan,
   type TijdlijnCursor,
@@ -94,6 +96,7 @@ describe('codeerCursor / decodeerCursor', () => {
 
 // ── rijNaarBericht ───────────────────────────────────────────────────────────
 
+// De rij draagt de CODES van de matcher, zoals ze in productie staan.
 const basisRij = {
   id: 'i1',
   editie_id: 'e1',
@@ -101,8 +104,8 @@ const basisRij = {
   positie: 0,
   vorm: 'raakt' as const,
   tekst: 'De regel voor jou',
-  waarom: ['w1'],
-  wat_mist: ['m1'],
+  waarom: ['thema:sparen-rente', 'reden:reden-spaargeld-5k', 'impact:ontbreekt'],
+  wat_mist: ['spaargeld'],
   deadline: null,
   snapshot: { titel: 'T', rubriek: 'R', bron: 'B', url: 'https://x.test', gepubliceerd: '2026-09-28', samenvatting: 'S' },
   krant_edities: { week_key: '2026-W39' },
@@ -121,8 +124,8 @@ describe('rijNaarBericht', () => {
       tekst: 'De regel voor jou',
       aiTekst: null,
       aiToegevoegd: false,
-      waarom: ['w1'],
-      watMist: ['m1'],
+      waarom: ['Volgens je profiel heb je € 5.000 of meer spaargeld.'],
+      watMist: ['je spaargeld'],
       deadline: null,
       titel: 'T',
       rubriek: 'R',
@@ -182,6 +185,54 @@ describe('rijNaarBericht', () => {
     const b = rijNaarBericht(rij)
     expect(b.waarom).toEqual([])
     expect(b.watMist).toEqual([])
+  })
+
+  // Security G2 (30-09-2026): de lezer zag de codes van de matcher letterlijk.
+  describe('"Waarom zie ik dit?" toont zinnen uit de catalogus, nooit een code', () => {
+    const ALLE_CODES = [
+      'thema:sparen-rente',
+      'redactie:spaarbuffer',
+      'impact:bereik',
+      'impact:ontbreekt',
+      'impact:nul',
+      'doelgroep-onbevestigd',
+      'deadline',
+      'rubriek-voorkeur',
+      'rubriek-gedempt',
+      'samenvatting-leeg:model',
+      'samenvatting-geweerd:wft',
+      'ai:toegevoegd',
+    ]
+
+    it('geen enkele technische code bereikt de lezer', () => {
+      expect(leesbaarWaarom(ALLE_CODES)).toEqual([])
+      const b = rijNaarBericht({ ...basisRij, waarom: [...ALLE_CODES, 'reden:reden-koopwoning'] })
+      expect(b.waarom).toHaveLength(1)
+      for (const zin of b.waarom) expect(zin).not.toMatch(/[a-z]:[a-z]|^[a-z-]+$/)
+    })
+
+    it('een reden wordt de zin uit de catalogus; een gevoelige reden staat hier wél (achter de klik)', () => {
+      expect(leesbaarWaarom(['reden:reden-spaargeld-50k'])).toEqual([renderSjabloon('raakt-reden', 0, { reden: renderSjabloon('reden-spaargeld-50k', 0) })])
+      expect(leesbaarWaarom(['reden:reden-krediet'])).toEqual(['Volgens je profiel heb je een lening of krediet.'])
+    })
+
+    it('regel 2b: het bufferbericht heeft geen zichtbare reden', () => {
+      expect(leesbaarWaarom(['thema:sparen-rente', 'redactie:spaarbuffer'])).toEqual([])
+    })
+
+    it('een onbekende of vervallen reden valt weg, en dubbelen tellen één keer', () => {
+      expect(leesbaarWaarom(['reden:reden-bestaat-niet', 'reden:raakt-kop', 'reden:', 'reden:reden-huur', 'reden:reden-huur'])).toEqual([
+        renderSjabloon('raakt-reden', 0, { reden: renderSjabloon('reden-huur', 0) }),
+      ])
+      expect(leesbaarWaarom([42 as unknown as string])).toEqual([])
+    })
+
+    it('"wat we nog niet weten": de naam van het veld, nooit de sleutel; een onbekende sleutel valt weg', () => {
+      expect(leesbaarWatMist(['spaargeld', 'hypotheek_rentevast', 'spaargeld', 'bestaat-niet', 'constructor'])).toEqual([
+        renderSjabloon('veld-spaargeld', 0),
+        renderSjabloon('veld-hypotheek_rentevast', 0),
+      ])
+    })
   })
 
   it('lege-string snapshot-velden tellen als afwezig (str-helper)', () => {
