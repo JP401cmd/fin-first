@@ -6,8 +6,8 @@
  * regressiesuite (`lib/regression-tests/suites/uat-krant.ts`). Deze test loopt
  * er alleen overheen en toetst `expect(actual).toBe(expected)`.
  *
- * KRANT is aaneengesloten 01..12: elk catalogus-scenario heeft precies één
- * criterium. Verdeling: 9 exact, 1 consistency, 2 ui-only.
+ * KRANT is aaneengesloten 01..16: elk catalogus-scenario heeft precies één
+ * criterium. Verdeling: 9 exact, 2 consistency, 5 ui-only.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -28,9 +28,9 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Krant — acceptatiecriteria dekking', () => {
-  it('is de KRANT-zone met precies 12 criteria', () => {
+  it('is de KRANT-zone met precies 16 criteria', () => {
     expect(KRANT_ACCEPTANCE.zone).toBe('KRANT')
-    expect(KRANT_ACCEPTANCE.criteria.length).toBe(12)
+    expect(KRANT_ACCEPTANCE.criteria.length).toBe(16)
   })
 
   it('heeft precies één criterium per catalogus-KRANT-scenario', () => {
@@ -70,13 +70,14 @@ describe('UAT Krant — acceptatiecriteria dekking', () => {
     expect(checkWorkflows).toEqual(exactWorkflows)
   })
 
-  it('heeft de verwachte kind-verdeling (9 exact, 1 consistency, 2 ui-only)', () => {
+  it('heeft de verwachte kind-verdeling (9 exact, 2 consistency, 5 ui-only)', () => {
     const counts = { exact: 0, consistency: 0, 'ui-only': 0, oracle: 0, direction: 0 }
     for (const c of KRANT_ACCEPTANCE.criteria) counts[c.assertion.kind]++
-    expect(counts).toEqual({ exact: 9, consistency: 1, 'ui-only': 2, oracle: 0, direction: 0 })
+    expect(counts).toEqual({ exact: 9, consistency: 2, 'ui-only': 5, oracle: 0, direction: 0 })
     expect(criterion('WF-KRANT-03').assertion.kind).toBe('ui-only')
     expect(criterion('WF-KRANT-08').assertion.kind).toBe('ui-only')
     expect(criterion('WF-KRANT-10').assertion.kind).toBe('consistency')
+    expect(criterion('WF-KRANT-15').assertion.kind).toBe('consistency')
   })
 
   it('de regressietoets WF-KRANT-12 is KERN', () => {

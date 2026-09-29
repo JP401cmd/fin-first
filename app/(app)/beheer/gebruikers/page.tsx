@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Users, Search, Check, AlertCircle, Clock, CalendarDays, Ban, RotateCcw } from 'lucide-react'
 import { ADDON_PLANS, formatPlanPrice, type AddonPlan } from '@/lib/subscription-catalog'
 import type { GebruikersActiviteit } from '@/lib/beheer/gebruik'
+import { ProductKeuze } from '@/components/app/beheer/product-keuze'
 
 interface AdminUser {
   id: string
@@ -384,6 +385,13 @@ export default function BeheerGebruikersPage() {
                   <option value="superadmin">Superadmin</option>
                 </select>
               </label>
+
+              <ProductKeuze
+                userId={user.id}
+                naam={user.name || user.email || 'deze gebruiker'}
+                disabled={busyAction !== null}
+                onStatus={setStatus}
+              />
 
               <button
                 onClick={handleBlockToggle}

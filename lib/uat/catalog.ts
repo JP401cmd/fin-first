@@ -611,6 +611,10 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-KRANT-10', wf: 'WF-KRANT-10', zone: 'KRANT', band: 'dagelijks', naam: 'Elke AI-route en het aanzetten van een add-on weigeren een Krant-account', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 10, duurMin: 6 },
   { id: 'UAT-KRANT-11', wf: 'WF-KRANT-11', zone: 'KRANT', band: 'dagelijks', naam: 'Productkeuze Krant ⇄ Geheel via PUT /api/modules, zonder iets te wissen', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 11, duurMin: 8 },
   { id: 'UAT-KRANT-12', wf: 'WF-KRANT-12', zone: 'KRANT', band: 'dagelijks', naam: 'REGRESSIE: een account zonder moduleset of met alle zes ziet alles zoals vroeger', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 12, duurMin: 10 },
+  { id: 'UAT-KRANT-13', wf: 'WF-KRANT-13', zone: 'KRANT', band: 'dagelijks', naam: '/krant/meer: de weg omhoog, met één knop die alles zelf navigeert', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c'], volgorde: 13, duurMin: 6 },
+  { id: 'UAT-KRANT-14', wf: 'WF-KRANT-14', zone: 'KRANT', band: 'dagelijks', naam: 'De kaart "Meer TriFinity" op /mijn/account: alleen voor een Krant-account', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 14, duurMin: 3 },
+  { id: 'UAT-KRANT-15', wf: 'WF-KRANT-15', zone: 'KRANT', band: 'dagelijks', naam: 'Beheer zet het product van een account om, zonder het huidige product te tonen', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 15, duurMin: 6 },
+  { id: 'UAT-KRANT-16', wf: 'WF-KRANT-16', zone: 'KRANT', band: 'dagelijks', naam: 'Een Geheel-account op /krant/meer krijgt een link, geen knop', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['c'], volgorde: 16, duurMin: 2 },
 ]
 
 /** Alle scenario-ID's die tot de canonieke rooktest (§2.6) behoren. */

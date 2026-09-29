@@ -1,6 +1,6 @@
 /**
  * Acceptatiecriteria — domein Krant-product: shell en productgrens
- * (WF-KRANT-01..12 / UAT-KRANT-01..12).
+ * (WF-KRANT-01..16 / UAT-KRANT-01..16).
  *
  * Nieuwe zone (29 sep 2026) voor Krant 2B — de productgrens — en Krant 2A
  * fase 2 — de productkeuze `PUT /api/modules` plus de waarde 'nieuws' in
@@ -39,9 +39,21 @@
  * nog, een klik gaf een 403 — is in dezelfde bouwronde gesloten: account-client
  * verbergt Abonnement en AI-tegoed voor een Krant-account (WF-KRANT-10).
  *
+ * KRANT 2D FASE 1 (WF-KRANT-13..16, besluit B12) — "de weg omhoog": /krant/meer
+ * ligt al op de allowlist (WF-KRANT-04) maar bestond nog niet; deze vier
+ * criteria dekken de nieuwe schermen/route nu ze er zijn. FASE 1 = wat je
+ * ziet en de omzetting zelf; NIET IN FASE 1 (blijft open, 2C): de Geheel-
+ * onboarding na de overstap (`onboarding_completed` terugzetten voor een
+ * account zonder de stap 'identity'), voorvullen uit het nieuwsprofiel, en het
+ * omzetten van de herkomst. Een downgrade-knop voor de lezer zelf komt er
+ * bewust niet — terug naar alleen de Krant loopt uitsluitend via support
+ * (WF-KRANT-15), zodat niemand zijn eigen product per ongeluk terugzet.
+ *
  * Verdeling: 9 × 'exact' (pure beslisfuncties, zie krant-checks.ts),
- * 1 × 'consistency' (één AI-poort over alle AI-routes), 2 × 'ui-only'
- * (client-routewacht, Fin-loze shell).
+ * 2 × 'consistency' (de AI-poort over alle AI-routes; de beheer-productkeuze
+ * die dezelfde PRODUCT_PRESETS hergebruikt als WF-KRANT-11), 5 × 'ui-only'
+ * (client-routewacht, Fin-loze shell, /krant/meer zelf, de kaart op
+ * /mijn/account, de link i.p.v. knop voor een Geheel-account).
  */
 
 import type { AcceptanceCriterion, AcceptanceSet } from './types'
@@ -243,6 +255,70 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: 'zonderModulesRedirect=null; alleZesRedirect=null; subsetRedirect=null; subsetIsKrant=false; zonderModulesMenuOngewijzigd=true; alleZesGlobalNavOngewijzigd=true; alleZesMijnHref=/mijn; zonderModulesFin=true; alleZesFin=true; subsetFin=true; alleZesBriefing=true; alleZesPerspectiefActies=3; alleZesHomeschermActie=true',
       source: 'lib/modules/krant-grens.ts#krantRedirect + isKrantAccount + shouldMountFin + receivesBriefing + lib/nav-config.ts#navSurfaceFor (GEHEEL_SURFACE) + lib/modules/resolve.ts#resolveActiveModules — zie krant-checks.ts; de regressie per oppervlak in lib/nav-config.krant.test.ts, components/app/shell/krant-shell.test.tsx en lib/modules/krant-ai-poort.test.ts',
+    },
+  },
+  {
+    workflow: 'WF-KRANT-13',
+    scenarioId: 'UAT-KRANT-13',
+    titel: '/krant/meer: de weg omhoog, met één knop die alles zelf navigeert',
+    kriticiteit: 'KERN',
+    given:
+      'Een Krant-account. /krant/meer staat al op de allowlist (WF-KRANT-04); dit criterium toetst de pagina nu ze bestaat. FASE 1: geen onboarding na de overstap, geen voorvullen uit het nieuwsprofiel, geen herkomst-omzetting — dat is 2C.',
+    when:
+      'De gebruiker opent /mijn/account, volgt de kaart "Meer TriFinity" naar /krant/meer, klikt "Meer TriFinity", ziet de bevestiging en klikt "Aanzetten". Los daarvan: hij annuleert een keer, en de route levert een keer een fout.',
+    then:
+      'De pagina opent met één h2-aanhef (`PageOpening`, geen h1 — ADR 0110) en precies één knop "Meer TriFinity"; die opent `<ShellOverlay kind="confirm">` met titel "Meer TriFinity aanzetten?" en schrijft nog niets. Pas "Aanzetten" roept `PUT /api/modules` aan met `{ product: \'geheel\' }`; bij een 2xx volgt een hárde navigatie (`window.location.assign`, geen `router.push`) naar /overzicht — bewust hard, want de gedeelde (app)-layout houdt de moduleset in de FeatureAccessProvider vast en een soft-push zou de KrantRouteGuard nog het oude product laten zien en meteen terugsturen naar /nieuws. Bij een fout blijft de bevestiging open met de foutmelding (`role="alert"`) en wordt niet genavigeerd; "Annuleren" sluit zonder aan te roepen. De kopij op de pagina, in de info-knop en in de bevestiging bevat geen AI-claim, prijs/eurobedrag, bespaar- of adviestaal en geen koop-metafoor (ADR 0165), en noemt expliciet "Er wordt niets gewist" en de weg terug via support.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/krant/krant-meer-artikel.tsx (h2/h3-structuur, GEHEEL_ONDERDELEN) + components/krant/meer-trifinity-knop.tsx (MeerTriFinityKnop, NA_OVERSTAP_HREF=/overzicht, hardeNavigatie) + app/(app)/krant/meer/page.tsx — bewaakt door components/krant/krant-meer-artikel.test.tsx en lib/modules/krant-meer.grens.test.ts; het feitelijke schrijfpad (product:\'geheel\' → PRODUCT_PRESETS.geheel) is het \'exact\'-criterium WF-KRANT-11, hier niet dubbel gerekend',
+    },
+  },
+  {
+    workflow: 'WF-KRANT-14',
+    scenarioId: 'UAT-KRANT-14',
+    titel: 'De kaart "Meer TriFinity" op /mijn/account: alleen voor een Krant-account',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Een Krant-account en, ter vergelijking, een Geheel-account, beiden op /mijn/account.',
+    when:
+      'De gebruiker opent /mijn/account.',
+    then:
+      'Het Krant-account ziet de sectie "Meer TriFinity" (kop + korte uitleg + de link "Bekijk wat het volledige TriFinity laat zien" naar /krant/meer) en géén Abonnement-/AI-tegoedsectie (WF-KRANT-10, hier nogmaals geborgd); de accountbasis (e-mail/wachtwoord) blijft zichtbaar. Het Geheel-account ziet de kaart niet, en ziet Abonnement en AI-tegoed wél. `AccountClient` beslist dit via dezelfde `useNavSurface().isKrant` als de rest van de productgrens — geen aparte lezing.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/mijn/account/meer-trifinity-kaart.tsx (MeerTriFinityKaart) + components/mijn/account/account-client.tsx (isKrant → MeerTriFinityKaart i.p.v. AbonnementSection/AiCreditsSection) — bewaakt door components/mijn/account/account-client.krant.test.tsx',
+    },
+  },
+  {
+    workflow: 'WF-KRANT-15',
+    scenarioId: 'UAT-KRANT-15',
+    titel: 'Beheer zet het product van een account om, zonder het huidige product te tonen',
+    kriticiteit: 'KERN',
+    given:
+      'Een superadmin op /beheer/gebruikers, en ter vergelijking een gewone gebruiker die de route rechtstreeks aanroept. Er is bewust géén downgrade-knop voor de lezer zelf (B12) — terug naar alleen de Krant loopt uitsluitend hierlangs.',
+    when:
+      'De superadmin klikt naast een gebruikersrij "Zet op Krant" of "Zet op Geheel", ziet de bevestiging met de uitleg per keuze en bevestigt; los daarvan roept de gewone gebruiker `POST /api/admin/users/product` rechtstreeks aan.',
+    then:
+      'Elke keuze gaat eerst via `<ShellOverlay kind="confirm">` en schrijft pas na bevestigen; vóór het bevestigen is er geen `fetch`-aanroep, en "Annuleren" schrijft niets. Na bevestigen roept de knop `POST /api/admin/users/product` aan met `{ userId, product }`; de route (achter `isSuperAdmin`, anders 403; zonder sessie 401) leest van `profiles` alleen `id` + `full_name` (ADR 0146 — de huidige moduleset staat niet op de beheer-leeslijst, dus de knoppen tonen bewust niet wat een account nú heeft) en schrijft `active_modules`/`home_screen` uit dezelfde `PRODUCT_PRESETS` als `PUT /api/modules` (WF-KRANT-11) — geen tweede preset-definitie. Het auditlog krijgt een `user.product`-regel met alleen het doel (`to: product`), geen "van"-waarde. Er wordt niets gewist: alleen die twee profielkolommen veranderen (bewaakt door een bronscan die elke `delete`/`insert`/`upsert` in de route verbiedt). Een onbekend product of een extra veld geeft een 400 (strict body-schema); de gewone gebruiker krijgt 403 vóór er iets wordt gelezen of geschreven.',
+    assertion: {
+      kind: 'consistency',
+      source: 'app/api/admin/users/product/route.ts (isSuperAdmin-poort, ProductBodySchema strict, PRODUCT_PRESETS-hergebruik, logAdminAction user.product, geen delete/insert/upsert) + components/app/beheer/product-keuze.tsx (ProductKeuze: bevestiging vóór fetch) + lib/beheer/geen-inhoud.test.ts (de META_KOLOMMEN-gate op profiles) — A=B-toets tegen dezelfde PRODUCT_PRESETS als WF-KRANT-11 (\'exact\'); bewaakt door components/app/beheer/product-keuze.test.tsx; de route zelf in app/api/admin/users/product/route.test.ts (401/403/400/404, beide presets, audit, geen delete/insert/upsert) — dat is een openstaand testgat, geen definitiegat',
+    },
+  },
+  {
+    workflow: 'WF-KRANT-16',
+    scenarioId: 'UAT-KRANT-16',
+    titel: 'Een Geheel-account op /krant/meer krijgt een link, geen knop',
+    kriticiteit: 'OVERIG',
+    given:
+      'Een Geheel-account dat rechtstreeks naar /krant/meer navigeert (bv. via een gedeelde link) — de route ligt binnen de Krant-grens en redirect dus niet (WF-KRANT-04).',
+    when:
+      'Het account opent /krant/meer.',
+    then:
+      'De pagina toont dezelfde uitleg over wat het volledige TriFinity laat zien, maar géén knop "Meer TriFinity" (die hoort alleen bij `isKrant`): in plaats daarvan staat er "Je gebruikt het volledige TriFinity al." met een link "Naar je overzicht" naar /overzicht. Er is geen bevestigingsmodal en geen `PUT /api/modules`-aanroep mogelijk vanaf deze pagina voor dit account.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/krant/krant-meer-artikel.tsx#KrantMeerArtikel (isKrant ? MeerTriFinityKnop : link naar /overzicht) — bewaakt door components/krant/krant-meer-artikel.test.tsx ("een account met het volledige TriFinity krijgt geen knop")',
     },
   },
 ]

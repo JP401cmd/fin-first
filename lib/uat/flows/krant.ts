@@ -1,16 +1,21 @@
 // Gecureerde Krant-procesflow (verdiepingslaag laag 2 voor de UAT-plaat).
 //
 // Bron: de acceptatie in lib/uat/acceptance/krant.ts (Krant 2B + 2A fase 2,
-// ADR 0184). De knopen met `scenarioId` verwijzen naar UAT-KRANT-NN uit
-// lib/uat/catalog.ts en erven de rondestatus.
+// ADR 0184; Krant 2D fase 1 "de weg omhoog", besluit B12). De knopen met
+// `scenarioId` verwijzen naar UAT-KRANT-NN uit lib/uat/catalog.ts en erven de
+// rondestatus.
 //
 // Opbouw: instap (inloggen als Krant-account) → landing op /nieuws → de
 // beslissing "ligt dit pad binnen de grens?" met de twee handhavingsmomenten
 // (server-redirect bij een harde laadbeurt, client-wacht bij een in-app link)
 // en de grensroutes zelf; daarnaast drie lanes — wat de navigatie toont, wat
 // er zonder Fin/AI níét is, en de productkeuze — en tot slot de regressie voor
-// elk ander account. Cross-knopen wijzen naar de zones die het Geheel-gedrag
-// en de Krant-inhoud dragen.
+// elk ander account. De product-lane draagt ook de weg omhoog: de kaart op
+// /mijn/account → /krant/meer → (Krant-account) de knop die naar de
+// regressietak leidt, of (Geheel-account) alleen een link; en de beheer-actie
+// die beide kanten op werkt zonder het huidige product te tonen (geen-inhoud-
+// gate). Cross-knopen wijzen naar de zones die het Geheel-gedrag en de
+// Krant-inhoud dragen.
 //
 // GEEN React, GEEN data-fetching — pure curatie.
 
@@ -47,6 +52,12 @@ export const KRANT_FLOW: UatFlow = {
     { id: 'productkeuze', scenarioId: 'UAT-KRANT-11', label: 'WF-KRANT-11 · PUT /api/modules krant ⇄ geheel (niets gewist)', kind: 'action', stage: 1, lane: 'product' },
     { id: 'regressie', scenarioId: 'UAT-KRANT-12', label: 'WF-KRANT-12 · REGRESSIE: null / alle zes zien alles zoals vroeger', kind: 'outcome', stage: 2, lane: 'product' },
 
+    // ── 1-2 · de weg omhoog (Krant 2D fase 1, besluit B12) ─────────────────
+    { id: 'kaart-meer', scenarioId: 'UAT-KRANT-14', label: 'WF-KRANT-14 · Kaart "Meer TriFinity" op /mijn/account (alleen Krant)', kind: 'screen', stage: 1, lane: 'product' },
+    { id: 'krant-meer', scenarioId: 'UAT-KRANT-13', label: 'WF-KRANT-13 · /krant/meer: knop → bevestiging → PUT /api/modules → hard naar /overzicht', kind: 'action', stage: 2, lane: 'product' },
+    { id: 'geheel-op-meer', scenarioId: 'UAT-KRANT-16', label: 'WF-KRANT-16 · Geheel-account op /krant/meer: link, geen knop', kind: 'screen', stage: 2, lane: 'product' },
+    { id: 'beheer-product', scenarioId: 'UAT-KRANT-15', label: 'WF-KRANT-15 · Beheer zet product om (geen huidige waarde getoond)', kind: 'action', stage: 2, lane: 'product' },
+
     // ── 4 · cross-zone ────────────────────────────────────────────────────
     { id: 'x-will', label: 'Fin, berichten & krant · de inhoud van /nieuws (UAT-WILL-15..19)', kind: 'cross', stage: 4, crossZone: 'WILL' },
     { id: 'x-nav', label: 'Navigatie & shell · de volledige navigatie van een Geheel-account (UAT-NAV-01..)', kind: 'cross', stage: 4, crossZone: 'NAV' },
@@ -70,6 +81,13 @@ export const KRANT_FLOW: UatFlow = {
     { from: 'entry', to: 'productkeuze' },
     { from: 'productkeuze', to: 'landing', label: 'krant' },
     { from: 'productkeuze', to: 'regressie', label: 'geheel' },
+    { from: 'landing', to: 'kaart-meer' },
+    { from: 'kaart-meer', to: 'krant-meer' },
+    { from: 'krant-meer', to: 'regressie', label: 'aanzetten → geheel' },
+    { from: 'krant-meer', to: 'geheel-op-meer', label: 'al Geheel', kind: 'branch' },
+    { from: 'entry', to: 'beheer-product' },
+    { from: 'beheer-product', to: 'landing', label: 'zet op krant' },
+    { from: 'beheer-product', to: 'regressie', label: 'zet op geheel' },
     { from: 'grensroutes', to: 'x-will', kind: 'cross' },
     { from: 'regressie', to: 'x-nav', kind: 'cross' },
     { from: 'productkeuze', to: 'x-mijn', kind: 'cross' },

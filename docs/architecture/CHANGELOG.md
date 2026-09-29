@@ -1260,3 +1260,10 @@
 
 - **API-routes** toegevoegd: /api/admin/krant-weekmeting, /api/krant/bezwaar, /api/krant/tijdlijn, /api/krant/tijdlijn/gelezen, /api/krant/tijdlijn/vernieuwen, /api/krant/variant
 - **Componenten (aantal)** toegevoegd: +8
+
+## 2026-09-29
+
+- **Schermen** toegevoegd: /krant/meer
+- **API-routes** toegevoegd: /api/admin/users/product, /api/modules
+- **Integraties** verwijderd: OpenRouter
+- **Componenten (aantal)** toegevoegd: +13

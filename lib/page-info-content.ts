@@ -756,6 +756,13 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Je abonnement en accountstatus in één overzicht, inclusief welke add-ons (AI, Connected) actief zijn.',
     grip: 'Wijzig je e-mail of wachtwoord, log overal uit, of verwijder je account definitief in de danger zone.',
   },
+  // Krant 2D fase 1: de weg omhoog van de Krant naar het volledige TriFinity.
+  '/krant/meer': {
+    insight:
+      'Je Krant laat zien welk nieuws jouw situatie raakt. Het volledige TriFinity zet daar je eigen geld naast: je vermogen, je budget, box 3 en een plan in de tijd, met elk bedrag ook als vrijheidstijd.',
+    grip:
+      'Met de knop "Meer TriFinity" zet je het volledige TriFinity aan. Je Krant en je nieuwsprofiel blijven staan en er wordt niets gewist. Terug naar alleen de Krant kan via support.',
+  },
   '/mijn/notificaties': {
     insight:
       'Alleen meldingen die er voor jou toe doen houden je scherp — te veel ruis en je mist het signaal dat wél belangrijk is.',

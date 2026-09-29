@@ -438,6 +438,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['do-meta', 't-supabase'],
     reviewedAt: '2026-09-17',
   },
+  {
+    id: 'active-modules-zelf-schrijfbaar-geen-betaalmuur-guard',
+    title: 'profiles.active_modules is door de gebruiker zelf schrijfbaar — vandaag onschadelijk, morgen een zelf te zetten betaalmuur-discriminator',
+    detail:
+      'De Krant-productgrens (ADR 0184, Krant 2D fase 1/B12) leest overal dezelfde kolom: `resolveActiveModules(profiles.active_modules)` bepaalt of een account "Krant" (`[\'nieuws\']`) of "Geheel" (alle zes) is, voor layout-redirect, navigatie, Fin-mount, briefingmail en de AI-poort. `PUT /api/modules` en de knop "Meer TriFinity" kennen maar twee sets (`PRODUCT_PRESETS`, lib/modules/resolve.ts) — maar de database kent geen tweede slot: `profiles` heeft een UPDATE-grant voor `authenticated` en `guard_profiles_role` (de trigger die een self-escalatie op `role` blokkeert) bewaakt alleen die ene kolom, niet `active_modules`. Een sessie kan dus via PostgREST rechtstreeks élke subset van de zes modules zetten, niet alleen de twee presets. Vandaag onschadelijk: de Krant is uitsluitend een BEPERKING (minder zien, geen extra bevoegdheid), AI hangt aan `active_subscriptions` + `ai_enabled` — een aparte, wél bewaakte kolom (`checkTierGate`, lib/require-tier.ts) — en een scan van live policies/functies (29-09-2026) laat zien dat `active_modules` nergens anders dan de UI-laag wordt gelezen: 0 RLS-policies en 0 SECURITY DEFINER-functies verwijzen ernaar. Wordt het Geheel zelf (of een losse ingang zoals Budget) ooit een betaalde upgrade, dan wordt `active_modules` een discriminator die de gebruiker zelf kan zetten om een betaalmuur te omzeilen — dan hoort de kolom onder dezelfde soort guard als `role` (of het schrijfpad moet naar een service-role-schrijver, zoals `POST /api/admin/users/product` al is voor de beheerkant). Zie ook ADR 0188 (de weg omhoog) onder "gevolgen/open". Verwijder dit punt zodra ofwel een guard op `active_modules` staat (own-row alleen naar een van de PRODUCT_PRESETS, zoals `PUT /api/modules` al afdwingt maar de database niet), ofwel een eigenaarsbesluit vastlegt dat geen enkel modulelidmaatschap ooit betaald wordt.',
+    severity: 'debt',
+    elementIds: ['as-nieuws', 'do-meta'],
+    reviewedAt: '2026-09-29',
+  },
 ]
 
 /** Aandachtspunten die een specifiek element raken. */

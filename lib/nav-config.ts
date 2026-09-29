@@ -470,6 +470,10 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/rapportages/benchmark': 'Benchmark',
   '/rapportages/persoonlijk-plan': 'Persoonlijk plan',
   '/rapportages/totaalplan': 'Totaalplan',
+  // Krant 2D: de weg omhoog naar het volledige TriFinity. Bewust niet in het
+  // menu — de ingang is de kaart "Meer TriFinity" op /mijn/account (alleen
+  // voor een Krant-account).
+  '/krant/meer': 'Meer TriFinity',
   // De drie onderdelen van Budget stonden hier zolang ze buiten de nav vielen.
   // Sinds UR3-28 zijn ze `children` van de Budget-hefboom in `navGroups` en
   // leveren ze hun titel dus uit de nav-structuur zelf — hier laten staan zou

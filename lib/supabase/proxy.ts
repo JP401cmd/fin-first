@@ -161,6 +161,9 @@ export async function updateSession(request: NextRequest) {
     '/identity',
     '/beheer',
     '/onboarding',
+    // Krant 2D: /krant/meer (de weg omhoog naar het Geheel) is alleen voor
+    // ingelogde lezers; uitgelogd direct naar /login i.p.v. via de layout.
+    '/krant',
     '/api/',
   ]
 
