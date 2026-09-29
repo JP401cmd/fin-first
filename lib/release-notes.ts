@@ -97,6 +97,29 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.23',
+    date: '2026-09-29',
+    title: 'De Krant met AI op de tijdlijn staat klaar',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De Krant met AI wordt een toelichting bij je tijdlijn',
+            description:
+              'De Krant met AI is gebouwd als korte toelichting bij de berichten in je tijdlijn. Hij staat nog uit; aan de Krant die je nu leest verandert niets.',
+          },
+          {
+            title: 'Eerdere edities van de Krant met AI zijn bewaard',
+            description:
+              'We hebben je eerdere edities overgezet naar de tijdlijn. Je ziet ze terug zodra de tijdlijn voor je openstaat.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.22',
     date: '2026-09-29',
     title: 'Beheer opent met een dashboard',
