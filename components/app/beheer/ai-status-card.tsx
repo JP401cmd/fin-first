@@ -4,9 +4,13 @@ import type { AiHealthSnapshot } from '@/lib/ai/ai-health-loader'
 
 /**
  * UR3-09 / ADR 0132 — de AI-storing van 24 aug–5 sep was twaalf dagen
- * onzichtbaar op /beheer. `AiHealthStrip` (hub, alleen bij `storing`/
- * `hapering`) en `AiStatusCard` (/beheer/ai, altijd) delen deze presentatie;
- * de data komt van `lib/ai/ai-health-loader.ts`.
+ * onzichtbaar op /beheer. `AiStatusCard` staat altijd bovenaan /beheer/ai; de
+ * data komt van `lib/ai/ai-health-loader.ts`.
+ *
+ * Op de startpagina van beheer stond tot het beheerdashboard een losse strip
+ * (`AiHealthStrip`). Die is vervallen: dezelfde stand staat daar nu in de
+ * aandachtslijst en de statustabel (lib/beheer/dashboard/signalen.ts en
+ * onderdelen.ts), naast de andere signalen en met dezelfde drempel.
  */
 
 const dateTimeFmt = new Intl.DateTimeFormat('nl-NL', {
@@ -26,11 +30,6 @@ function meervoud(n: number, enkel: string, meer: string): string {
   return `${n} ${n === 1 ? enkel : meer}`
 }
 
-/** Ook gebruikt door de hub-pagina om te bepalen of de strip moet renderen. */
-export function aiHealthNeedsAttention(status: AiHealthSnapshot['status']): boolean {
-  return status === 'storing' || status === 'hapering'
-}
-
 function describeStatus(health: AiHealthSnapshot): string {
   switch (health.status) {
     case 'storing':
@@ -47,31 +46,6 @@ function describeStatus(health: AiHealthSnapshot): string {
     default:
       return `Werkt — laatste geslaagde aanroep ${fmt(health.lastSuccessAt)}.`
   }
-}
-
-/** Compacte banner voor de /beheer-hub. Rendert NIETS bij `ok`/`idle`/`attention`. */
-export function AiHealthStrip({ health }: { health: AiHealthSnapshot }) {
-  if (!aiHealthNeedsAttention(health.status)) return null
-  const Icon = health.status === 'storing' ? AlertTriangle : Clock
-  return (
-    <div
-      role="status"
-      className="mb-6 flex items-start gap-2.5 rounded-[var(--r-lg)] border border-negative/30 bg-negative-bg px-4 py-3"
-    >
-      <Icon aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-negative" />
-      <div className="min-w-0 text-sm text-[var(--ink)]">
-        <p className="font-medium">{describeStatus(health)}</p>
-        <p className="mt-1 flex flex-wrap gap-x-3 text-xs">
-          <Link href="/beheer/ai" className="underline hover:text-[var(--ink-2)]">
-            AI-instellingen
-          </Link>
-          <Link href="/beheer/errors" className="underline hover:text-[var(--ink-2)]">
-            Foutmeldingen
-          </Link>
-        </p>
-      </div>
-    </div>
-  )
 }
 
 /** Volledige statuskaart bovenaan /beheer/ai — altijd zichtbaar, ook bij 'Werkt'. */

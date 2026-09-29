@@ -27,6 +27,12 @@ export interface ErrorLogRow {
   url: string | null
   stack: string | null
   created_at: string
+  /**
+   * Alleen aanwezig als de aanroeper de kolom meeleest (het beheerdashboard,
+   * voor het TELLEN van getroffen gebruikers). Wordt nooit doorgegeven aan een
+   * groep of aan de browser.
+   */
+  user_id?: string | null
 }
 
 /** Eén rij uit `error_log_resolutions` — de boekhouding "dit is afgehandeld". */

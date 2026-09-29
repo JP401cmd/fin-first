@@ -1292,3 +1292,16 @@
 ## 2026-09-29
 
 - Geen wijzigingen.
+
+## 2026-09-29
+
+- **Integraties** verwijderd: OpenRouter
+- **Componenten (aantal)** toegevoegd: +20
+
+## 2026-09-29
+
+- Geen wijzigingen.
+
+## 2026-09-29
+
+- Geen wijzigingen.

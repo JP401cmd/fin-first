@@ -97,6 +97,24 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.22',
+    date: '2026-09-29',
+    title: 'Beheer opent met een dashboard',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Beheer opent met een dashboard',
+            description:
+              'De beheerpagina laat zien wat aandacht vraagt, hoe elk onderdeel ervoor staat en wat er veranderd is. Voor gebruikers verandert er niets.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.21',
     date: '2026-09-29',
     title: 'De Krant als los product',

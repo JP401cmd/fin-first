@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { clientContext } from '@/lib/observability/client-context'
 import { shouldPersistErrorLog } from '@/lib/observability/runtime-environment'
 
 /**
@@ -38,7 +39,9 @@ export async function POST(req: Request) {
 
   await supabase.from('error_logs').insert({
     user_id: user.id,
-    context: body.context ? String(body.context).slice(0, 200) : null,
+    // Servercategorieën (`ai:`, `serverError:`, `onRequestError:`) zijn niet door
+    // de browser te claimen: ze sturen de AI-gezondheid en het beheerdashboard.
+    context: clientContext(body.context),
     message,
     stack: body.stack ? String(body.stack).slice(0, 8000) : null,
     url: body.url ? String(body.url).slice(0, 500) : null,

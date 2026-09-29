@@ -8,6 +8,10 @@ import {
   USER_REPORT_COLUMNS,
   type UserReportRow,
 } from '@/lib/user-reports/notion'
+import {
+  USER_REPORT_NIET_GESYNCT,
+  USER_REPORT_SYNC_MAX_ATTEMPTS,
+} from '@/lib/user-reports/sync-grens'
 
 // Node-runtime: we lezen de service-role-key en het Notion-token server-side.
 export const runtime = 'nodejs'
@@ -15,8 +19,9 @@ export const runtime = 'nodejs'
 /** Max. aantal rijen per run — houdt de cron ruim binnen zijn tijdvenster. */
 const BATCH_SIZE = 50
 
-/** Na 5 pogingen stoppen we: dan is het structureel (property-drift, token). */
-const MAX_ATTEMPTS = 5
+// De pogingengrens woont in lib/user-reports/sync-grens.ts: het beheerdashboard
+// telt met dezelfde grens hoeveel meldingen zijn blijven liggen.
+const MAX_ATTEMPTS = USER_REPORT_SYNC_MAX_ATTEMPTS
 
 /**
  * GET /api/cron/user-reports-notion-sync — herstelt gemiste Notion-pushes.
@@ -67,7 +72,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from('user_reports')
     .select(USER_REPORT_COLUMNS)
-    .in('notion_sync_status', ['pending', 'error'])
+    .in('notion_sync_status', [...USER_REPORT_NIET_GESYNCT])
     .lt('notion_sync_attempts', MAX_ATTEMPTS)
     .order('created_at', { ascending: true })
     .limit(BATCH_SIZE)

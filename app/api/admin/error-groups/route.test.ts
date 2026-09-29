@@ -43,12 +43,17 @@ function makeClient() {
       if (table === 'error_logs') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const b: any = {
-          // De head-count-variant (`select('id', { head: true })`) levert direct
-          // een promise; het leesvenster ketent door naar .order().limit().
+          // De head-count-variant (`select('id', { head: true })`) eindigt op de
+          // bovenkant van het venster (`.lte`); het leesvenster ketent door naar
+          // .lte().order().limit().
           select: (_cols: string, opts?: { head?: boolean }) =>
             opts?.head
-              ? Promise.resolve({ data: null, error: null, count: totalRowCount ?? logRows.length })
+              ? {
+                  lte: () =>
+                    Promise.resolve({ data: null, error: null, count: totalRowCount ?? logRows.length }),
+                }
               : b,
+          lte: () => b,
           order: () => b,
           limit: () => Promise.resolve({ data: logRows, error: null }),
         }

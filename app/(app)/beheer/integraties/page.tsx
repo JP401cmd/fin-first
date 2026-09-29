@@ -1,8 +1,12 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import archData from '@/docs/architecture/architecture.json'
+import { isSuperAdmin } from '@/lib/admin'
 import { selectIntegrations } from '@/lib/architecture/facts'
 import { buildIntegrationsModel } from '@/lib/architecture/integrations-model'
+import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
+import { KOPPELING_TABELLEN, loadKoppelingTellingen } from '@/lib/beheer/koppelingen-tellingen'
 import { IntegratiesShell } from './integraties-shell'
 
 export const metadata: Metadata = { title: 'Integraties — Beheer' }
@@ -10,72 +14,27 @@ export const dynamic = 'force-dynamic'
 
 type TableCounts = Record<string, { total: number; withError: number } | null>
 
-// Tabellen waarvoor we platform-brede telemetrie tonen. Operator-telemetrie op
-// een al-superadmin-gated pagina: alleen COUNT (head: true), nooit rij-payloads.
-const COUNT_TABLES = [
-  'exchange_connections',
-  'broker_connections',
-  'wallet_addresses',
-  'bank_connections',
-] as const
-
-// Niet alle telemetrie-tabellen hebben een last_sync_error-kolom.
-// Verificatie via migraties (supabase/migrations/):
-//   exchange_connections  → 20260501000001: heeft last_sync_error ✓
-//   wallet_addresses      → 20260501000001: heeft last_sync_error ✓
-//   broker_connections    → 20260616010000: heeft last_sync_error ✓
-//   bank_connections      → enkel ALTER TABLE in 20260408000001, geen last_sync_error ✗
-//
-// Voor tabellen zonder de kolom slaan we de error-count-query over (withError = 0).
-const TABLES_WITH_SYNC_ERROR_COL = new Set([
-  'exchange_connections',
-  'broker_connections',
-  'wallet_addresses',
-])
-
+// De tellingen zelf (welke tabellen, welke een sync-fout-kolom hebben) wonen in
+// lib/beheer/koppelingen-tellingen.ts, gedeeld met het beheerdashboard.
 async function loadTableCounts(): Promise<TableCounts> {
-  const result: TableCounts = {}
-  let supabase: ReturnType<typeof getServiceClient>
   try {
-    supabase = getServiceClient()
+    return await loadKoppelingTellingen(getServiceClient())
   } catch {
     // service-role read mislukt (bv. ontbrekende env-var bij build) → alles null
-    for (const table of COUNT_TABLES) result[table] = null
+    const result: TableCounts = {}
+    for (const table of KOPPELING_TABELLEN) result[table] = null
     return result
   }
-
-  await Promise.all(
-    COUNT_TABLES.map(async (table) => {
-      try {
-        const hasErrorCol = TABLES_WITH_SYNC_ERROR_COL.has(table)
-        const [totalRes, errorRes] = await Promise.all([
-          supabase.from(table).select('*', { count: 'exact', head: true }),
-          // Alleen queriën als de kolom bestaat — anders geeft Supabase een 400
-          hasErrorCol
-            ? supabase
-                .from(table)
-                .select('*', { count: 'exact', head: true })
-                .not('last_sync_error', 'is', null)
-            : Promise.resolve({ count: 0, error: null }),
-        ])
-        if (totalRes.error) {
-          result[table] = null
-          return
-        }
-        result[table] = {
-          total: totalRes.count ?? 0,
-          withError: errorRes.error ? 0 : errorRes.count ?? 0,
-        }
-      } catch {
-        result[table] = null
-      }
-    }),
-  )
-
-  return result
 }
 
 export default async function BeheerIntegratiesPage() {
+  // Dit scherm leest via de service-role (platformbrede tellingen en de laatste
+  // bereikbaarheidsmeting). De layout weert niet-beheerders al, maar een
+  // pagina die de service-role gebruikt, controleert de rol zelf (ADR 0006,
+  // zelfde patroon als /beheer/jobs): de layout hoort niet het enige slot te zijn.
+  const supabase = await createClient()
+  if (!(await isSuperAdmin(supabase))) redirect('/overzicht')
+
   const facts = selectIntegrations(archData)
   const model = buildIntegrationsModel(facts)
 

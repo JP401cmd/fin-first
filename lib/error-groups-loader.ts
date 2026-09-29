@@ -5,6 +5,7 @@ import {
   type ErrorLogRow,
   type ErrorResolutionRow,
 } from './error-groups'
+import { leesvensterTotEnMet } from './observability/leesvenster'
 
 /**
  * Leesvenster + groepering van `error_logs` × `error_log_resolutions` (ADR 0113).
@@ -43,12 +44,24 @@ export const ERROR_GROUPS_MAX_ROWS = 1000
 export const ERROR_LOG_COLUMNS = 'id, context, message, level, url, stack, created_at'
 /** Telling + laatst-gezien volstaan voor afvinken en tellen — `stack` is tot 8 kB/rij. */
 export const ERROR_LOG_COLUMNS_LEAN = 'id, context, message, level, url, created_at'
+/**
+ * Lean plus `user_id`, voor het beheerdashboard: dat telt per foutsoort hoeveel
+ * verschillende gebruikers geraakt zijn. De id's blijven server-side; naar het
+ * scherm gaat alleen het aantal.
+ */
+export const ERROR_LOG_COLUMNS_IMPACT = 'id, context, message, level, url, created_at, user_id'
 const RESOLUTION_COLUMNS = 'signature, resolved_at, resolved_by, note, resolved_count, last_seen_at'
 
 export interface ErrorGroupsWindow {
   groups: ErrorGroup[]
   /** Er staan méér rijen in de tabel dan het venster bevat. */
   truncated: boolean
+  /**
+   * De gelezen rijen zelf, nieuwste eerst. Voor afleidingen die een groep niet
+   * draagt (voorvallen per dag, getroffen gebruikers). NIET naar de browser
+   * sturen: de rijen dragen vrije tekst en, met de impact-kolomset, gebruikers-id's.
+   */
+  rows: ErrorLogRow[]
 }
 
 /**
@@ -57,19 +70,28 @@ export interface ErrorGroupsWindow {
  * `truncated` komt uit een APARTE head-count, niet uit `rows.length >= MAX_ROWS`:
  * die vergelijking kan de PostgREST-cap niet overschrijden en zou dus nooit
  * kunnen zeggen dat er meer ís.
+ *
+ * Het venster heeft een BOVENKANT (nu plus een klokmarge): een ingelogde
+ * gebruiker mag zelf in `error_logs` schrijven en kiest dan ook `created_at`.
+ * Rijen met een datum in de toekomst zouden anders voor altijd bovenaan staan
+ * en de echte regels uit het venster drukken (zie `leesvenster.ts`). De telling
+ * krijgt dezelfde bovenkant, zodat `truncated` over hetzelfde venster gaat.
  */
 export async function loadErrorGroups(
   supabase: SupabaseClient,
   columns: string = ERROR_LOG_COLUMNS,
+  nu: Date = new Date(),
 ): Promise<ErrorGroupsWindow | { error: unknown }> {
+  const totEnMet = leesvensterTotEnMet(nu)
   const [logs, resolutions, total] = await Promise.all([
     supabase
       .from('error_logs')
       .select(columns)
+      .lte('created_at', totEnMet)
       .order('created_at', { ascending: false })
       .limit(ERROR_GROUPS_MAX_ROWS),
     supabase.from('error_log_resolutions').select(RESOLUTION_COLUMNS),
-    supabase.from('error_logs').select('id', { count: 'exact', head: true }),
+    supabase.from('error_logs').select('id', { count: 'exact', head: true }).lte('created_at', totEnMet),
   ])
 
   if (logs.error) return { error: logs.error }
@@ -79,5 +101,6 @@ export async function loadErrorGroups(
   return {
     groups: buildErrorGroups(rows, (resolutions.data ?? []) as ErrorResolutionRow[]),
     truncated: (total.count ?? rows.length) > rows.length,
+    rows,
   }
 }

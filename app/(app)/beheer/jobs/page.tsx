@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { isPushConfigured } from '@/lib/alerts/push'
-import { JOB_CATALOG, JOB_LIST } from '@/lib/job-catalog'
+import { JOB_CATALOG } from '@/lib/job-catalog'
 import type { JobStatus } from '@/lib/job-runs'
 import { PRIJZEN_BRON, PRIJZEN_PEILDATUM } from '@/lib/ai/token-prices'
 import { loadRunTokens, type RunTokens } from '@/lib/beheer/run-tokens'
@@ -13,84 +13,30 @@ import {
   JOB_HEALTH_META,
   JOB_HEALTH_ORDER,
   cronScheduleFor,
-  deriveJobHealth,
   detectScheduleDrift,
   pageStaleAfterHours,
   summarizeJobHealth,
   type JobHealth,
 } from '@/lib/job-health'
+import {
+  JOB_RUN_KOLOMMEN,
+  loadJobStanden,
+  verliesRegels,
+  type JobRunRij,
+} from '@/lib/job-health-loader'
+import { taakAnker } from '@/lib/beheer/dashboard/doorklik'
 
 export const dynamic = 'force-dynamic'
 
-interface JobRun {
-  id: string
-  job: string
-  /** `partial` = de taak liep, maar een stap verloor zijn resultaat (sinds 25 sep 2026). */
-  status: JobStatus
-  started_at: string
-  finished_at: string
-  duration_ms: number | null
-  summary: unknown
-  error: string | null
-  created_at: string
-}
+type JobRun = JobRunRij
 
 // Catalogus = single source in lib/job-catalog.ts (gedeeld met de cron-melding
 // en de stilte-drempel van de meldingen-sweep); het échte schema komt uit
-// vercel.json via lib/job-health.ts. Hier alleen de weergave.
+// vercel.json via lib/job-health.ts. De leesactie per taak woont in
+// lib/job-health-loader.ts, gedeeld met het beheerdashboard. Hier alleen de
+// weergave.
 
-type Db = Awaited<ReturnType<typeof createClient>>
-
-const RUN_COLUMNS =
-  'id, job, status, started_at, finished_at, duration_ms, summary, error, created_at'
-
-/**
- * "Geen rij" en "kon niet lezen" zijn twee verschillende uitkomsten. Wie de
- * `error` van een query weggooit, laat een leesfout renderen als "nog niet
- * uitgevoerd" — precies de valse geruststelling die deze pagina moet wegnemen.
- */
-type ReadResult<T> = { ok: true; value: T } | { ok: false }
-
-/**
- * Laatste run van één taak.
- *
- * Bewust een gerichte query per taak i.p.v. één venster van N recente rijen:
- * met negen taken en veel historie viel de laatste run van een zeldzame taak
- * (maandsnapshots, 1×/maand) buiten dat venster, waarna de pagina ten onrechte
- * "Nog niet uitgevoerd" toonde. Spiegelt `loadLastSuccessByJob` in
- * lib/alerts/store.ts, dat om dezelfde reden zo werkt.
- */
-async function lastRunFor(supabase: Db, job: string): Promise<ReadResult<JobRun | null>> {
-  const { data, error } = await supabase
-    .from('job_runs')
-    .select(RUN_COLUMNS)
-    .eq('job', job)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) return { ok: false }
-  return { ok: true, value: (data as JobRun | null) ?? null }
-}
-
-/**
- * Alleen het tijdstip van de laatste run die NIET hard faalde — meer heeft het
- * actualiteitsoordeel niet nodig. `'partial'` telt hier mee, net als in
- * `loadLastSuccessByJob` (lib/alerts/store.ts): die run liep, hij leverde
- * alleen niet alles. Resultaatverlies is een ándere vraag en heeft op deze
- * pagina zijn eigen band en badge.
- */
-async function lastSuccessAtFor(supabase: Db, job: string): Promise<ReadResult<string | null>> {
-  const { data, error } = await supabase
-    .from('job_runs')
-    .select('created_at')
-    .eq('job', job)
-    .in('status', ['success', 'partial'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) return { ok: false }
-  return { ok: true, value: (data as { created_at: string } | null)?.created_at ?? null }
-}
+const RUN_COLUMNS = JOB_RUN_KOLOMMEN
 
 const dateTimeFmt = new Intl.DateTimeFormat('nl-NL', {
   day: 'numeric',
@@ -166,17 +112,10 @@ function primitiveEntries(summary: unknown): [string, string][] {
   return out
 }
 
-/**
- * De verlies-regels uit een summary van een `partial`-run: welke stap verloor
- * wat. `primitiveEntries` laat arrays bewust weg, dus deze lijst heeft zijn
- * eigen weergave — anders zou de reden alleen in de dichtgeklapte JSON staan,
- * en dan is 'partial' net zo onzichtbaar als het defect dat hij moet melden.
- */
-function verliesRegels(summary: unknown): string[] {
-  if (!summary || typeof summary !== 'object') return []
-  const rauw = (summary as { verlies?: unknown }).verlies
-  return Array.isArray(rauw) ? rauw.filter((r): r is string => typeof r === 'string') : []
-}
+// De verlies-regels van een `partial`-run (`verliesRegels`) komen uit
+// lib/job-health-loader.ts: `primitiveEntries` laat arrays bewust weg, dus die
+// lijst heeft zijn eigen weergave — anders zou de reden alleen in de
+// dichtgeklapte JSON staan.
 
 // Stoplichtsemantiek — bewust géén module-accenten: dit is status, geen identiteit.
 const TONE_CLASSES: Record<
@@ -258,37 +197,7 @@ export default async function BeheerJobsPage() {
 
   const [recentRes, jobRows] = await Promise.all([
     supabase.from('job_runs').select(RUN_COLUMNS).order('created_at', { ascending: false }).limit(15),
-    Promise.all(
-      JOB_LIST.map(async (job) => {
-        const lastRes = await lastRunFor(supabase, job.key)
-        const last = lastRes.ok ? lastRes.value : null
-
-        // Laatste run én laatste GESLAAGDE run zijn twee dingen: het
-        // achterstallig-signaal hangt op de tweede. De tweede query vuurt alleen
-        // als hij iets kan toevoegen — niet bij een geslaagde laatste run (zelfde
-        // rij), niet zonder runs (gegarandeerd leeg) en niet bij een taak die we
-        // toch niet bewaken (uitkomst wordt genegeerd).
-        // 'partial' telt als "draaide" (zie lastSuccessAtFor): alleen een harde
-        // fout zet de actualiteitsklok door naar een eerdere run.
-        let lastSuccessAt = last && last.status !== 'error' ? last.created_at : null
-        let readFailed = !lastRes.ok
-        if (last && last.status === 'error' && job.maxAgeHours != null) {
-          const successRes = await lastSuccessAtFor(supabase, job.key)
-          if (successRes.ok) lastSuccessAt = successRes.value
-          else readFailed = true
-        }
-
-        const health: JobHealth = readFailed
-          ? 'unknown'
-          : deriveJobHealth({
-              maxAgeHours: job.maxAgeHours,
-              lastRunAt: last?.created_at ?? null,
-              lastSuccessAt,
-              now,
-            })
-        return { job, last, lastSuccessAt, health }
-      }),
-    ),
+    loadJobStanden(supabase, now),
   ])
 
   const recentFailed = Boolean(recentRes.error)
@@ -483,7 +392,13 @@ export default async function BeheerJobsPage() {
           const entries = last ? primitiveEntries(last.summary) : []
           const cron = cronScheduleFor(job.path)
           return (
-            <section key={job.key} className="border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+            <section
+              key={job.key}
+              // Anker voor de doorklik vanaf het beheerdashboard; de marge houdt
+              // de kaart onder de vaste kop vandaan.
+              id={taakAnker(job.key)}
+              className="scroll-mt-24 border border-[var(--border-ed)] bg-[var(--paper)] p-4 target:border-[var(--ink-3)]"
+            >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
