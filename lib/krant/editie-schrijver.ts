@@ -62,16 +62,31 @@ export interface GeschrevenEditie {
   items: number
 }
 
+/** Draagt dit bericht iets van de AI-laag (een toelichting, of door het model gekozen)? */
+function heeftAi(item: SchrijfItem): boolean {
+  return item.aiTekst != null || item.aiToegevoegd === true
+}
+
 /**
  * De rij-vorm van één item, zoals hij in krant_editie_items landt. `tijdlijn`
  * is de gedenormaliseerde bron van de editie: hij draagt de partiële unieke
  * index lezer + artikel (migratie 20261004120000) — een artikel staat
  * hoogstens één keer in iemands tijdlijn.
  */
-export function itemNaarRij(item: SchrijfItem, editieId: string, userId: string, positie: number, tijdlijn = false) {
-  // De AI-kolommen alleen noemen als er iets AI's is: een matcherbericht zonder
-  // laag schrijft dan exact dezelfde rij als vóór 1E (ook vóór de migratie).
-  const ai = item.aiTekst != null || item.aiToegevoegd === true ? { ai_tekst: item.aiTekst ?? null, ai_toegevoegd: item.aiToegevoegd === true } : {}
+export function itemNaarRij(
+  item: SchrijfItem,
+  editieId: string,
+  userId: string,
+  positie: number,
+  tijdlijn = false,
+  aiKolommen = heeftAi(item),
+) {
+  // De AI-kolommen alleen noemen als er iets AI's is: een verversing zonder
+  // laag schrijft dan exact dezelfde rij als vóór 1E. Die keuze valt per
+  // INSERT, niet per rij (`aiKolommen`, zie schrijfEditie): PostgREST neemt de
+  // vereniging van de sleutels als kolomlijst en vult een ontbrekende sleutel
+  // met NULL — op ai_toegevoegd (NOT NULL) is dat 23502 (live-run 29-09).
+  const ai = aiKolommen ? { ai_tekst: item.aiTekst ?? null, ai_toegevoegd: item.aiToegevoegd === true } : {}
   return {
     ...ai,
     editie_id: editieId,
@@ -129,7 +144,10 @@ export async function schrijfEditie(service: SupabaseClient, invoer: SchrijfEdit
 
   if (uitkomst.items.length === 0) return { id: editieId, items: 0 }
 
-  const rijen = uitkomst.items.map((item, i) => itemNaarRij(item, editieId, userId, i, bron === 'tijdlijn'))
+  // Eén insert, één kolomlijst: draagt één bericht iets van de AI-laag, dan
+  // noemt élke rij beide AI-kolommen.
+  const aiKolommen = uitkomst.items.some(heeftAi)
+  const rijen = uitkomst.items.map((item, i) => itemNaarRij(item, editieId, userId, i, bron === 'tijdlijn', aiKolommen))
   const { error: itemsFout } = await service.from('krant_editie_items').insert(rijen)
   if (itemsFout) {
     // Compensatie: geen editie zonder haar regels. Faalt ook die, dan staat er
