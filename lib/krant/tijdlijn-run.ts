@@ -48,6 +48,14 @@ export interface VerversInvoer {
   now: Date
   aowRows: AowLeeftijdRow[]
   kandidaten: readonly KandidaatArtikel[]
+  /**
+   * Alleen de cron: vlak vóór het schrijven opnieuw toetsen of de lezer
+   * intussen de AI-Krant koos of bezwaar maakte (security G1, 29-09). De
+   * cron kiest zijn lezers vooraf en loopt tot vier minuten; zonder deze
+   * hertoets kwam er ná het wissen alsnog een verversing bij. De knop laat
+   * hem uit: een bezwaar geldt voor de achtergrond, niet voor het eigen verzoek.
+   */
+  hertoetsVoorSchrijven?: boolean
 }
 
 export interface VerversUitkomst {
@@ -56,6 +64,8 @@ export interface VerversUitkomst {
   leeg: boolean
   /** Aantal nieuwe berichten in deze verversing. */
   items: number
+  /** true: niets geschreven, de lezer koos intussen de AI-Krant of maakte bezwaar. */
+  overgeslagen?: boolean
 }
 
 /** Portiegrootte voor de "al in de tijdlijn?"-vraag: ruim onder PostgREST max_rows en de URL-lengte. */
@@ -107,8 +117,27 @@ export async function ververs(service: SupabaseClient, invoer: VerversInvoer): P
   })
 
   const actueel = await alleenNogGeduid(service, uitkomst)
+  if (invoer.hertoetsVoorSchrijven && !(await nogTijdlijnlezer(service, userId))) {
+    return { editieId: '', profielType: actueel.profielType, leeg: true, items: 0, overgeslagen: true }
+  }
   const geschreven = await schrijfEditie(service, { userId, weekKey: amsterdamWeekKey(now), bron: 'tijdlijn', profiel, uitkomst: actueel, now })
   return { editieId: geschreven.id, profielType: actueel.profielType, leeg: actueel.leeg, items: geschreven.items }
+}
+
+/**
+ * Is deze lezer nog steeds iemand voor de automatische verversing? Nee als hij
+ * intussen de AI-Krant koos (krant_variant 'ai') of bezwaar maakte
+ * (profiles.krant_schaduw_bezwaar_at). Twee meta-lezingen; een leesfout gooit
+ * (de cron telt de lezer dan als fout, er wordt niets geschreven).
+ */
+export async function nogTijdlijnlezer(service: SupabaseClient, userId: string): Promise<boolean> {
+  const [np, pr] = await Promise.all([
+    service.from('nieuwsprofiel').select('krant_variant').eq('user_id', userId).maybeSingle(),
+    service.from('profiles').select('krant_schaduw_bezwaar_at').eq('id', userId).maybeSingle(),
+  ])
+  if (np.error) throw new Error(`[krant/tijdlijn-run] variant hertoetsen mislukt: ${np.error.message}`)
+  if (pr.error) throw new Error(`[krant/tijdlijn-run] bezwaar hertoetsen mislukt: ${pr.error.message}`)
+  return np.data?.krant_variant !== 'ai' && pr.data?.krant_schaduw_bezwaar_at == null
 }
 
 /**
@@ -165,5 +194,19 @@ export async function ruimTijdlijnOp(service: SupabaseClient, userId: string, no
 export async function wisTijdlijn(service: SupabaseClient, userId: string): Promise<number> {
   const { count, error } = await service.from('krant_edities').delete({ count: 'exact' }).eq('user_id', userId).eq('bron', 'tijdlijn')
   if (error) throw new Error(`[krant/tijdlijn-run] wissen mislukt: ${error.message}`)
+  return count ?? 0
+}
+
+/**
+ * De 120 dagen voor IEDEREEN, niet alleen voor wie deze run ververst wordt:
+ * een lezer met bezwaar, een AI-lezer of iemand zonder module nieuws slaat de
+ * cron over, maar zijn oude verversingen moeten toch weg (de belofte in
+ * /privacy sectie 6 is een bewaartermijn, geen bijwerking van verversen).
+ * Alleen meta-filters (bron + created_at); items cascaden mee.
+ */
+export async function ruimAlleTijdlijnenOp(service: SupabaseClient, now: Date): Promise<number> {
+  const grens = new Date(now.getTime() - TIJDLIJN_BEWAAR_DAGEN * DAG_MS).toISOString()
+  const { count, error } = await service.from('krant_edities').delete({ count: 'exact' }).eq('bron', 'tijdlijn').lt('created_at', grens)
+  if (error) throw new Error(`[krant/tijdlijn-run] opruimen (alle lezers) mislukt: ${error.message}`)
   return count ?? 0
 }

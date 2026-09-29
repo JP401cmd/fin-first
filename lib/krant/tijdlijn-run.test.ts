@@ -17,7 +17,7 @@ import { afleidNieuwsprofiel } from './profiel-afleiding'
 import { AOW_RIJEN, ARTIKELEN, NU, PROFIEL_TESSA } from './editie.fixture'
 import { EDITIE_MAX } from './matcher'
 import { maakNepClient } from './nep-client.fixture'
-import { GEZIEN_PORTIE, TIJDLIJN_BEWAAR_DAGEN, ruimTijdlijnOp, tijdlijnArtikelIds, ververs, wisTijdlijn } from './tijdlijn-run'
+import { GEZIEN_PORTIE, TIJDLIJN_BEWAAR_DAGEN, nogTijdlijnlezer, ruimAlleTijdlijnenOp, ruimTijdlijnOp, tijdlijnArtikelIds, ververs, wisTijdlijn } from './tijdlijn-run'
 
 const UID = 'user-a'
 const afleidMock = vi.mocked(afleidNieuwsprofiel)
@@ -125,6 +125,21 @@ describe('tijdlijn-run (Krant 1C, B31)', () => {
     expect(nep.rijen('krant_edities').map((e) => e.id).sort()).toEqual(['p-oud', 's-oud', 't-vers'])
   })
 
+  it('ruimAlleTijdlijnenOp: de 120 dagen voor iedereen (ook wie de cron overslaat); vers en schaduw blijven', async () => {
+    const oud = new Date(NU.getTime() - (TIJDLIJN_BEWAAR_DAGEN + 1) * 86_400_000).toISOString()
+    const vers = new Date(NU.getTime() - (TIJDLIJN_BEWAAR_DAGEN - 1) * 86_400_000).toISOString()
+    const nep = maakNepClient({
+      krant_edities: [
+        { id: 't-oud', user_id: UID, bron: 'tijdlijn', created_at: oud },
+        { id: 'p-oud', user_id: 'bezwaarmaker', bron: 'tijdlijn', created_at: oud },
+        { id: 't-vers', user_id: UID, bron: 'tijdlijn', created_at: vers },
+        { id: 's-oud', user_id: UID, bron: 'schaduw', created_at: oud },
+      ],
+    })
+    expect(await ruimAlleTijdlijnenOp(nep.client as never, NU)).toBe(2)
+    expect(nep.rijen('krant_edities').map((e) => e.id).sort()).toEqual(['s-oud', 't-vers'])
+  })
+
   it('wisTijdlijn (de bèta uit): de hele eigen tijdlijn weg, schaduw en partner blijven', async () => {
     const nep = maakNepClient({
       krant_edities: [
@@ -142,5 +157,82 @@ describe('tijdlijn-run (Krant 1C, B31)', () => {
     const m = readSourceLF('lib/news-ingest.ts').match(/export const ARTICLE_RETENTION_DAYS = (\d+)/)
     expect(m, 'ARTICLE_RETENTION_DAYS niet gevonden in lib/news-ingest.ts').not.toBeNull()
     expect(TIJDLIJN_BEWAAR_DAGEN).toBe(Number(m![1]))
+  })
+
+  describe('nogTijdlijnlezer (security G1, 29-09): is deze lezer nog een lezer van de automatische verversing?', () => {
+    it('true: geen "ai"-keuze, geen bezwaar', async () => {
+      const nep = maakNepClient({
+        nieuwsprofiel: [{ user_id: UID, krant_variant: 'tijdlijn' }],
+        profiles: [{ id: UID, krant_schaduw_bezwaar_at: null }],
+      })
+      expect(await nogTijdlijnlezer(nep.client as never, UID)).toBe(true)
+    })
+
+    it('false: intussen bewust de AI-Krant gekozen (krant_variant "ai")', async () => {
+      const nep = maakNepClient({
+        nieuwsprofiel: [{ user_id: UID, krant_variant: 'ai' }],
+        profiles: [{ id: UID, krant_schaduw_bezwaar_at: null }],
+      })
+      expect(await nogTijdlijnlezer(nep.client as never, UID)).toBe(false)
+    })
+
+    it('false: bezwaar tegen verwerking op de achtergrond', async () => {
+      const nep = maakNepClient({
+        nieuwsprofiel: [{ user_id: UID, krant_variant: 'tijdlijn' }],
+        profiles: [{ id: UID, krant_schaduw_bezwaar_at: '2026-09-29T08:00:00Z' }],
+      })
+      expect(await nogTijdlijnlezer(nep.client as never, UID)).toBe(false)
+    })
+
+    it('true bij een ontbrekende rij (nieuwe lezer, geen keuze en geen bezwaar bekend)', async () => {
+      const nep = maakNepClient({ nieuwsprofiel: [], profiles: [] })
+      expect(await nogTijdlijnlezer(nep.client as never, UID)).toBe(true)
+    })
+
+    it('een leesfout op nieuwsprofiel of profiles gooit (fail-loud — de cron telt de lezer dan als fout)', async () => {
+      const nepNp = maakNepClient({ nieuwsprofiel: [], profiles: [] }, { fouten: { 'nieuwsprofiel:select': 'kapot' } })
+      await expect(nogTijdlijnlezer(nepNp.client as never, UID)).rejects.toThrow(/variant hertoetsen mislukt/)
+      const nepPr = maakNepClient({ nieuwsprofiel: [], profiles: [] }, { fouten: { 'profiles:select': 'kapot' } })
+      await expect(nogTijdlijnlezer(nepPr.client as never, UID)).rejects.toThrow(/bezwaar hertoetsen mislukt/)
+    })
+  })
+
+  describe('ververs met hertoetsVoorSchrijven (de cron; security G1)', () => {
+    it('nogTijdlijnlezer=false vlak vóór het schrijven: niets geschreven, overgeslagen=true', async () => {
+      const nep = maakNepClient({
+        news_articles: artikelRijen(),
+        nieuwsprofiel: [{ user_id: UID, krant_variant: 'ai' }], // intussen de AI-Krant gekozen
+        profiles: [{ id: UID, krant_schaduw_bezwaar_at: null }],
+      })
+      const uit = await ververs(nep.client as never, { ...invoer(), hertoetsVoorSchrijven: true })
+      expect(uit).toEqual({ editieId: '', profielType: expect.any(String), leeg: true, items: 0, overgeslagen: true })
+      expect(nep.rijen('krant_edities')).toHaveLength(0)
+      expect(nep.rijen('krant_editie_items')).toHaveLength(0)
+    })
+
+    it('nogTijdlijnlezer=true: schrijft gewoon, geen overgeslagen-vlag', async () => {
+      const nep = maakNepClient({
+        news_articles: artikelRijen(),
+        nieuwsprofiel: [{ user_id: UID, krant_variant: 'tijdlijn' }],
+        profiles: [{ id: UID, krant_schaduw_bezwaar_at: null }],
+      })
+      const uit = await ververs(nep.client as never, { ...invoer(), hertoetsVoorSchrijven: true })
+      expect(uit.overgeslagen).toBeUndefined()
+      expect(nep.rijen('krant_edities')).toHaveLength(1)
+    })
+
+    it('zonder hertoetsVoorSchrijven (de knop): geen hertoets, schrijft altijd — ook al zouden nieuwsprofiel/profiles "ai"/bezwaar bevatten', async () => {
+      const nep = maakNepClient({
+        news_articles: artikelRijen(),
+        nieuwsprofiel: [{ user_id: UID, krant_variant: 'ai' }],
+        profiles: [{ id: UID, krant_schaduw_bezwaar_at: '2026-09-29T08:00:00Z' }],
+      })
+      const uit = await ververs(nep.client as never, invoer())
+      expect(uit.overgeslagen).toBeUndefined()
+      expect(nep.rijen('krant_edities')).toHaveLength(1)
+      // De hertoets is nooit geraadpleegd: geen enkele query op nieuwsprofiel/profiles.
+      expect(nep.queriesOp('nieuwsprofiel')).toHaveLength(0)
+      expect(nep.queriesOp('profiles')).toHaveLength(0)
+    })
   })
 })

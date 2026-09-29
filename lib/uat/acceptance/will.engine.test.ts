@@ -9,7 +9,7 @@
  *
  * WILL is — net als SCHULD/TOEK — NIET aaneengesloten op WF-nummer: WF-WILL-21/22
  * hebben geen eigen UAT-WILL-scenario (→ gedekt door UAT-OVZ-19/20/21) en
- * ontbreken dus terecht in de catalogus voor zone WILL. De 29 criteria hier
+ * ontbreken dus terecht in de catalogus voor zone WILL. De 36 criteria hier
  * zijn wél 1-op-1 met de catalogus-scenario's UAT-WILL-01..20 + UAT-WILL-23
  * (lokaal actievoorstel, backlog #886 C2c) + UAT-WILL-24 (melding maken vanuit
  * de chat, release 8 aug 2026) + UAT-WILL-25 (chat blokkeert vóóraf bij AI
@@ -17,7 +17,9 @@
  * gidsstap, ADR 0130 fase 2) + UAT-WILL-27 t/m 31 (gespreksgeschiedenis voor
  * de Fin-chat, ADR 0137 / melding W-004: bewaren+hervatten, nieuw gesprek,
  * opslagkeuze, de privacyvloer en de suggestievragen in de lege staat) +
- * UAT-WILL-32 (een vragenlijst invullen in de chat, sep 2026).
+ * UAT-WILL-32 (een vragenlijst invullen in de chat, sep 2026) + UAT-WILL-33
+ * t/m 39 (Krant 1C fase 2 — B40, ADR 0183: bronkeuze, de tijdlijn-rem,
+ * archief/cursor, katerndrempel, bezwaar, AI-keuze wist de tijdlijn, nieuwsstip).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -76,7 +78,7 @@ describe('UAT Fin — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = WILL_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(15)
+    expect(exactWorkflows.length).toBe(19)
   })
 
   it('markeert de AI-gegenereerde/proces-workflows als ui-only (niet-deterministisch)', () => {

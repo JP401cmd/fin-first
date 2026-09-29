@@ -140,14 +140,17 @@ create index if not exists idx_krant_editie_items_tijdlijn_lezer
 
 alter table public.nieuwsprofiel
   add column if not exists krant_variant text,
-  add column if not exists tijdlijn_gelezen_tot timestamptz;
+  add column if not exists tijdlijn_gelezen_tot timestamptz,
+  add column if not exists tijdlijn_vernieuwd_at timestamptz;
 
 alter table public.nieuwsprofiel drop constraint if exists nieuwsprofiel_krant_variant_check;
 alter table public.nieuwsprofiel
   add constraint nieuwsprofiel_krant_variant_check check (krant_variant is null or krant_variant in ('ai', 'tijdlijn'));
 
 comment on column public.nieuwsprofiel.krant_variant is
-  'Welke Krant de lezer leest: ''ai'' | ''tijdlijn'' | NULL = de standaard (tot de K1-poort de AI-Krant). Alleen service-role schrijft (bèta-poort, B38).';
+  'Welke Krant de lezer leest: ''ai'' (bewust de AI-Krant, alleen met AI aan + AI-abonnement) | ''tijdlijn'' | NULL = de standaard: de tijdlijn zonder AI (B40, zolang TIJDLIJN_BETA_OPEN dicht staat alleen voor de superadmin). Alleen service-role schrijft.';
+comment on column public.nieuwsprofiel.tijdlijn_vernieuwd_at is
+  'Fase 2: de ATOMAIRE rem van de vernieuwknop (hoogstens één per 10 minuten). lib/krant/tijdlijn-vernieuwen.ts claimt met update … where (null or < now() - 10 min) returning; van gelijktijdige verzoeken wint er één (eindreview Y3 / security Y1, 29-09). Service-role only (niet in de sessiegrant); wisTijdlijn raakt hem niet, dus wisselen van variant reset de rem niet.';
 comment on column public.nieuwsprofiel.tijdlijn_gelezen_tot is
   'Tot wanneer de lezer de tijdlijn heeft gezien ("nieuw sinds je laatste bezoek", nieuwsstip). Eigen-rij-voorkeur: sessie-schrijfbaar.';
 alter table public.nieuwsprofiel drop constraint if exists nieuwsprofiel_herkomst_grootte_check;
@@ -179,3 +182,36 @@ grant update (
   beleggingen_vorm, schulden, pensioen_werkgever, pensioen_lijfrente, rubrieken,
   herkomst, tijdlijn_gelezen_tot, updated_at
 ) on table public.nieuwsprofiel to authenticated;
+
+-- ── krant_geduide_artikelen: actuele duiding voor de leesloader (fase 2) ─────
+-- De tijdlijn-leesloader (lib/krant/tijdlijn-lezen.ts) leest via de
+-- SESSIE-client. Achtergrond en katern staan als jsonb op de verversing en
+-- moeten bij het lezen gefilterd worden op de ACTUELE duiding_status (een
+-- teruggetrokken artikel mag daar niet blijven staan; eindreview M2 fase 1).
+-- news_articles is voor sessies niet leesbaar (policy service/superadmin,
+-- 20260719090108). Deze functie geeft uit de opgegeven id's alleen die terug
+-- die NU 'geduid' zijn — geen inhoud, geen lezersdata; de status van een
+-- publiek nieuwsartikel. Begrensd op 200 id's (een verversing draagt er ≤ ~16).
+-- SECURITY DEFINER met lege search_path en volledig gekwalificeerde namen;
+-- alleen authenticated mag hem aanroepen (anon en public niet).
+-- VERWACHT na toepassen: een get_advisors-WARN "SECURITY DEFINER callable by
+-- authenticated" op deze functie. Die is BEDOELD (de sessie-loader moet hem
+-- kunnen aanroepen); niet "fixen" door authenticated in te trekken (ADR 0183).
+create or replace function public.krant_geduide_artikelen(ids uuid[])
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select a.id
+  from public.news_articles a
+  where a.id = any (ids[1:200])
+    and a.duiding_status = 'geduid'
+$$;
+
+comment on function public.krant_geduide_artikelen(uuid[]) is
+  'Krant 1C fase 2: welke van deze artikel-id''s zijn nu geduid? Alleen id''s, geen inhoud. Voor de tijdlijn-leesloader (sessie-client), ADR 0183.';
+
+revoke all on function public.krant_geduide_artikelen(uuid[]) from public, anon;
+grant execute on function public.krant_geduide_artikelen(uuid[]) to authenticated;

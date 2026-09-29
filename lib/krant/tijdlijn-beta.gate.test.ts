@@ -71,7 +71,14 @@ describe('inTijdlijnBeta — wie mag in de bèta', () => {
   })
 
   it('allowlist van importeurs (security G4): een nieuwe plek die de bèta-toets gebruikt, vraagt een bewuste review', () => {
-    const TOEGESTAAN = new Set(['app/api/krant/tijdlijn/cron/route.ts'])
+    const TOEGESTAAN = new Set([
+      'app/api/krant/tijdlijn/cron/route.ts',
+      // Fase 2: de bronkeuze van /nieuws + de API (B40) en de vernieuwknop.
+      'lib/krant/tijdlijn-bron.ts',
+      'lib/krant/tijdlijn-vernieuwen.ts',
+      // Bezwaar/variant: wist de banden alleen als /nieuws geen tijdlijn is (security Y2).
+      'lib/krant/tijdlijn-keuzes.ts',
+    ])
     const bronnen = ['app', 'lib', 'components']
       .flatMap((d) => (readdirSync(d, { recursive: true }) as string[]).map((p) => (d + '/' + p).split('\\').join('/')))
       .filter((p) => /\.(ts|tsx)$/.test(p) && !/\.test\.tsx?$/.test(p) && p !== 'lib/krant/tijdlijn-beta.ts')

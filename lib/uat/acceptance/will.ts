@@ -11,7 +11,15 @@
  * `lib/uat/catalog.ts` bevat dan ook geen UAT-WILL-21/22 (het volgnummer na 20
  * is UAT-WILL-23, zie hieronder) — dit domein is dus, net als SCHULD/TOEK, NIET
  * volledig aaneengesloten op WF-nummer, maar WEL 1-op-1 met de catalogus-
- * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 t/m 31 = 29).
+ * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 t/m 32 = 29
+ * + UAT-WILL-33 t/m 39 (Krant 1C fase 2, zie hieronder) = 36).
+ *
+ * UAT-WILL-33 t/m 39 (Krant 1C fase 2 — B31/B32/B37/B40/U11/U13, ADR 0183):
+ * /nieuws koos vóór deze release altijd de AI-Krant; sindsdien is dat een
+ * server-side BRONKEUZE (`bepaalKrantBron`) tussen de AI-Krant, de tijdlijn
+ * zonder AI (de nieuwe standaard) en een neutraal wachtscherm voor een
+ * Krant-account waarvoor de bèta nog dicht staat. WF-WILL-15 (hierboven)
+ * beschrijft voortaan expliciet alleen nog de AI-Krant-tak.
  *
  * UAT-WILL-27 t/m 31 (gespreksgeschiedenis voor de Fin-chat, ADR 0137 /
  * melding W-004): tot deze release leefde een gesprek alleen in browser-state
@@ -276,10 +284,11 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-WILL-15',
     scenarioId: 'UAT-WILL-15',
-    titel: 'De persoonlijke krant openen en lezen (/nieuws)',
+    titel: 'De AI-Krant openen en lezen (/nieuws, bron = AI)',
     kriticiteit: 'BELANGRIJK',
-    given: 'Gebruiker zonder eerdere edities (hoogste bestaand edition_nr = 0/geen); huidig kalenderjaar 2026.',
-    when: 'De gebruiker opent /nieuws voor het eerst.',
+    given:
+      'Gebruiker zonder eerdere edities (hoogste bestaand edition_nr = 0/geen); huidig kalenderjaar 2026. GESCOPED SINDS KRANT 1C FASE 2 (B40, `lib/krant/tijdlijn-bron.ts#bepaalKrantBron` — zie WF-WILL-33): dit criterium geldt uitsluitend voor een lezer wiens /nieuws de AI-Krant (bron \'ai\') toont — een Geheel-account met AI dat bewust `krant_variant: \'ai\'` koos, of (zolang `TIJDLIJN_BETA_OPEN` false staat) een Geheel-account dat de bèta niet ziet. Een Krant-account krijgt NOOIT deze editie (WF-WILL-33/38); wie de tijdlijn zonder AI leest, valt onder WF-WILL-34..39.',
+    when: 'De gebruiker opent /nieuws voor het eerst en /api/news bouwt de eerste editie.',
     then: 'Editienummer = 0 + 1 = 1; jaargang = 2026 − 2025 = 1. Colofon "N artikelen"/"M bronartikelen" zijn directe lengtes van de editie resp. het getoetste bronmateriaal (geen aparte formule). De artikeltekst zelf is AI-inhoud, niet deterministisch toetsbaar. BRONLINK PER 1F FASE 2 (ADR 0176): de "Bron"-link achter de datum verschijnt alléén wanneer de bron-URL een geldige http(s)-URL is (`safeHttpUrl`); een `javascript:`/`data:`-adres of onleesbare rommel uit een externe bron levert géén link — alleen de datum blijft staan, en er komt nooit een klikbaar niet-http-adres in de editie. Een artikel zonder "Bron"-link is dus een geldige uitkomst, geen storing.',
     assertion: {
       kind: 'exact',
@@ -528,6 +537,125 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'ui-only',
       source:
         'components/app/chat/chat-panel.tsx (modus `vragenlijst`, `toonVragenlijstKnop`) + components/app/vragenlijst/vragenlijst-signaal-provider.tsx (één bron: lijsten, teller, popupkandidaat) + vragenlijst-badge.tsx + vragenlijst-uitnodiging.tsx (popup, aandachtsregister ADR 0134) + components/app/chat/vragenlijst/vragenlijst-view.tsx (Keuze/Invullen, hervatten, wijzigen, afronden, `initieelId`) + app/api/questionnaires/route.ts (zichtbaarheid compute-on-read via lib/questionnaires/verspreiding.ts) + app/api/questionnaires/[id]/{session,respond,uitnodiging}/route.ts + lib/questionnaires/antwoord.ts (antwoordvalidatie per vraagtype) — invulproces zonder cijfermatige uitkomst; bewaakt in `components/app/chat/vragenlijst/vragenlijst-view.test.tsx`, `components/app/vragenlijst/*.test.tsx`, `app/api/questionnaires/**/route.test.ts` en `lib/questionnaires/*.test.ts`.',
+    },
+  },
+  // ── Krant 1C fase 2: de tijdlijn zonder AI (B31/B32/B37/B40/U11/U13, ADR 0183) ──
+  //
+  // /nieuws is sinds B40 een BRONKEUZE, niet meer één vast scherm (zie WF-WILL-15
+  // hierboven, dat nu expliciet de AI-variant beschrijft). Deze zeven scenario's
+  // dekken de tijdlijn zonder AI die de standaard is zodra TIJDLIJN_BETA_OPEN
+  // openstaat, en de twee keuzes eromheen (bezwaar, AI kiezen). De krant-crons
+  // (weekcron /api/krant/cron en de nieuwe dagelijkse /api/krant/tijdlijn/cron)
+  // staan bewust NIET hier maar bij WF-BEHEER-31 (het job_runs-logboek): dat is
+  // waar de andere krant-cron (krant-editie/krant-weekmeting) ook al staat.
+  {
+    workflow: 'WF-WILL-33',
+    scenarioId: 'UAT-WILL-33',
+    titel: 'De server kiest de bron van /nieuws (tijdlijn, AI-Krant of wachtscherm)',
+    kriticiteit: 'KERN',
+    given:
+      'Drie accounttypen: (1) een Krant-account (`resolveActiveModules` = alleen `nieuws`), (2) een Geheel-account zonder gekozen variant, (3) een Geheel-account met `krant_variant: \'ai\'` — laatste zowel met als zonder AI toegestaan (`aiToegestaan` = kill-switch `ai_enabled` aan én een AI-abonnement). Elk in en buiten de tijdlijn-bèta (`inTijdlijnBeta` — superadmin altijd `true`, anders `TIJDLIJN_BETA_OPEN`).',
+    when: 'De server roept `bepaalKrantBron({ krantAccount, variant, inBeta, aiToegestaan })` aan voor elke combinatie.',
+    then:
+      'Een Krant-account krijgt NOOIT de AI-Krant: buiten de bèta \'wacht\' (KrantWacht, nooit een AI-upsell), binnen de bèta \'tijdlijn\'. Een Geheel-account dat bewust \'ai\' koos én AI mag krijgt altijd \'ai\', ongeacht de bètavlag (de bewuste keuze wint). Staat de kill-switch uit of ontbreekt het AI-abonnement, dan wint de bewuste keuze NIET meer: binnen de bèta valt hij terug op de nieuwe standaard \'tijdlijn\' (eindreview Y2, 29-09) — anders eindigt de lezer bij een AI-Krant die hem alsnog weigert. Een Geheel-account zonder gekozen variant krijgt \'ai\' buiten de bèta (het gedrag van vóór 1C) en \'tijdlijn\' zodra de bèta openstaat (de nieuwe standaard, B40).',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'krantBuitenBeta=wacht; krantBinnenBeta=tijdlijn; geheelGeenVariantBuitenBeta=ai; geheelGeenVariantBinnenBeta=tijdlijn; geheelVariantAiBuitenBeta=ai; geheelVariantAiBinnenBeta=ai; geheelVariantAiZonderAiBinnenBeta=tijdlijn',
+      source:
+        'lib/krant/tijdlijn-bron.ts#bepaalKrantBron (echte, pure productiefunctie, geen mirror) + de server-caller app/(app)/nieuws/page.tsx#NieuwsOnlyPage (roept krantBronVoor aan en rendert TijdlijnClient/KrantWacht/NieuwsOnlyClient — zie will-checks.ts voor de pure toets)',
+    },
+  },
+  {
+    workflow: 'WF-WILL-34',
+    scenarioId: 'UAT-WILL-34',
+    titel: 'De tijdlijn verversen binnen de rem van tien minuten',
+    kriticiteit: 'BELANGRIJK',
+    given: 'Een tijdlijnlezer klikt "Vernieuwen" vlak na een eerdere verversing (t < 10 min) en daarna opnieuw ná 10 minuten.',
+    when: 'POST /api/krant/tijdlijn/vernieuwen (`verversEigenTijdlijn`) draait voor beide tijdstippen.',
+    then:
+      'Binnen de rem: HTTP 429 en de knop toont "Je hebt net vernieuwd. Probeer het over een paar minuten opnieuw." (of de servertekst); er wordt niets geschreven. Ná de rem, zonder een sinds de vorige verversing nieuw geduid artikel: status \'niets-nieuws\' — ook geen schrijving, de client toont "Er is niets nieuws sinds de vorige keer.". Ná de rem mét nieuw geduid materiaal: status \'ververst\', de client toont het aantal nieuwe berichten en `router.refresh()` haalt de nieuwe pagina op. Een lezer wiens /nieuws niet de tijdlijn is (WF-WILL-33): \'geen-tijdlijn\', route geeft 403 op GET maar de vernieuwknop verschijnt daar client-side sowieso niet.',
+    assertion: {
+      kind: 'exact',
+      expected: 'VERNIEUW_INTERVAL_MS=600000; teSnelBinnenRem=true; magVerversenNaRem=true',
+      source:
+        'lib/krant/tijdlijn-vernieuwen.ts#VERNIEUW_INTERVAL_MS + de tijdsvergelijking `now - vorige < VERNIEUW_INTERVAL_MS` (r67-69, gemirrord met een pure tijdsfunctie) + components/berichten/tijdlijn-client.tsx#doeVernieuwen (429-tekst) — zie will-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-WILL-35',
+    scenarioId: 'UAT-WILL-35',
+    titel: 'Tijdlijn: "Meer laden" en het archief per week doorbladeren',
+    kriticiteit: 'BELANGRIJK',
+    given: 'Een tijdlijn met meer dan 20 berichten verspreid over minstens twee archiefweken.',
+    when: 'De gebruiker klikt "Meer laden" onder de hoofdpagina, en opent daarna een archiefweek met "Meer uit deze week".',
+    then:
+      'Elke pagina telt hoogstens `TIJDLIJN_PAGINA` (20) berichten; de cursor codeert (created_at, positie, id) van het laatste bericht en `decodeerCursor` accepteert uitsluitend die exacte vorm terug — een geknoeide of te lange cursor-string geeft `null`, en de route beantwoordt dat met 400 (geen 500, geen stille lege pagina). Binnen één archiefweek werkt dezelfde cursor door met `?week=`. Een niet-`2026-W40`-vormige weekwaarde geeft eveneens 400.',
+    assertion: {
+      kind: 'exact',
+      expected: 'TIJDLIJN_PAGINA=20; cursorRoundtrip=true; ongeldigeCursorGeeftNull=true; ongeldigeWeekGeeftNull=true',
+      source: 'lib/krant/tijdlijn-lezen.ts#TIJDLIJN_PAGINA + #codeerCursor/#decodeerCursor + #WEEK_KEY — echte, pure productiefuncties, geen mirror — zie will-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-WILL-36',
+    scenarioId: 'UAT-WILL-36',
+    titel: 'Het algemene katern verschijnt alleen onder vijf berichten',
+    kriticiteit: 'OVERIG',
+    given: 'Een tijdlijn met in totaal 4 berichten, en apart eentje met 5 berichten (beide met een gevuld algemeen katern in de laatste verversing).',
+    when: '`laadTijdlijn` bepaalt of het katern getoond wordt.',
+    then: 'Bij totaal 4 (< KATERN_ONDER) toont /nieuws het katern (U13); bij totaal 5 (niet meer < KATERN_ONDER) verdwijnt het — de tijdlijn is dan zelf al gevuld genoeg.',
+    assertion: {
+      kind: 'exact',
+      expected: 'KATERN_ONDER=5; toonKatern4=true; toonKatern5=false',
+      source: 'lib/krant/tijdlijn-lezen.ts#KATERN_ONDER + de afleiding `toonKatern = totaal < KATERN_ONDER` (r279, gemirrord als eenregelige pure functie) — zie will-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-WILL-37',
+    scenarioId: 'UAT-WILL-37',
+    titel: 'Bezwaar maken tegen verwerking op de achtergrond (en intrekken)',
+    kriticiteit: 'BELANGRIJK',
+    given: 'Een tijdlijnlezer zonder eerder bezwaar, met bestaande schaduwedities (bron \'schaduw\').',
+    when: 'De gebruiker klikt "Bezwaar maken" en bevestigt in de modal; later klikt hij "Bezwaar intrekken".',
+    then:
+      'PUT /api/krant/bezwaar {bezwaar:true} zet `profiles.krant_schaduw_bezwaar_at` op nu en wist alle rijen in `krant_edities` met `bron=\'schaduw\'` voor deze gebruiker; heeft de lezer bovendien `krant_variant=\'ai\'` gekozen (kan bij een Geheel-account dat weer terugkeert), dan worden ook de bandvelden van het nieuwsprofiel geleegd (het profiel heeft dan geen doel meer). Leest de lezer de tijdlijn zelf, dan blijft het nieuwsprofiel staan — de vernieuwknop is zijn eigen verzoek en blijft werken; wél slaan de weekcron en de dagelijkse tijdlijncron deze lezer voortaan over (WF-BEHEER-31). Intrekken (`bezwaar:false`) zet de kolom terug op `null` zonder iets te wissen; de eerstvolgende cronrun leidt het profiel weer af.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'app/api/krant/bezwaar/route.ts (PUT, zod {bezwaar:boolean}) + lib/krant/tijdlijn-keuzes.ts#zetSchaduwBezwaar (service-role, .eq(user_id) op elke query) — procestoets: het schrijfpad en de voorwaardelijke wis-tak zijn deterministisch, maar vereisen een Supabase-client en zijn dus niet als pure engine-check gemirrord',
+    },
+  },
+  {
+    workflow: 'WF-WILL-38',
+    scenarioId: 'UAT-WILL-38',
+    titel: 'Overstappen naar de AI-Krant wist de tijdlijn; terug kan altijd',
+    kriticiteit: 'KERN',
+    given: 'Een Geheel-account met AI-abonnement leest de tijdlijn (`kanAiKiezen=true`, dus geen Krant-account en geen bestaande tier-blokkade).',
+    when:
+      'De gebruiker klikt "Liever de Krant met AI" en bevestigt ("Tijdlijn wissen"); later, op de AI-Krant, klikt hij in de balk van `TerugNaarTijdlijn` op "Naar de tijdlijn".',
+    then:
+      'PUT /api/krant/variant {variant:\'ai\'} zet `krant_variant=\'ai\'` EN wist in dezelfde stap alle tijdlijn-verversingen van deze gebruiker (`wisTijdlijn`) — de bevestigingsmodal noemt dit vooraf ("Je tijdlijn wordt dan direct gewist"). Een Krant-account krijgt op deze route altijd 403 ("De Krant heeft geen AI-variant"), ook al zou de AI-tiergate zelf slagen; ontbreekt het AI-abonnement, dan 403 met reason `ai_abonnement`. Terug (`variant:\'tijdlijn\'`) zet de kolom leeg zonder iets terug te zetten — de eerstvolgende verversing (knop of cron) begint de tijdlijn opnieuw vanaf nul, precies zoals de bevestigingstekst vooraf aankondigde.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'app/api/krant/variant/route.ts (PUT, krantAccount→403, checkTierGate) + lib/krant/tijdlijn-keuzes.ts#zetKrantVariant (wisTijdlijn bij \'ai\') + components/berichten/tijdlijn-client.tsx (bevestigingstekst) + components/berichten/terug-naar-tijdlijn.tsx — procestoets: vereist een Supabase-client (service-role wis-pad), niet als pure engine-check gemirrord',
+    },
+  },
+  {
+    workflow: 'WF-WILL-39',
+    scenarioId: 'UAT-WILL-39',
+    titel: 'De nieuwsstip in de zijbalk voor een tijdlijnlezer',
+    kriticiteit: 'OVERIG',
+    given:
+      'Een tijdlijnlezer met minstens één bericht in de tijdlijn en `nieuwsprofiel.tijdlijn_gelezen_tot` nog leeg (nooit bezocht); apart dezelfde lezer nadat alle berichten ouder zijn dan `tijdlijn_gelezen_tot`.',
+    when: 'De sidebar mount `useNewsUnread` en die haalt `/api/krant/tijdlijn?peek=1` op.',
+    then:
+      'Zonder `tijdlijn_gelezen_tot` (nooit bezocht) en met minstens één bericht: `{nieuw:true}` — de stip staat aan vóór het eerste bezoek. Zijn alle berichten ouder dan `tijdlijn_gelezen_tot`: `{nieuw:false}`. Een lezer wiens /nieuws niet de tijdlijn is krijgt op deze route 403; de hook onthoudt dat voor de sessie (`tijdlijnPeekForbidden`) en valt terug op het AI-pad (`/api/news?peek=1`) — alleen als het AI-recht aanwezig is (`enabled`), anders blijft de stip grijs.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'lib/krant/tijdlijn-lezen.ts#heeftNieuw (Supabase-afhankelijk, niet gemirrord) + app/api/krant/tijdlijn/route.ts (`?peek=1`) + lib/hooks/use-news-unread.ts#fetchTijdlijnUnread/tijdlijnPeekForbidden — procestoets: de vergelijking zelf is triviaal deterministisch maar leunt op een live rij-lezing, dus geen pure engine-check',
     },
   },
 ]

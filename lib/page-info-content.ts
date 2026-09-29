@@ -767,6 +767,13 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Financieel nieuws wordt pas nuttig als het relevant is voor jouw situatie — artikelen worden daarom gescoord op je profiel en doelen, niet zomaar chronologisch getoond.',
     grip: 'Sla items op voor later of markeer ze als gelezen.',
   },
+  // De Krant zonder AI (Krant 1C, B40): dezelfde route, een andere weergave.
+  // Eigen sleutel omdat de AI-Krant hierboven '/nieuws' blijft gebruiken.
+  '/nieuws/tijdlijn': {
+    insight:
+      'Je Krant is een persoonlijke tijdlijn: nieuws dat jouw situatie raakt komt bovenaan, met bij elk bericht wat het voor jou betekent en waarom je het ziet. Een bericht blijft staan zoals het toen was en verdwijnt na 120 dagen.',
+    grip: 'Vernieuwen haalt het nieuwste op; oudere berichten vind je per week in het archief.',
+  },
   '/berichten': {
     insight:
       'Alle meldingen die je ontvangt komen hier samen — budgetwaarschuwingen, partner-transacties, mijlpalen, herinneringen en tips — zodat je niets hoeft te missen tussen losse kanalen.',

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { useNewsUnread } from './use-news-unread'
+import { useNewsUnread, __resetNewsUnread } from './use-news-unread'
 import { __resetInflight } from '@/lib/inflight'
 
 /**
@@ -14,9 +14,15 @@ import { __resetInflight } from '@/lib/inflight'
  *  - false wanneer /api/news of /api/news/read een niet-ok status geeft
  */
 
+/**
+ * De tijdlijn-peek (Krant 1C fase 2) komt eerst. In de AI-Krant-tests hieronder
+ * leest de lezer de tijdlijn niet: die peek geeft 403 en telt niet mee in de
+ * volgorde van `responses`.
+ */
 function makeFetch(responses: Array<{ ok: boolean; json?: object }>) {
   let call = 0
-  return vi.fn(async () => {
+  return vi.fn(async (url: RequestInfo | URL) => {
+    if (String(url).startsWith('/api/krant/tijdlijn')) return { ok: false, status: 403, json: async () => ({}) } as Response
     const r = responses[call++] ?? { ok: false }
     return {
       ok: r.ok,
@@ -30,16 +36,46 @@ afterEach(() => {
   // In-flight dedupe-registratie wissen zodat een hangende/lopende fetch uit de
   // vorige test niet naar de volgende lekt (gedeelde module-state).
   __resetInflight()
+  __resetNewsUnread()
 })
 
 describe('useNewsUnread', () => {
-  it('slaat de fetch over wanneer entitlement ontbreekt (enabled=false)', async () => {
-    const fetchSpy = vi.fn()
+  it('slaat de AI-fetch over wanneer entitlement ontbreekt (enabled=false) — alleen de tijdlijn-peek', async () => {
+    const fetchSpy = makeFetch([])
     global.fetch = fetchSpy as unknown as typeof fetch
     const { result } = renderHook(() => useNewsUnread(false))
     await act(async () => {})
     expect(result.current).toBe(false)
-    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(fetchSpy.mock.calls.map((c) => c[0])).toEqual(['/api/krant/tijdlijn?peek=1'])
+  })
+
+  describe('tijdlijn (Krant 1C fase 2)', () => {
+    it('leest de lezer de tijdlijn, dan komt de stip uit { nieuw } — ook zonder AI-recht, zonder /api/news', async () => {
+      const fetchSpy = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ nieuw: true }) }) as Response)
+      global.fetch = fetchSpy as unknown as typeof fetch
+      const { result } = renderHook(() => useNewsUnread(false))
+      await act(async () => {})
+      expect(result.current).toBe(true)
+      expect(fetchSpy.mock.calls.map((c) => (c as unknown as [string])[0])).toEqual(['/api/krant/tijdlijn?peek=1'])
+    })
+
+    it('{ nieuw: false } → grijs', async () => {
+      global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ nieuw: false }) }) as Response)
+      const { result } = renderHook(() => useNewsUnread())
+      await act(async () => {})
+      expect(result.current).toBe(false)
+    })
+
+    it('een 403 op de tijdlijn wordt onthouden: de volgende mount vraagt hem niet opnieuw', async () => {
+      const fetchSpy = makeFetch([])
+      global.fetch = fetchSpy as unknown as typeof fetch
+      renderHook(() => useNewsUnread(false))
+      await act(async () => {})
+      __resetInflight()
+      renderHook(() => useNewsUnread(false))
+      await act(async () => {})
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('begint op false (loading-state)', async () => {

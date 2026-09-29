@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-28T18:41:50.443Z",
-  "generatedDate": "2026-09-28",
+  "generatedAt": "2026-09-29T07:23:33.252Z",
+  "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.14"
+    "version": "0.92.15"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -191,11 +191,11 @@
   "stats": {
     "routes": 136,
     "routesProduction": 90,
-    "api": 336,
+    "api": 342,
     "tables": 105,
     "migrations": 269,
     "integrations": 25,
-    "components": 1243,
+    "components": 1251,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2032,6 +2032,14 @@
       ]
     },
     {
+      "url": "/api/admin/krant-weekmeting",
+      "file": "app/api/admin/krant-weekmeting/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/admin/local-ai-gate",
       "file": "app/api/admin/local-ai-gate/route.ts",
       "domain": "admin",
@@ -3650,6 +3658,14 @@
       ]
     },
     {
+      "url": "/api/krant/bezwaar",
+      "file": "app/api/krant/bezwaar/route.ts",
+      "domain": "krant",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/krant/cron",
       "file": "app/api/krant/cron/route.ts",
       "domain": "krant",
@@ -3666,11 +3682,43 @@
       ]
     },
     {
+      "url": "/api/krant/tijdlijn",
+      "file": "app/api/krant/tijdlijn/route.ts",
+      "domain": "krant",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/krant/tijdlijn/cron",
       "file": "app/api/krant/tijdlijn/cron/route.ts",
       "domain": "krant",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/krant/tijdlijn/gelezen",
+      "file": "app/api/krant/tijdlijn/gelezen/route.ts",
+      "domain": "krant",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "url": "/api/krant/tijdlijn/vernieuwen",
+      "file": "app/api/krant/tijdlijn/vernieuwen/route.ts",
+      "domain": "krant",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/krant/variant",
+      "file": "app/api/krant/variant/route.ts",
+      "domain": "krant",
+      "methods": [
+        "PUT"
       ]
     },
     {
@@ -4681,7 +4729,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 54,
+      "count": 55,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4813,6 +4861,14 @@
         {
           "url": "/api/admin/krant-meting",
           "file": "app/api/admin/krant-meting/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/admin/krant-weekmeting",
+          "file": "app/api/admin/krant-weekmeting/route.ts",
           "domain": "admin",
           "methods": [
             "GET"
@@ -5913,6 +5969,77 @@
       ]
     },
     {
+      "domain": "krant",
+      "label": "krant",
+      "count": 8,
+      "routes": [
+        {
+          "url": "/api/krant/bezwaar",
+          "file": "app/api/krant/bezwaar/route.ts",
+          "domain": "krant",
+          "methods": [
+            "PUT"
+          ]
+        },
+        {
+          "url": "/api/krant/cron",
+          "file": "app/api/krant/cron/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/testeditie",
+          "file": "app/api/krant/testeditie/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/tijdlijn",
+          "file": "app/api/krant/tijdlijn/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/tijdlijn/cron",
+          "file": "app/api/krant/tijdlijn/cron/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/tijdlijn/gelezen",
+          "file": "app/api/krant/tijdlijn/gelezen/route.ts",
+          "domain": "krant",
+          "methods": [
+            "PUT"
+          ]
+        },
+        {
+          "url": "/api/krant/tijdlijn/vernieuwen",
+          "file": "app/api/krant/tijdlijn/vernieuwen/route.ts",
+          "domain": "krant",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/krant/variant",
+          "file": "app/api/krant/variant/route.ts",
+          "domain": "krant",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "report",
       "label": "Rapportages",
       "count": 7,
@@ -6672,37 +6799,6 @@
           "url": "/api/horizon-kernel/verificatie",
           "file": "app/api/horizon-kernel/verificatie/route.ts",
           "domain": "horizon-kernel",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "krant",
-      "label": "krant",
-      "count": 3,
-      "routes": [
-        {
-          "url": "/api/krant/cron",
-          "file": "app/api/krant/cron/route.ts",
-          "domain": "krant",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/krant/testeditie",
-          "file": "app/api/krant/testeditie/route.ts",
-          "domain": "krant",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/krant/tijdlijn/cron",
-          "file": "app/api/krant/tijdlijn/cron/route.ts",
-          "domain": "krant",
           "methods": [
             "GET"
           ]
@@ -9341,11 +9437,11 @@
     }
   ],
   "components": {
-    "total": 1243,
+    "total": 1251,
     "groups": [
       {
         "group": "app",
-        "count": 463,
+        "count": 465,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9576,6 +9672,8 @@
           "koopkracht-erosie",
           "koopkracht-erosie-onttrekken",
           "krant-meting-panel",
+          "krant-weekmeting-panel",
+          "krant-weekmeting-panel.test",
           "lab-harp",
           "lab-harp.test",
           "lab-knoppen",
@@ -10569,7 +10667,7 @@
       },
       {
         "group": "berichten",
-        "count": 14,
+        "count": 20,
         "items": [
           "archive-edition-card",
           "archive-section",
@@ -10578,13 +10676,19 @@
           "berichten-client.loading-masthead.test",
           "berichten-client.unread-count.test",
           "krant-testsectie",
+          "krant-wacht",
+          "krant-wacht.test",
           "masthead",
           "masthead.test",
           "news-components",
           "newspaper-footer",
           "nieuws-only-client",
           "nieuws-only-client.test",
-          "section-heading"
+          "section-heading",
+          "terug-naar-tijdlijn",
+          "terug-naar-tijdlijn.test",
+          "tijdlijn-client",
+          "tijdlijn-client.test"
         ]
       },
       {
@@ -11840,7 +11944,7 @@
       "krant": [
         {
           "name": "nieuwsprofiel",
-          "write": false
+          "write": true
         },
         {
           "name": "profiles",
@@ -14097,6 +14201,7 @@
           "write": false,
           "routes": [
             "/api/admin/krant-meting",
+            "/api/admin/krant-weekmeting",
             "/api/admin/news-ingest"
           ]
         },
@@ -15578,9 +15683,10 @@
         {
           "domain": "krant",
           "label": "krant",
-          "write": false,
+          "write": true,
           "routes": [
-            "/api/krant/tijdlijn/cron"
+            "/api/krant/tijdlijn/cron",
+            "/api/krant/tijdlijn/gelezen"
           ]
         }
       ],
@@ -19028,6 +19134,17 @@
       ],
       "summary": "De Krant zonder AI wordt een persoonlijke tijdlijn in plaats van een weekeditie (B31–B33, 27 sep) en komt als opt-in bèta naast de AI-Krant, die de standaard blijft (B38, 28 sep). Dit besluit legt fase 1 vast: schema en motor, nog zonder scherm. Het bouwt op ADR 0172 (matcher, sj",
       "file": "docs/adr/0183-de-tijdlijn-van-de-krant-als-opt-in-beta.md"
+    },
+    {
+      "id": "0185-de-regelkalender-als-tweeling-van-de-fiscale-wijzigingslog",
+      "title": "De regelkalender is de machineleesbare tweeling van de fiscale wijzigingslog",
+      "status": "voorgesteld",
+      "date": "2026-09-29",
+      "elements": [
+        "as-nieuws"
+      ],
+      "summary": "Na een week meten had geen enkele geduide Krant-duiding een rekenend mechanisme. Tarieven, grenzen en percentages staan zelden in een nieuwsbericht; ze staan in wetteksten, pdf's en sleuteltabellen. Besluit B34 (27 sep): rekenende berichten komen uit een gecureerde kalender van r",
+      "file": "docs/adr/0185-de-regelkalender-als-tweeling-van-de-fiscale-wijzigingslog.md"
     }
   ],
   "churn": {
@@ -19087,8 +19204,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3853,
-        "commits": 20
+        "loc": 3876,
+        "commits": 21
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -20309,8 +20426,28 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-28",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/admin/krant-weekmeting",
+          "/api/krant/bezwaar",
+          "/api/krant/tijdlijn",
+          "/api/krant/tijdlijn/gelezen",
+          "/api/krant/tijdlijn/vernieuwen",
+          "/api/krant/variant"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+8"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -20800,6 +20937,13 @@
       "date": "2026-09-28",
       "api": 336,
       "components": 1243,
+      "tables": 105,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-29",
+      "api": 342,
+      "components": 1251,
       "tables": 105,
       "routesProduction": 90
     }

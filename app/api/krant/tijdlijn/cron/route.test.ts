@@ -3,8 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 /**
  * GET /api/krant/tijdlijn/cron (Krant 1C):
  *   - auth-matrix (fail-closed), zonder job_runs-write vóór de auth;
- *   - alleen lezers met krant_variant 'tijdlijn', de module nieuws en afgeronde onboarding;
- *   - bèta-slot: zolang TIJDLIJN_BETA_OPEN false is, alleen superadmins;
+ *   - opruimen (ruimAlleTijdlijnenOp) EERST en in een eigen try — een fout
+ *     daar laat de run doorgaan (security G2, 29-09);
+ *   - profielselectie GEPAGINEERD (.eq → .order('id') → .range), zodat >1000
+ *     profielen niet stil worden afgekapt (eindreview Y4);
+ *   - B40 (fase 2): iedereen met de module nieuws en afgeronde onboarding wiens
+ *     /nieuws de tijdlijn is — niet wie bewust de AI-Krant koos (krant_variant
+ *     'ai') MITS die lezer ook echt AI mag (ai_enabled + AI-abonnement,
+ *     eindreview Y2) — zonder AI valt de keuze terug op tijdlijn;
+ *   - bèta-slot (tijdelijke schakelaar): zolang TIJDLIJN_BETA_OPEN false is, alleen superadmins;
+ *   - bezwaar (profiles.krant_schaduw_bezwaar_at): overgeslagen;
+ *   - de hertoets vlak vóór schrijven (`ververs(..., hertoetsVoorSchrijven: true)`)
+ *     kan `overgeslagen: true` teruggeven (bezwaar/AI-keuze ná de profielselectie);
  *   - summary = tellingen; een falende lezer stopt de run niet.
  */
 
@@ -16,41 +26,96 @@ const mockVervers = vi.fn()
 const mockRuim = vi.fn()
 vi.mock('@/lib/krant/tijdlijn-run', () => ({
   ververs: (...a: unknown[]) => mockVervers(...a),
-  ruimTijdlijnOp: (...a: unknown[]) => mockRuim(...a),
+  ruimAlleTijdlijnenOp: (...a: unknown[]) => mockRuim(...a),
 }))
 const beta = { open: false }
 vi.mock('@/lib/krant/tijdlijn-beta', () => ({
   inTijdlijnBeta: (rol: string | null) => beta.open || rol === 'superadmin',
 }))
 
-let varianten: Array<{ user_id: string }>
+/** Wie bewust de AI-Krant koos (krant_variant = 'ai'). */
+let aiVarianten: Array<{ user_id: string }>
 let profielen: Array<Record<string, unknown>>
+const inAanroepen: string[][] = []
+const rangeAanroepen: Array<[number, number]> = []
+
+/** Paginagrootte zoals de route hem gebruikt (moet gelijk zijn aan TIJDLIJN_CRON_PAGINA). */
+const PAGINA = 500
 
 vi.mock('@/lib/supabase/service', () => ({
   getServiceClient: () => ({
-    from: (table: string) => ({
-      select: () => ({
-        eq: async () => (table === 'nieuwsprofiel' ? { data: varianten, error: null } : { data: [], error: null }),
-        in: async () => (table === 'profiles' ? { data: profielen, error: null } : { data: [], error: null }),
-      }),
-    }),
+    from: (table: string) => {
+      if (table === 'profiles') {
+        return {
+          select: () => ({
+            eq: (kolom: string, waarde: unknown) => {
+              expect([kolom, waarde]).toEqual(['onboarding_completed', true])
+              return {
+                order: (kolom2: string, opts: { ascending?: boolean }) => {
+                  expect(kolom2).toBe('id')
+                  expect(opts).toEqual({ ascending: true })
+                  return {
+                    range: async (van: number, tot: number) => {
+                      rangeAanroepen.push([van, tot])
+                      const gesorteerd = [...profielen.filter((p) => p.onboarding_completed === true)].sort((a, b) =>
+                        String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0,
+                      )
+                      return { data: gesorteerd.slice(van, tot + 1), error: null }
+                    },
+                  }
+                },
+              }
+            },
+          }),
+        }
+      }
+      // nieuwsprofiel: de variant-selectie (alleen 'ai' telt).
+      return {
+        select: () => ({
+          eq: (kolom: string, waarde: unknown) => {
+            expect([kolom, waarde]).toEqual(['krant_variant', 'ai'])
+            return {
+              in: async (_k: string, ids: string[]) => {
+                inAanroepen.push(ids)
+                return { data: aiVarianten.filter((v) => ids.includes(v.user_id)), error: null }
+              },
+            }
+          },
+        }),
+      }
+    },
   }),
 }))
 
-import { GET } from './route'
+import { GET, TIJDLIJN_CRON_PAGINA } from './route'
 
 const req = (secret?: string) => new Request(secret ? `https://x.test/api/krant/tijdlijn/cron?secret=${secret}` : 'https://x.test/api/krant/tijdlijn/cron')
 const ORIG = { ...process.env }
 
+/** Standaard-profiel: Geheel-account met AI toegestaan (ai_enabled + abonnement) tenzij overschreven. */
+function profiel(overrides: Record<string, unknown>) {
+  return {
+    active_modules: null,
+    onboarding_completed: true,
+    krant_schaduw_bezwaar_at: null,
+    ai_enabled: true,
+    active_subscriptions: ['ai'],
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   beta.open = false
-  varianten = [{ user_id: 'u-admin' }, { user_id: 'u-lezer' }, { user_id: 'u-zonder-nieuws' }, { user_id: 'u-onboarding' }]
+  aiVarianten = []
+  inAanroepen.length = 0
+  rangeAanroepen.length = 0
   profielen = [
-    { id: 'u-admin', role: 'superadmin', active_modules: null, onboarding_completed: true },
-    { id: 'u-lezer', role: 'user', active_modules: ['nieuws'], onboarding_completed: true },
-    { id: 'u-zonder-nieuws', role: 'superadmin', active_modules: ['budgetteren'], onboarding_completed: true },
-    { id: 'u-onboarding', role: 'superadmin', active_modules: null, onboarding_completed: false },
+    profiel({ id: 'u-admin', role: 'superadmin', active_modules: null }),
+    profiel({ id: 'u-lezer', role: 'user', active_modules: ['nieuws'] }),
+    profiel({ id: 'u-geheel', role: 'user', active_modules: null }),
+    profiel({ id: 'u-zonder-nieuws', role: 'superadmin', active_modules: ['budgetteren'] }),
+    profiel({ id: 'u-onboarding', role: 'superadmin', active_modules: null, onboarding_completed: false }),
   ]
   mockVervers.mockImplementation(async (_s: unknown, i: { userId: string }) => ({ editieId: `e-${i.userId}`, profielType: 'x', leeg: false, items: 2 }))
   mockRuim.mockResolvedValue(1)
@@ -78,27 +143,118 @@ describe('auth (fail-closed)', () => {
   })
 })
 
+describe('opruimen (120 dagen): eerst, eigen try, laat de run doorgaan bij een fout', () => {
+  it('draait vóór de profielselectie en telt mee in de summary', async () => {
+    const res = await GET(req('cron-secret'))
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(mockRuim).toHaveBeenCalledTimes(1)
+    expect(summary).toMatchObject({ opgeruimd: 1, opruimenMislukt: false })
+  })
+
+  it('een fout bij het opruimen laat de run doorgaan: opruimenMislukt=true, verversingen gaan gewoon door', async () => {
+    mockRuim.mockRejectedValueOnce(new Error('kapot'))
+    const res = await GET(req('cron-secret'))
+    expect(res.status).toBe(200)
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(summary).toMatchObject({ opruimenMislukt: true, opgeruimd: 0 })
+    expect(gedraaid()).toEqual(['u-admin'])
+    expect(mockRecordJobRun).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ job: 'krant-tijdlijn', status: 'success', error: 'opruimen (120 dagen) mislukt' }),
+    )
+  })
+})
+
+describe('profielselectie: gepagineerd op id', () => {
+  it('vraagt de eerste pagina op met range(0, TIJDLIJN_CRON_PAGINA - 1)', async () => {
+    await GET(req('cron-secret'))
+    expect(rangeAanroepen[0]).toEqual([0, TIJDLIJN_CRON_PAGINA - 1])
+    // Onder de paginagrootte: precies één pagina, geen tweede aanroep.
+    expect(rangeAanroepen).toHaveLength(1)
+  })
+
+  it('meer dan één pagina: blijft doorbladeren tot een pagina kleiner is dan TIJDLIJN_CRON_PAGINA', async () => {
+    // PAGINA + 3 profielen (allemaal superadmin zodat ze meetellen), bèta dicht.
+    profielen = Array.from({ length: PAGINA + 3 }, (_, i) => profiel({ id: `u-${String(i).padStart(4, '0')}`, role: 'superadmin' }))
+    const res = await GET(req('cron-secret'))
+    expect(rangeAanroepen).toEqual([
+      [0, PAGINA - 1],
+      [PAGINA, 2 * PAGINA - 1],
+    ])
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(summary).toMatchObject({ lezers: PAGINA + 3 })
+  })
+})
+
 describe('wie er ververst wordt', () => {
   it('bèta dicht: alleen de superadmin met module nieuws en afgeronde onboarding', async () => {
     const res = await GET(req('cron-secret'))
     expect(res.status).toBe(200)
     expect(gedraaid()).toEqual(['u-admin'])
     const { summary } = (await res.json()) as { summary: Record<string, unknown> }
-    expect(summary).toMatchObject({ lezers: 1, buitenBeta: 3, verversingen: 1, berichten: 2, opgeruimd: 1, fouten: 0 })
+    expect(summary).toMatchObject({ lezers: 1, buitenBeta: 2, bezwaar: 0, verversingen: 1, berichten: 2, opgeruimd: 1, fouten: 0 })
   })
 
-  it('bèta open: ook de gewone lezer — maar nooit zonder module nieuws of onboarding', async () => {
+  it('bèta open (B40): iedereen met module nieuws — Krant- én Geheel-account, zonder opt-in; nooit zonder module nieuws of onboarding', async () => {
     beta.open = true
     await GET(req('cron-secret'))
-    expect(gedraaid().sort()).toEqual(['u-admin', 'u-lezer'])
+    expect(gedraaid().sort()).toEqual(['u-admin', 'u-geheel', 'u-lezer'])
   })
 
-  it('niemand met de variant: geen kandidaten geladen, wel een success-run', async () => {
-    varianten = []
+  it('wie bewust de AI-Krant koos (variant ai) mét AI toegestaan, valt eruit — een Krant-account nooit (die heeft geen AI-variant)', async () => {
+    beta.open = true
+    aiVarianten = [{ user_id: 'u-geheel' }, { user_id: 'u-lezer' }]
+    const res = await GET(req('cron-secret'))
+    expect(gedraaid().sort()).toEqual(['u-admin', 'u-lezer'])
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(summary).toMatchObject({ lezers: 2, buitenBeta: 1 })
+  })
+
+  it('AI gekozen zonder AI toegestaan (ai_enabled false): de keuze wint niet — tóch tijdlijn (eindreview Y2)', async () => {
+    beta.open = true
+    profielen = profielen.map((p) => (p.id === 'u-geheel' ? { ...p, ai_enabled: false } : p))
+    aiVarianten = [{ user_id: 'u-geheel' }]
+    await GET(req('cron-secret'))
+    expect(gedraaid().sort()).toEqual(['u-admin', 'u-geheel', 'u-lezer'])
+  })
+
+  it('AI gekozen zonder AI-abonnement (geen "ai" in active_subscriptions): tóch tijdlijn', async () => {
+    beta.open = true
+    profielen = profielen.map((p) => (p.id === 'u-geheel' ? { ...p, active_subscriptions: [] } : p))
+    aiVarianten = [{ user_id: 'u-geheel' }]
+    await GET(req('cron-secret'))
+    expect(gedraaid().sort()).toEqual(['u-admin', 'u-geheel', 'u-lezer'])
+  })
+
+  it('bezwaar tegen verwerking op de achtergrond: overgeslagen en geteld, de variant wordt voor hem niet eens gevraagd', async () => {
+    beta.open = true
+    profielen[1].krant_schaduw_bezwaar_at = '2026-09-29T08:00:00Z'
+    const res = await GET(req('cron-secret'))
+    expect(gedraaid().sort()).toEqual(['u-admin', 'u-geheel'])
+    expect(inAanroepen.flat()).not.toContain('u-lezer')
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(summary).toMatchObject({ bezwaar: 1, lezers: 2 })
+  })
+
+  it('niemand in de tijdlijn: geen kandidaten geladen, wel een success-run', async () => {
+    profielen = profielen.filter((p) => p.role !== 'superadmin')
     const res = await GET(req('cron-secret'))
     expect(res.status).toBe(200)
     expect(mockVervers).not.toHaveBeenCalled()
     expect(mockRecordJobRun).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ job: 'krant-tijdlijn', status: 'success' }))
+  })
+
+  it('overgeslagen: de hertoets vlak vóór schrijven zegt dat de lezer intussen bezwaar maakte of de AI-Krant koos', async () => {
+    beta.open = true
+    mockVervers.mockImplementation(async (_s: unknown, i: { userId: string }) => {
+      if (i.userId === 'u-lezer') return { editieId: '', profielType: 'x', leeg: true, items: 0, overgeslagen: true }
+      return { editieId: 'e', profielType: 'x', leeg: false, items: 1 }
+    })
+    const res = await GET(req('cron-secret'))
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    // Bèta open → 3 lezers (u-admin, u-geheel, u-lezer); u-lezer wordt overgeslagen,
+    // de andere twee ververst (elk 1 bericht).
+    expect(summary).toMatchObject({ overgeslagen: 1, verversingen: 2, fouten: 0, berichten: 2 })
   })
 
   it('een 23505 (race met de knop op de unieke index) telt als overgeslagen, niet als fout', async () => {
@@ -109,7 +265,7 @@ describe('wie er ververst wordt', () => {
     })
     const res = await GET(req('cron-secret'))
     const { summary } = (await res.json()) as { summary: Record<string, unknown> }
-    expect(summary).toMatchObject({ overgeslagen: 1, fouten: 0, verversingen: 1 })
+    expect(summary).toMatchObject({ overgeslagen: 1, fouten: 0, verversingen: 2 })
   })
 
   it('een falende lezer telt als fout en stopt de run niet; summary bevat geen inhoud', async () => {
@@ -120,7 +276,7 @@ describe('wie er ververst wordt', () => {
     })
     const res = await GET(req('cron-secret'))
     const { summary } = (await res.json()) as { summary: Record<string, unknown> }
-    expect(summary).toMatchObject({ fouten: 1, verversingen: 1, leeg: 1 })
-    expect(JSON.stringify(summary)).not.toMatch(/u-admin|u-lezer|user_id/)
+    expect(summary).toMatchObject({ fouten: 1, verversingen: 2, leeg: 2 })
+    expect(JSON.stringify(summary)).not.toMatch(/u-admin|u-lezer|u-geheel|user_id/)
   })
 })

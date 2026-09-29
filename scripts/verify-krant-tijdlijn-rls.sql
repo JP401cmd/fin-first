@@ -32,6 +32,7 @@ DO $$ BEGIN
   IF has_table_privilege('authenticated','public.nieuwsprofiel','INSERT') THEN RAISE EXCEPTION '0c tabelbrede INSERT nog aanwezig'; END IF;
   IF has_column_privilege('authenticated','public.nieuwsprofiel','krant_variant','UPDATE') OR has_column_privilege('authenticated','public.nieuwsprofiel','krant_variant','INSERT')
   OR has_column_privilege('authenticated','public.nieuwsprofiel','afgeleid_at','UPDATE') OR has_column_privilege('authenticated','public.nieuwsprofiel','afgeleid_at','INSERT')
+  OR has_column_privilege('authenticated','public.nieuwsprofiel','tijdlijn_vernieuwd_at','UPDATE') OR has_column_privilege('authenticated','public.nieuwsprofiel','tijdlijn_vernieuwd_at','INSERT')
   THEN RAISE EXCEPTION '0d sessie mag een service-role-kolom schrijven'; END IF;
   IF NOT has_column_privilege('authenticated','public.nieuwsprofiel','woonplan','UPDATE') THEN RAISE EXCEPTION '0e profielveld niet schrijfbaar'; END IF;
   IF NOT has_column_privilege('authenticated','public.nieuwsprofiel','tijdlijn_gelezen_tot','UPDATE') THEN RAISE EXCEPTION '0f tijdlijn_gelezen_tot (eigen-rij-voorkeur) niet schrijfbaar'; END IF;
@@ -121,4 +122,36 @@ DO $$ DECLARE n int; a uuid := current_setting('leaktest.a')::uuid; art uuid; e1
         RAISE EXCEPTION '17 tweede tijdlijnitem met zelfde artikel toegelaten';
   EXCEPTION WHEN unique_violation THEN RAISE NOTICE '17 OK 23505 — artikel hoogstens één keer per tijdlijn'; END;
 END $$;
+-- 18 RPC krant_geduide_artikelen (fase 2): anon/public geen execute, authenticated wel;
+-- 18c/18d draaien als de ECHTE aanroeper (authenticated met JWT-claims), niet
+-- als service_role (die omzeilt RLS en zou ook een SECURITY INVOKER-functie
+-- laten slagen — security G4, 29-09).
+RESET ROLE;
+DO $$ BEGIN
+  IF has_function_privilege('anon', 'public.krant_geduide_artikelen(uuid[])', 'EXECUTE') THEN RAISE EXCEPTION '18a anon mag de RPC aanroepen'; END IF;
+  IF NOT has_function_privilege('authenticated', 'public.krant_geduide_artikelen(uuid[])', 'EXECUTE') THEN RAISE EXCEPTION '18b authenticated mag de RPC niet aanroepen'; END IF;
+END $$;
+DO $$ DECLARE g uuid; ng uuid; BEGIN
+  SELECT id INTO g FROM public.news_articles WHERE duiding_status = 'geduid' LIMIT 1;
+  SELECT id INTO ng FROM public.news_articles WHERE duiding_status <> 'geduid' LIMIT 1;
+  PERFORM set_config('leaktest.g', coalesce(g::text, ''), true);
+  PERFORM set_config('leaktest.ng', coalesce(ng::text, ''), true);
+END $$;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', json_build_object('sub', current_setting('leaktest.a'), 'role', 'authenticated')::text, true),
+       set_config('request.jwt.claim.sub', current_setting('leaktest.a'), true);
+DO $$ DECLARE n int; g uuid := nullif(current_setting('leaktest.g'), '')::uuid; ng uuid := nullif(current_setting('leaktest.ng'), '')::uuid; a uuid := current_setting('leaktest.a')::uuid; BEGIN
+  -- authenticated leest news_articles zelf NIET (policy service/superadmin), de RPC wel de status.
+  SELECT count(*) INTO n FROM public.krant_geduide_artikelen(array_remove(ARRAY[g, ng], NULL));
+  IF n <> (CASE WHEN g IS NULL THEN 0 ELSE 1 END) THEN RAISE EXCEPTION '18c RPC als authenticated geeft % rijen, verwacht alleen het geduide artikel', n; END IF;
+  -- 18d de exacte PostgREST-upsertvorm van PUT /api/krant/tijdlijn/gelezen
+  INSERT INTO public.nieuwsprofiel (user_id, tijdlijn_gelezen_tot, updated_at) VALUES (a, now(), now())
+    ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id, tijdlijn_gelezen_tot = EXCLUDED.tijdlijn_gelezen_tot, updated_at = EXCLUDED.updated_at;
+  -- 18e de rem-kolom is voor een sessie NIET schrijfbaar
+  BEGIN UPDATE public.nieuwsprofiel SET tijdlijn_vernieuwd_at = now() WHERE user_id = a;
+        RAISE EXCEPTION '18e sessie schrijft tijdlijn_vernieuwd_at';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE '18 OK RPC als authenticated, gelezen-upsert, rem-kolom dicht';
+END $$;
+RESET ROLE;
 ROLLBACK;

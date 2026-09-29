@@ -4,10 +4,11 @@ import { getServiceClient } from '@/lib/supabase/service'
 import { recordJobRun } from '@/lib/job-runs'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { mapWithConcurrency } from '@/lib/concurrency'
-import { resolveActiveModules } from '@/lib/modules/resolve'
+import { isNewsOnly, resolveActiveModules } from '@/lib/modules/resolve'
 import { laadKandidaten } from '@/lib/krant/editie-loader'
-import { ruimTijdlijnOp, ververs } from '@/lib/krant/tijdlijn-run'
+import { ruimAlleTijdlijnenOp, ververs } from '@/lib/krant/tijdlijn-run'
 import { inTijdlijnBeta } from '@/lib/krant/tijdlijn-beta'
+import { aiKrantToegestaan, bepaalKrantBron } from '@/lib/krant/tijdlijn-bron'
 
 export const maxDuration = 300
 
@@ -24,18 +25,20 @@ export const TIJDLIJN_CRON_CONCURRENCY = 3
  * knelt al (de duiding wordt uitgesteld), en wat na 06:30 geduid wordt komt
  * de dag erna of via de knop.
  *
- * Voor wie: `nieuwsprofiel.krant_variant = 'tijdlijn'` én de module nieuws.
- * Tweede slot, bovenop de kolomgrant van migratie 20261004120000 (alleen de
- * service-role zet krant_variant): zolang TIJDLIJN_BETA_OPEN false staat,
- * draait hij uitsluitend voor superadmins (`inTijdlijnBeta`) — een per ongeluk
- * gezette variant bij een gewone lezer levert dan geen verwerking op vóór
- * /privacy 2.4 live is. De rol is hier een verwerkingsslot, geen beheerrecht:
+ * Voor wie (B40, fase 2): iedereen met de module nieuws en afgeronde
+ * onboarding wiens /nieuws de tijdlijn ÍS — dezelfde `bepaalKrantBron` als de
+ * pagina, dus niet wie bewust de AI-Krant koos (krant_variant 'ai'). Zolang
+ * TIJDLIJN_BETA_OPEN false staat (de tijdelijke schakelaar uit B40) is dat
+ * uitsluitend de superadmin (`inTijdlijnBeta`): geen verwerking voor gewone
+ * lezers vóór /privacy 2.4 live is. Wie bezwaar maakte tegen verwerking op de
+ * achtergrond (profiles.krant_schaduw_bezwaar_at, art. 21 AVG) slaat deze cron
+ * over — net als de weekcron; de vernieuwknop (zijn eigen verzoek) blijft werken. De rol is hier een verwerkingsslot, geen beheerrecht:
  * de route leest dezelfde profielkolommen als de weekcron (/api/krant/cron) en
  * geen inhoud van anderen (ADR 0146).
  *
  * Per lezer: `ververs` (profiel afleiden → matcher in tijdlijnmodus → een
- * verversing met bron 'tijdlijn', ook als die leeg is) en de opruimstap van
- * 120 dagen (B32). Geen idempotentie per dag nodig: een tweede run voegt alleen
+ * verversing met bron 'tijdlijn', ook als die leeg is). Daarna één opruimstap
+ * van 120 dagen (B32) over ALLE tijdlijnen — ook van wie deze run overslaat. Geen idempotentie per dag nodig: een tweede run voegt alleen
  * toe wat er nog niet stond (gezien = de eigen tijdlijn; de partiële unieke
  * index vangt een race met de knop).
  *
@@ -50,10 +53,12 @@ function getServiceClientOrNull() {
 }
 
 export interface TijdlijnCronSummary {
-  /** Lezers met krant_variant 'tijdlijn' die deze run in aanmerking kwamen. */
+  /** Lezers wiens /nieuws de tijdlijn is en die deze run in aanmerking kwamen. */
   lezers: number
-  /** Lezers met de variant maar buiten de bèta (vlag dicht, geen superadmin) of zonder module nieuws. */
+  /** Nieuwslezers buiten de tijdlijn: bèta-vlag dicht (geen superadmin) of bewust de AI-Krant. */
   buitenBeta: number
+  /** Nieuwslezers met bezwaar tegen verwerking op de achtergrond: overgeslagen. */
+  bezwaar: number
   verversingen: number
   /** Verversingen die niets toevoegden. */
   leeg: number
@@ -66,7 +71,12 @@ export interface TijdlijnCronSummary {
   kandidaten: number
   kandidatenOngeldig: number
   tijdBudgetOp: boolean
+  /** De opruimstap van 120 dagen faalde (los van de verversingen; security G2). */
+  opruimenMislukt: boolean
 }
+
+/** Paginagrootte voor de profielselectie: ruim onder PostgREST max_rows (1000). */
+export const TIJDLIJN_CRON_PAGINA = 500
 
 export async function GET(request: Request) {
   const startedAt = new Date().toISOString()
@@ -93,6 +103,7 @@ export async function GET(request: Request) {
   const summary: TijdlijnCronSummary = {
     lezers: 0,
     buitenBeta: 0,
+    bezwaar: 0,
     verversingen: 0,
     leeg: 0,
     berichten: 0,
@@ -102,33 +113,83 @@ export async function GET(request: Request) {
     kandidaten: 0,
     kandidatenOngeldig: 0,
     tijdBudgetOp: false,
+    opruimenMislukt: false,
+  }
+
+  // De bewaartermijn (B32) EERST en los van de rest: een fout in de selectie of
+  // de verversingen mag de 120-dagenbelofte uit /privacy niet stil op pauze
+  // zetten (security G2, 29-09). Voor iedereen, ook wie deze run overslaat.
+  try {
+    summary.opgeruimd = await ruimAlleTijdlijnenOp(service, now)
+  } catch (err) {
+    summary.opruimenMislukt = true
+    console.error('[krant/tijdlijn-cron] opruimen mislukt:', err)
   }
 
   try {
-    const { data: varianten, error: variantFout } = await service.from('nieuwsprofiel').select('user_id').eq('krant_variant', 'tijdlijn')
-    if (variantFout) {
-      await recordJobRun(service, { job: 'krant-tijdlijn', status: 'error', startedAt, error: variantFout.message })
-      return serverError(variantFout, 'krant-tijdlijn-cron:GET')
-    }
-    const ids = ((varianten ?? []) as Array<{ user_id: string }>).map((v) => v.user_id)
-
-    let lezers: string[] = []
-    if (ids.length > 0) {
-      const { data: profielen, error: profielFout } = await service
+    // Alle profielen met afgeronde onboarding, gepagineerd op id: onder B40 is
+    // dit iedereen, dus de max_rows-grens (1000) zou anders stil een
+    // ongeordende rest overslaan (eindreview Y4).
+    const profielen: unknown[] = []
+    for (let van = 0; ; van += TIJDLIJN_CRON_PAGINA) {
+      const { data: pagina, error: profielFout } = await service
         .from('profiles')
-        .select('id, role, active_modules, onboarding_completed')
-        .in('id', ids)
+        .select('id, role, active_modules, active_subscriptions, ai_enabled, onboarding_completed, krant_schaduw_bezwaar_at')
+        .eq('onboarding_completed', true)
+        .order('id', { ascending: true })
+        .range(van, van + TIJDLIJN_CRON_PAGINA - 1)
       if (profielFout) {
-        await recordJobRun(service, { job: 'krant-tijdlijn', status: 'error', startedAt, error: profielFout.message })
+        await recordJobRun(service, { job: 'krant-tijdlijn', status: 'error', startedAt, summary, error: profielFout.message })
         return serverError(profielFout, 'krant-tijdlijn-cron:GET')
       }
-      lezers = ((profielen ?? []) as Array<{ id: string; role: string | null; active_modules: string[] | null; onboarding_completed: boolean | null }>)
-        .filter((p) => p.onboarding_completed === true && resolveActiveModules(p).includes('nieuws'))
-        .filter((p) => inTijdlijnBeta(p.role))
-        .map((p) => p.id)
+      profielen.push(...(pagina ?? []))
+      if ((pagina ?? []).length < TIJDLIJN_CRON_PAGINA) break
     }
+    type Rij = {
+      id: string
+      role: string | null
+      active_modules: string[] | null
+      active_subscriptions: string[] | null
+      ai_enabled: boolean | null
+      krant_schaduw_bezwaar_at: string | null
+    }
+    const nieuwslezers = (profielen as Rij[])
+      .map((p) => ({ ...p, modules: resolveActiveModules(p) }))
+      .filter((p) => p.modules.includes('nieuws'))
+    const zonderBezwaar = nieuwslezers.filter((p) => p.krant_schaduw_bezwaar_at == null)
+    summary.bezwaar = nieuwslezers.length - zonderBezwaar.length
+
+    // De variant (alleen 'ai' telt: bewust de AI-Krant). Fail-closed: kan hij
+    // niet gelezen worden, dan draait de run niet — anders kreeg een AI-lezer
+    // stil weer een tijdlijn.
+    const aiLezers = new Set<string>()
+    const kandidaatIds = zonderBezwaar.map((p) => p.id)
+    for (let i = 0; i < kandidaatIds.length; i += 100) {
+      const { data: varianten, error: variantFout } = await service
+        .from('nieuwsprofiel')
+        .select('user_id')
+        .eq('krant_variant', 'ai')
+        .in('user_id', kandidaatIds.slice(i, i + 100))
+      if (variantFout) {
+        await recordJobRun(service, { job: 'krant-tijdlijn', status: 'error', startedAt, error: variantFout.message })
+        return serverError(variantFout, 'krant-tijdlijn-cron:GET')
+      }
+      for (const v of (varianten ?? []) as Array<{ user_id: string }>) aiLezers.add(v.user_id)
+    }
+
+    const lezers = zonderBezwaar
+      .filter(
+        (p) =>
+          bepaalKrantBron({
+            krantAccount: isNewsOnly(p.modules),
+            variant: aiLezers.has(p.id) ? 'ai' : null,
+            inBeta: inTijdlijnBeta(p.role),
+            aiToegestaan: aiKrantToegestaan(p),
+          }) === 'tijdlijn',
+      )
+      .map((p) => p.id)
     summary.lezers = lezers.length
-    summary.buitenBeta = ids.length - lezers.length
+    summary.buitenBeta = zonderBezwaar.length - lezers.length
 
     if (lezers.length > 0) {
       const [{ artikelen, ongeldig }, aowRows] = await Promise.all([laadKandidaten(service, now), getAowLeeftijden(service)])
@@ -141,11 +202,15 @@ export async function GET(request: Request) {
           return
         }
         try {
-          const uitkomst = await ververs(service, { userId, now, aowRows, kandidaten: artikelen })
+          const uitkomst = await ververs(service, { userId, now, aowRows, kandidaten: artikelen, hertoetsVoorSchrijven: true })
+          if (uitkomst.overgeslagen) {
+            // Intussen de AI-Krant gekozen of bezwaar gemaakt: niets geschreven.
+            summary.overgeslagen++
+            return
+          }
           summary.verversingen++
           summary.berichten += uitkomst.items
           if (uitkomst.leeg) summary.leeg++
-          summary.opgeruimd += await ruimTijdlijnOp(service, userId, now)
         } catch (err) {
           // 23505 op de partiële unieke index = de knop was deze lezer net voor:
           // de compensatie in schrijfEditie haalde deze verversing weg en er is
@@ -165,7 +230,14 @@ export async function GET(request: Request) {
       status: 'success',
       startedAt,
       summary,
-      error: summary.fouten > 0 ? `${summary.fouten} lezer(s) faalden` : summary.tijdBudgetOp ? 'tijdbudget op — rest volgt bij de volgende run' : null,
+      error:
+        summary.fouten > 0
+          ? `${summary.fouten} lezer(s) faalden`
+          : summary.opruimenMislukt
+            ? 'opruimen (120 dagen) mislukt'
+            : summary.tijdBudgetOp
+              ? 'tijdbudget op — rest volgt bij de volgende run'
+              : null,
     })
     return NextResponse.json({ success: true, summary })
   } catch (err) {

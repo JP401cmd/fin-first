@@ -80,12 +80,24 @@ export const WILL_FLOW: UatFlow = {
     { id: 'briefingmelding', scenarioId: 'UAT-WILL-14', label: 'WF-WILL-14 · Wekelijkse briefing-melding', kind: 'screen', stage: 2, lane: 'meldingen' },
 
     // ── 3 · krant ─────────────────────────────────────────────────────────
-    { id: 'krant', scenarioId: 'UAT-WILL-15', label: 'WF-WILL-15 · Persoonlijke krant openen en lezen (/nieuws)', kind: 'screen', stage: 3, lane: 'krant' },
+    // Krant 1C fase 2 (B40): /nieuws is een BRONKEUZE. 'bronkeuze' beslist
+    // tussen de AI-Krant ('krant', WF-WILL-15) en de tijdlijn zonder AI
+    // ('tijdlijn' + subacties); het derde uitkomst-been (KrantWacht voor een
+    // Krant-account buiten de bèta) zit als tak in datzelfde WF-WILL-33.
+    { id: 'bronkeuze', scenarioId: 'UAT-WILL-33', label: 'WF-WILL-33 · Server kiest de bron (tijdlijn/AI-Krant/wacht)', kind: 'screen', stage: 3, lane: 'krant' },
+    { id: 'krant', scenarioId: 'UAT-WILL-15', label: 'WF-WILL-15 · AI-Krant openen en lezen (/nieuws, bron=AI)', kind: 'screen', stage: 3, lane: 'krant', subOf: 'bronkeuze' },
     { id: 'ververs', scenarioId: 'UAT-WILL-16', label: 'WF-WILL-16 · Krant verversen binnen de weeklimiet', kind: 'action', stage: 3, lane: 'krant', subOf: 'krant' },
     { id: 'archief', scenarioId: 'UAT-WILL-17', label: 'WF-WILL-17 · Krantenarchief doorbladeren', kind: 'screen', stage: 3, lane: 'krant', subOf: 'krant' },
     { id: 'artikelbespreek', scenarioId: 'UAT-WILL-18', label: 'WF-WILL-18 · Nieuwsartikel met Fin bespreken', kind: 'action', stage: 3, lane: 'krant', subOf: 'krant' },
     { id: 'artikelactie', scenarioId: 'UAT-WILL-19', label: 'WF-WILL-19 · Actie maken vanuit een nieuwsartikel', kind: 'action', stage: 3, lane: 'krant', subOf: 'krant' },
     { id: 'minderhierover', scenarioId: 'UAT-WILL-20', label: 'WF-WILL-20 · "Minder hierover"-feedback geven', kind: 'action', stage: 3, lane: 'krant', subOf: 'krant' },
+
+    { id: 'tijdlijn', scenarioId: 'UAT-WILL-35', label: 'WF-WILL-35 · Tijdlijn: "Meer laden" + archief per week', kind: 'screen', stage: 3, lane: 'krant', subOf: 'bronkeuze' },
+    { id: 'tijdlijn-ververs', scenarioId: 'UAT-WILL-34', label: 'WF-WILL-34 · Tijdlijn verversen binnen de rem van 10 min', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'tijdlijn-katern', scenarioId: 'UAT-WILL-36', label: 'WF-WILL-36 · Algemeen katern alleen onder 5 berichten', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'tijdlijn-bezwaar', scenarioId: 'UAT-WILL-37', label: 'WF-WILL-37 · Bezwaar maken tegen verwerking (en intrekken)', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'tijdlijn-naar-ai', scenarioId: 'UAT-WILL-38', label: 'WF-WILL-38 · Naar de AI-Krant wist de tijdlijn; terug kan altijd', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'nieuwsstip', scenarioId: 'UAT-WILL-39', label: 'WF-WILL-39 · Nieuwsstip in de zijbalk (tijdlijnlezer)', kind: 'screen', stage: 3, lane: 'krant' },
 
     // ── 4 · uitkomst ──────────────────────────────────────────────────────
     { id: 'uitkomst', label: 'Tips/acties/meldingen/krant bijgewerkt', kind: 'outcome', stage: 4 },
@@ -101,7 +113,7 @@ export const WILL_FLOW: UatFlow = {
     // instap
     { from: 'nav', to: 'chatbeslis' },
     { from: 'nav', to: 'bel' },
-    { from: 'nav', to: 'krant' },
+    { from: 'nav', to: 'bronkeuze' },
     { from: 'nav', to: 'coachmelding' },
     { from: 'coachmelding', to: 'vraag', label: 'klik op de meldingstekst opent de chat' },
     { from: 'coachmelding', to: 'gidsstap', label: 'gids loopt nog → gidsstap i.p.v. data-gap-tip' },
@@ -148,13 +160,24 @@ export const WILL_FLOW: UatFlow = {
     { from: 'bel', to: 'x-bezit', kind: 'cross', label: 'koersalert-keten' },
     { from: 'bel', to: 'briefingmelding' },
 
-    // krant
+    // krant — bronkeuze splitst naar de AI-Krant of de tijdlijn zonder AI
+    { from: 'bronkeuze', to: 'krant', kind: 'branch', label: 'bron=ai (bewuste keuze, of standaard buiten de bèta)' },
+    { from: 'bronkeuze', to: 'tijdlijn', kind: 'branch', label: 'bron=tijdlijn (standaard binnen de bèta)' },
     { from: 'krant', to: 'ververs' },
     { from: 'krant', to: 'archief' },
     { from: 'krant', to: 'artikelbespreek' },
     { from: 'krant', to: 'artikelactie' },
     { from: 'krant', to: 'minderhierover' },
     { from: 'artikelbespreek', to: 'tip' },
+
+    // tijdlijn zonder AI
+    { from: 'tijdlijn', to: 'tijdlijn-ververs' },
+    { from: 'tijdlijn', to: 'tijdlijn-katern' },
+    { from: 'tijdlijn', to: 'tijdlijn-bezwaar' },
+    { from: 'tijdlijn', to: 'tijdlijn-naar-ai' },
+    { from: 'tijdlijn-naar-ai', to: 'krant', kind: 'branch', label: '"Liever de Krant met AI" wist de tijdlijn' },
+    { from: 'krant', to: 'tijdlijn', kind: 'branch', label: '"Naar de tijdlijn" (TerugNaarTijdlijn) als de bèta openstaat' },
+    { from: 'bronkeuze', to: 'nieuwsstip', label: 'de zijbalkstip leest dezelfde bronkeuze via /api/krant/tijdlijn?peek=1' },
 
     // samenvloeien → uitkomst
     { from: 'tip', to: 'uitkomst' },

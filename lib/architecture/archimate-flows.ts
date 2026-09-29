@@ -57,6 +57,16 @@ export const ARCHI_FLOWS: ArchiFlow[] = [
     ],
   },
   {
+    id: 'krant-tijdlijn',
+    title: 'Ingest → duiding → tijdlijn',
+    lead: 'Hoe een nieuwsartikel een persoonlijk bericht in de Krant zonder AI wordt — van de dagelijkse ingest tot wat de lezer op /nieuws ziet, zonder tussenkomst van een LLM per lezer.',
+    steps: [
+      { elementId: 'as-nieuws', label: 'Ingest + duiding', artifact: 'lib/news-ingest.ts · lib/krant/duiding.ts', detail: 'De dagelijkse cron haalt publieke bronnen op en duidt elk artikel eenmalig naar gegronde parameters (ADR 0171); euro-only, gesloten schema, fail-closed.' },
+      { elementId: 'do-krant', label: 'Matcher schrijft een verversing', artifact: 'lib/krant/tijdlijn-run.ts · lib/krant/matcher.ts (modus \'tijdlijn\')', detail: 'De dagcron (06:30 UTC) of de vernieuwknop van de lezer zelf leidt een nieuwsprofiel af uit de eigen data en schrijft een editierij met bron "tijdlijn", ook als die leeg is (ADR 0183 fase 1+2).' },
+      { elementId: 'sp-nieuws', label: '/nieuws toont de eigen tijdlijn', artifact: 'lib/krant/tijdlijn-lezen.ts · components/berichten/tijdlijn-client.tsx', detail: 'De server bepaalt eerst de bron (bepaalKrantBron, B40); is dat de tijdlijn, dan leest de sessie-client de eigen rijen (own-row-RLS) en filtert Achtergrond/katern op de actuele duiding_status via de RPC krant_geduide_artikelen.' },
+    ],
+  },
+  {
     id: 'snapshot-trend',
     title: 'Snapshot → trend',
     lead: 'Hoe historische foto’s van je vermogen trends, backtests, dashboard-widgets en het verloop van je gezondheid voeden.',

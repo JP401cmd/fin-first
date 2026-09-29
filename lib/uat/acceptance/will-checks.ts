@@ -16,12 +16,22 @@
  * mirror van een inline `getDemotedCategories` in app/api/news/route.ts) en
  * sinds sep 2026 `buildTipTerugNotifications` (lib/notifications/tip-terug.ts —
  * de producent die `/api/notifications` gebruikt; verving de bel-badge-mirror).
+ * SINDS KRANT 1C FASE 2 (B40, ADR 0183) VIER EXTRA ECHTE PURE IMPORTS —
+ * stuk voor stuk zonder Supabase-parameter, dus rechtstreeks importeerbaar:
+ * `bepaalKrantBron` (lib/krant/tijdlijn-bron.ts — de bronkeuze zelf),
+ * `VERNIEUW_INTERVAL_MS` (lib/krant/tijdlijn-vernieuwen.ts — de rem van 10
+ * minuten), en `TIJDLIJN_PAGINA`/`KATERN_ONDER`/`codeerCursor`/`decodeerCursor`/
+ * `WEEK_KEY` (lib/krant/tijdlijn-lezen.ts — paginagrootte, katerndrempel en de
+ * cursor-(de)codering).
  *
  * DRIE MIRRORS met bronregel-verwijzing (server-only API-routes met een
  * Supabase-client-parameter — niet importeerbaar in een pure module, spiegelt
  * de spaardoel-mirror in `budget-checks.ts` en de netto-vermogen-mirror in
  * `start-checks.ts`): postpone-termijn, budgetmelding-tekst,
- * krant-editienummer/jaargang/ververs-resterend.
+ * krant-editienummer/jaargang/ververs-resterend. SINDS KRANT 1C FASE 2 ÉÉN
+ * EXTRA MIRROR: de "te snel"-tijdsvergelijking van `verversEigenTijdlijn`
+ * (lib/krant/tijdlijn-vernieuwen.ts r67-69) — die functie zelf vraagt een
+ * Supabase-client, maar de tijdsrekenkunde erin is puur.
  */
 
 import { shouldAlert, budgetLimitStatus } from '@/lib/budget-alerts'
@@ -32,6 +42,9 @@ import { getFirstUndismissedSuggestion, type CoachDataGaps } from '@/lib/coach-s
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { demotedCategories, demotionWindowStartIso } from '@/lib/news-feedback-summary'
 import { buildTipTerugNotifications } from '@/lib/notifications/tip-terug'
+import { bepaalKrantBron } from '@/lib/krant/tijdlijn-bron'
+import { VERNIEUW_INTERVAL_MS } from '@/lib/krant/tijdlijn-vernieuwen'
+import { TIJDLIJN_PAGINA, KATERN_ONDER, WEEK_KEY, codeerCursor, decodeerCursor } from '@/lib/krant/tijdlijn-lezen'
 import { WILL_ACCEPTANCE } from './will'
 import type { AcceptanceCriterion } from './types'
 
@@ -99,6 +112,13 @@ function verzendVensterMirror(rollen: Array<'user' | 'assistant'>): Array<'user'
   while (start < rollen.length && rollen[start] !== 'user') start++
   const venster = rollen.slice(start)
   return venster.length > 0 ? venster : rollen.slice(-1)
+}
+
+/** Mirror van de tijdsvergelijking in lib/krant/tijdlijn-vernieuwen.ts
+ *  (r67-69, `verschil = now - vorige; verschil < VERNIEUW_INTERVAL_MS`) —
+ *  de functie zelf vraagt een Supabase-client, deze rekenkunde is puur. */
+function tijdlijnTeSnelMirror(nowMs: number, vorigeMs: number): boolean {
+  return nowMs - vorigeMs < VERNIEUW_INTERVAL_MS
 }
 
 /** Mirror van app/api/notifications/route.ts#formatAmountPair — centen zodra
@@ -496,6 +516,84 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
           `zelfdeSeedGelijk=${ids(seed0) === ids(seed0Opnieuw)}; ` +
           `andereSeedAnders=${ids(seed0) !== ids(seed1)}; ` +
           `poolGroeitMetData=${suggestiePoolGrootte(gevuld) > suggestiePoolGrootte(leeg)}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-33',
+    scenarioId: 'UAT-WILL-33',
+    label: 'Bronkeuze /nieuws (echte bepaalKrantBron): Krant-account nooit AI, bewuste keuze wint, standaard volgt de bèta',
+    run: () => {
+      criterion('WF-WILL-33')
+      const krantBuitenBeta = bepaalKrantBron({ krantAccount: true, variant: null, inBeta: false, aiToegestaan: true })
+      const krantBinnenBeta = bepaalKrantBron({ krantAccount: true, variant: null, inBeta: true, aiToegestaan: true })
+      const geheelGeenVariantBuitenBeta = bepaalKrantBron({ krantAccount: false, variant: null, inBeta: false, aiToegestaan: true })
+      const geheelGeenVariantBinnenBeta = bepaalKrantBron({ krantAccount: false, variant: null, inBeta: true, aiToegestaan: true })
+      const geheelVariantAiBuitenBeta = bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: false, aiToegestaan: true })
+      const geheelVariantAiBinnenBeta = bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: true, aiToegestaan: true })
+      // aiToegestaan false (kill-switch uit of geen AI-abonnement): de bewuste
+      // keuze 'ai' wint niet meer — anders eindigt de lezer bij een AI-Krant
+      // die hem weigert (eindreview Y2, 29-09). Binnen de bèta valt hij terug
+      // op de nieuwe standaard 'tijdlijn'.
+      const geheelVariantAiZonderAiBinnenBeta = bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: true, aiToegestaan: false })
+      return {
+        expected:
+          'krantBuitenBeta=wacht; krantBinnenBeta=tijdlijn; geheelGeenVariantBuitenBeta=ai; geheelGeenVariantBinnenBeta=tijdlijn; geheelVariantAiBuitenBeta=ai; geheelVariantAiBinnenBeta=ai; geheelVariantAiZonderAiBinnenBeta=tijdlijn',
+        actual:
+          `krantBuitenBeta=${krantBuitenBeta}; krantBinnenBeta=${krantBinnenBeta}; ` +
+          `geheelGeenVariantBuitenBeta=${geheelGeenVariantBuitenBeta}; geheelGeenVariantBinnenBeta=${geheelGeenVariantBinnenBeta}; ` +
+          `geheelVariantAiBuitenBeta=${geheelVariantAiBuitenBeta}; geheelVariantAiBinnenBeta=${geheelVariantAiBinnenBeta}; ` +
+          `geheelVariantAiZonderAiBinnenBeta=${geheelVariantAiZonderAiBinnenBeta}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-34',
+    scenarioId: 'UAT-WILL-34',
+    label: 'Tijdlijn-rem van 10 minuten (echte VERNIEUW_INTERVAL_MS + gemirrorde tijdsvergelijking)',
+    run: () => {
+      criterion('WF-WILL-34')
+      const vorige = Date.UTC(2026, 8, 29, 12, 0, 0)
+      const binnenRem = tijdlijnTeSnelMirror(vorige + 5 * 60 * 1000, vorige)
+      const naRem = !tijdlijnTeSnelMirror(vorige + 10 * 60 * 1000 + 1, vorige)
+      return {
+        expected: 'VERNIEUW_INTERVAL_MS=600000; teSnelBinnenRem=true; magVerversenNaRem=true',
+        actual: `VERNIEUW_INTERVAL_MS=${VERNIEUW_INTERVAL_MS}; teSnelBinnenRem=${binnenRem}; magVerversenNaRem=${naRem}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-35',
+    scenarioId: 'UAT-WILL-35',
+    label: 'Tijdlijn-paginagrootte + cursor-(de)codering (echte TIJDLIJN_PAGINA/codeerCursor/decodeerCursor/WEEK_KEY)',
+    run: () => {
+      criterion('WF-WILL-35')
+      const cursor = { createdAt: '2026-09-29T06:30:00.000Z', positie: 2, id: '3f6b6b8a-8a3e-4e3e-9c3e-1a2b3c4d5e6f' }
+      const gecodeerd = codeerCursor(cursor)
+      const gedecodeerd = decodeerCursor(gecodeerd)
+      const roundtrip =
+        gedecodeerd !== null &&
+        gedecodeerd.createdAt === cursor.createdAt &&
+        gedecodeerd.positie === cursor.positie &&
+        gedecodeerd.id === cursor.id
+      const ongeldigeCursorGeeftNull = decodeerCursor('niet-base64url-!!!') === null
+      const ongeldigeWeekGeeftNull = !WEEK_KEY.test('2026-40')
+      return {
+        expected: 'TIJDLIJN_PAGINA=20; cursorRoundtrip=true; ongeldigeCursorGeeftNull=true; ongeldigeWeekGeeftNull=true',
+        actual: `TIJDLIJN_PAGINA=${TIJDLIJN_PAGINA}; cursorRoundtrip=${roundtrip}; ongeldigeCursorGeeftNull=${ongeldigeCursorGeeftNull}; ongeldigeWeekGeeftNull=${ongeldigeWeekGeeftNull}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-36',
+    scenarioId: 'UAT-WILL-36',
+    label: 'Katerndrempel (echte KATERN_ONDER + de gemirrorde afleiding totaal<KATERN_ONDER)',
+    run: () => {
+      criterion('WF-WILL-36')
+      const toonKatern = (totaal: number) => totaal < KATERN_ONDER // mirror van tijdlijn-lezen.ts r279
+      return {
+        expected: 'KATERN_ONDER=5; toonKatern4=true; toonKatern5=false',
+        actual: `KATERN_ONDER=${KATERN_ONDER}; toonKatern4=${toonKatern(4)}; toonKatern5=${toonKatern(5)}`,
       }
     },
   },
