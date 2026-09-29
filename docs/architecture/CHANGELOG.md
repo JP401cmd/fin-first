@@ -1247,3 +1247,8 @@
 ## 2026-09-27
 
 - Geen wijzigingen.
+
+## 2026-09-29
+
+- **API-routes** toegevoegd: /api/admin/krant-weekmeting
+- **Componenten (aantal)** toegevoegd: +2

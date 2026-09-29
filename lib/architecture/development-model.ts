@@ -142,6 +142,11 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'De Wft/AVG-poort vóór elke publieke uiting, AI-wijziging en SEO-pagina: inzicht mag, vergunningsplichtig advies niet — plus de claimlijst, en altijd een beslisbare uitkomst (goedkeuren · aanpassen · afwijzen).',
   },
+  'duiding-inhaalslag': {
+    kind: 'tooling',
+    tagline:
+      'De achterstand in de Krant-duiding inhalen vanuit een sessie in plaats van via de API: exact de prompt van de cron exporteren, de duiding in de sessie schrijven, met dezelfde controles tegen de actuele rij toetsen, en pas na akkoord alleen het geduide deel schrijven.',
+  },
   'fiscale-wijzigingslog': {
     kind: 'tooling',
     tagline:
@@ -277,6 +282,11 @@ export const AGENT_CURATION: Record<string, AgentCuration> = {
     groupId: 'ai',
     rol: 'De AI-plumbing — Vercel AI SDK, providers, tools, schemas, context-builders en de guardrails.',
     inzet: 'Voor nieuwe AI-routes, tools, structured outputs of provider/config-wijzigingen.',
+  },
+  'duiding-schrijver': {
+    groupId: 'ai',
+    rol: 'Schrijft handmatige Krant-duidingen voor de inhaalslag, met alleen Read en Write, omdat de bronfragmenten onbetrouwbare tekst van derden zijn.',
+    inzet: 'Alleen vanuit de skill duiding-inhaalslag, per deel van een batch met een eigen uitvoerbestand.',
   },
   'ai-specialist-prompt-dna': {
     groupId: 'ai',
