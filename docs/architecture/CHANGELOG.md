@@ -1288,3 +1288,7 @@
 - **Schermen** toegevoegd: /krant/meer
 - **API-routes** toegevoegd: /api/admin/users/product, /api/modules
 - **Componenten (aantal)** toegevoegd: +13
+
+## 2026-09-29
+
+- Geen wijzigingen.
