@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import type { WeekMeting } from './duiding-beheer'
+import { onderdrukPerProfieltype } from './meting'
 import {
   amsterdamWeekGrenzen,
   bouwWeekmeting,
   bouwWeekreeks,
+  isVoorlopig,
   poortCodes,
   vorigeWeekKey,
   SAMENVATTING_DALING_PP,
+  WACHTRIJ_VOORLOPIG_AANDEEL,
   WEEKMETING_VERSIE,
   type WeekmetingInvoer,
 } from './weekmeting'
@@ -141,11 +144,21 @@ describe('bouwWeekmeting', () => {
     expect(r.vorigeWeek).toEqual({ week: '2026-W39', aandeelSamenvatting: 0.5 })
   })
 
-  it('lege edities: één per lezer, testaccounts per type, echte lezers ALLEEN in het totaal (security 🟡-1)', () => {
+  it('lege edities: één per lezer, testaccounts ongedrukt, echte lezers per type k=5-onderdrukt (besluit 29 sep)', () => {
     const r = bouwWeekmeting(invoer())
-    expect(r.verversingen).toEqual({ edities: 2, leeg: 1, onvolledig: false, testaccounts: { p1: { edities: 1, leeg: 1 } } })
-    // Het profieltype van de echte lezer (p2) komt nergens in het record.
-    expect(JSON.stringify(r)).not.toContain('p2')
+    expect(r.verversingen.edities).toBe(2)
+    expect(r.verversingen.leeg).toBe(1)
+    expect(r.verversingen.testaccounts).toEqual({ p1: { edities: 1, leeg: 1 } })
+    // Dezelfde onderdrukking als de weekcron: één echte lezer tegen een totaal van 1.
+    expect(r.verversingen.perProfieltype).toEqual(onderdrukPerProfieltype({ p2: { edities: 1, leeg: 0 } }, { edities: 1, leeg: 0 }))
+    // Nooit het ruwe aantal van één lezer.
+    expect(r.verversingen.perProfieltype?.p2.edities).not.toBe(1)
+  })
+
+  it('met vijf of meer echte lezers per type staat het getal er ongedrukt', () => {
+    const edities = Array.from({ length: 6 }, (_, i) => ({ user_id: `u-${i}`, profiel_type: 'p9', leeg: i < 2 }))
+    const r = bouwWeekmeting(invoer({ edities, testaccountIds: new Set() }))
+    expect(r.verversingen.perProfieltype).toEqual(onderdrukPerProfieltype({ p9: { edities: 6, leeg: 2 } }, { edities: 6, leeg: 2 }))
   })
 
   it('een onvolledige editierun is een waarschuwing, geen stil getal', () => {
@@ -177,8 +190,34 @@ describe('bouwWeekmeting', () => {
 describe('waarschuwingen (drempels)', () => {
   const codes = (inv: WeekmetingInvoer) => bouwWeekmeting(inv).waarschuwingen.map((w) => w.code)
 
-  it('G1 > 0 waarschuwt; een schone week niet', () => {
-    expect(codes(invoer())).toEqual(['g1'])
+  it('G1–G3 zijn een telling, geen waarschuwing (besluit eigenaar 29 sep)', () => {
+    const r = bouwWeekmeting(
+      invoer({ duiding: week({ poort: { groen: 2, gedegradeerd: 6, perReden: { 'g1:a': 2, 'g2:datum': 2, 'g3:meta': 2 } } }) }),
+    )
+    expect(r.poort).toMatchObject({ g1: 2, g2: 2, g3: 2 })
+    expect(r.waarschuwingen.map((w) => w.code)).toEqual([])
+  })
+
+  it('een week die grotendeels nog in de duidingswachtrij staat is "voorlopig" — geen nul-rekenend of dalingsvals-alarm', () => {
+    // De situatie van W39 op 29 sep: 106 van 107 op wacht, 1 (teruggetrokken) geduid, 0 rekenend.
+    const inv = invoer({
+      duiding: week({ binnen: 107, geduid: 1, wacht: 106, rekenend: 0, poort: { groen: 1, gedegradeerd: 0, perReden: {} } }),
+      metSamenvattingTotaal: 0,
+      vorigeWeek: { week: '2026-W38', geduid: 20, metSamenvatting: 10 },
+    })
+    const r = bouwWeekmeting(inv)
+    expect(r.waarschuwingen.map((w) => w.code)).toEqual(['voorlopig'])
+    expect(r.waarschuwingen[0].tekst).toContain('106 van 107')
+    expect(isVoorlopig(r.artikelen)).toBe(true)
+  })
+
+  it(`hoogstens ${WACHTRIJ_VOORLOPIG_AANDEEL * 100}% op wacht is niet voorlopig`, () => {
+    expect(isVoorlopig({ binnen: 100, wacht: 10 })).toBe(false)
+    expect(isVoorlopig({ binnen: 100, wacht: 11 })).toBe(true)
+    expect(isVoorlopig({ binnen: 0, wacht: 0 })).toBe(false)
+  })
+
+  it('een schone, volledig geduide week geeft geen waarschuwing', () => {
     const schoon = invoer({ duiding: week({ poort: { groen: 8, gedegradeerd: 0, perReden: {} } }) })
     expect(codes(schoon)).toEqual([])
   })

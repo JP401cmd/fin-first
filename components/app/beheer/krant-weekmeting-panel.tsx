@@ -2,7 +2,9 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import { CalendarCheck, ChevronDown, ChevronUp } from 'lucide-react'
-import { WEEKMETING_BRONSOORTEN, type WeekmetingReeksRegel } from '@/lib/krant/weekmeting'
+import { GEBRUIK_K } from '@/lib/beheer/gebruik-analyse/onderdrukking'
+import { metingCelTekst } from '@/lib/krant/meting-beheer'
+import { isVoorlopig, WEEKMETING_BRONSOORTEN, type WeekmetingReeksRegel } from '@/lib/krant/weekmeting'
 
 /**
  * Weekmeting van de Krant op `/beheer/nieuws` (B41): één regel per afgesloten
@@ -86,6 +88,7 @@ export function KrantWeekmetingPanel({ ververs }: { ververs: number }) {
                 <th className="px-3 py-2.5 font-medium">Week</th>
                 <th className="px-3 py-2.5 text-right font-medium">Binnen</th>
                 <th className="px-3 py-2.5 text-right font-medium">Geduid</th>
+                <th className="px-3 py-2.5 text-right font-medium">Wacht</th>
                 <th className="hidden px-3 py-2.5 text-right font-medium sm:table-cell">Samenv.</th>
                 <th className="hidden px-3 py-2.5 text-right font-medium sm:table-cell">Thema</th>
                 <th className="px-3 py-2.5 text-right font-medium">Rekenend</th>
@@ -104,9 +107,15 @@ export function KrantWeekmetingPanel({ ververs }: { ververs: number }) {
                       className="cursor-pointer transition-colors hover:bg-[var(--subtle)]"
                       onClick={() => setOpen(isOpen ? null : r.week)}
                     >
-                      <td className="px-3 py-2 text-[var(--ink)]">{r.week}</td>
+                      <td className="px-3 py-2 text-[var(--ink)]">
+                        {r.week}
+                        {isVoorlopig(r.artikelen) && (
+                          <span className="ml-2 font-sans text-xs text-[var(--warning)]">voorlopig</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-right text-[var(--ink-3)]">{r.artikelen.binnen}</td>
                       <td className="px-3 py-2 text-right text-[var(--ink-2)]">{r.artikelen.geduid}</td>
+                      <td className="px-3 py-2 text-right text-[var(--ink-3)]">{r.artikelen.wacht}</td>
                       <td className="hidden px-3 py-2 text-right text-[var(--ink-2)] sm:table-cell">
                         {pct(r.artikelen.aandeelSamenvatting)}
                       </td>
@@ -141,7 +150,7 @@ export function KrantWeekmetingPanel({ ververs }: { ververs: number }) {
                     </tr>
                     {isOpen && (
                       <tr>
-                        <td colSpan={9} className="bg-[var(--paper)] px-3 py-4 font-sans">
+                        <td colSpan={10}className="bg-[var(--paper)] px-3 py-4 font-sans">
                           <WeekDetail regel={{ record: r, status, startedAt: null }} />
                         </td>
                       </tr>
@@ -161,7 +170,11 @@ function WeekDetail({ regel }: { regel: WeekmetingReeksRegel }) {
   const r = regel.record
   const soorten = [...WEEKMETING_BRONSOORTEN, 'onbekend'] as const
   const features = Object.entries(r.tokens.perFeature).sort((a, b) => b[1].input + b[1].output - (a[1].input + a[1].output))
-  const test = Object.entries(r.verversingen.testaccounts).sort((a, b) => a[0].localeCompare(b[0]))
+  // Records van vóór 29 sep dragen geen verdeling van echte lezers.
+  const echt = r.verversingen.perProfieltype
+    ? Object.entries(r.verversingen.perProfieltype).sort((a, b) => a[0].localeCompare(b[0]))
+    : null
+  const test =Object.entries(r.verversingen.testaccounts).sort((a, b) => a[0].localeCompare(b[0]))
   return (
     <div className="space-y-4 text-xs text-[var(--ink-3)]">
       {r.waarschuwingen.length > 0 && (
@@ -222,18 +235,30 @@ function WeekDetail({ regel }: { regel: WeekmetingReeksRegel }) {
           Lege edities {r.editieWeek}: {r.verversingen.leeg} van {r.verversingen.edities}
           {r.verversingen.onvolledig && ' (ondergrens: de editierun liep niet volledig)'}
         </h4>
-        <p className="mb-1">
-          De verdeling per profieltype van echte lezers staat in het paneel Meting schaduweditie (k-onderdrukt);
-          hier alleen het totaal, zodat twee tabellen samen niets prijsgeven.
-        </p>
-        <ul>
-          <li className="font-medium">Testaccounts</li>
-          {test.length === 0 ? <li>—</li> : test.map(([t, c]) => (
-            <li key={t} className="font-mono">
-              {t}: {c.leeg} / {c.edities}
-            </li>
-          ))}
-        </ul>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <ul>
+            <li className="font-medium">Echte lezers (k = {GEBRUIK_K})</li>
+            {echt === null ? (
+              <li>niet vastgelegd in deze run</li>
+            ) : echt.length === 0 ? (
+              <li>—</li>
+            ) : (
+              echt.map(([t, c]) => (
+                <li key={t} className="font-mono">
+                  {t}: {metingCelTekst(c.leeg)} / {metingCelTekst(c.edities)}
+                </li>
+              ))
+            )}
+          </ul>
+          <ul>
+            <li className="font-medium">Testaccounts</li>
+            {test.length === 0 ? <li>—</li> : test.map(([t, c]) => (
+              <li key={t} className="font-mono">
+                {t}: {c.leeg} / {c.edities}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
       <div>
         <h4 className="mb-1 font-semibold text-[var(--ink-2)]">

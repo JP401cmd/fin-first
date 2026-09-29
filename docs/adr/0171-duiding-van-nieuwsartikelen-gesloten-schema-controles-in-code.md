@@ -212,7 +212,7 @@ dat niet overnemen: Supabase is geen claude.ai-connector. Daarom meet de app zic
 `legWeekmetingVast` aan (`lib/krant/weekmeting-run.ts`). Die meet de **afgesloten** Amsterdamse
 ISO-week ervoor en schrijft één record in `job_runs` onder de eigen taak `krant-weekmeting`:
 G1–G6 (afgeleid uit `bouwDuidingMeting`, geen tweede telling), dekking per bronsoort, artikelpagina's
-en resterende backfill, lege edities (echte lezers alleen als totaal, testaccounts per profieltype) en tokens per
+en resterende backfill, lege edities (echte lezers per profieltype k=5-onderdrukt, testaccounts ongedrukt) en tokens per
 AI-feature. `/beheer/nieuws` toont de weekreeks via `GET /api/admin/krant-weekmeting`, dat alleen
 `job_runs` leest.
 
@@ -229,12 +229,19 @@ AI-feature. `/beheer/nieuws` toont de weekreeks via `GET /api/admin/krant-weekme
   mechanisme, 0 rekenend, het aandeel met samenvatting ≥ 5 procentpunt gedaald, een afgekapte of
   mislukte lezing) staat in het record en maakt de run `partial` (ADR 0178). De runner werpt nooit.
 
-**Voorlopig (nacht 29 sep, eigenaar kan omdraaien):** G1–G3 waarschuwen net als G4/G5, zoals de kaart
-vraagt. G1–G3 betekenen dat de tekstpoort iets tegenhield, dus ze zullen vaak afgaan; blijkt dat ruis,
-dan worden ze een telling zonder waarschuwing. De dalingsdrempel van 5 procentpunt is ook voorlopig.
+**Besluit eigenaar (29 sep):** G1–G3 zijn een telling in het record, geen waarschuwing — ze betekenen dat
+de tekstpoort iets tegenhield. G4/G5 en een fout getal bij een rekenend mechanisme blijven waarschuwen. De
+dalingsdrempel blijft 5 procentpunt.
 
-**Eén publicatie per populatie.** De verdeling per profieltype van echte lezers staat al k=5-onderdrukt
-in de `krant-editie`-summary. De weekmeting publiceert haar niet nog een keer: twee correct onderdrukte
-tabellen over een net iets andere populatie (een herhaalde run in dezelfde week) geven samen de
-ongedrukte cel van het verschil prijs (security-run 29 sep). Het weekrecord draagt daarom alleen de
-totalen en de ongedrukte verdeling van de vijf testaccounts.
+**Voorlopig bij een duidingswachtrij.** Staat meer dan 10 % van de gemeten week nog op `wacht` (bv. na de
+v3-bump van 27 sep: de ingest duidt nieuwste eerst, dus een afgesloten week komt als laatste), dan geeft
+het record één waarschuwing `voorlopig` in plaats van `nul-rekenend` en `samenvatting-daalt` — die zeggen
+dan iets over de wachtrij, niet over de duiding. Een herhaalde run later in de week meet dezelfde week
+opnieuw en wint in de weekreeks.
+
+**Verdeling van echte lezers: bewust aanvaard restrisico (besluit eigenaar 29 sep).** Het weekrecord
+draagt de verdeling per profieltype van echte lezers, k=5-onderdrukt met hetzelfde algoritme als de
+weekcron. De security-run wees op het restrisico: dezelfde verdeling staat ook in de `krant-editie`-summary,
+en twee correct onderdrukte tabellen over een net iets andere populatie (een herhaalde run in dezelfde
+week) kunnen samen de cel van het verschil prijsgeven. De eigenaar heeft dat risico aanvaard; bij een
+groeiende lezerspopulatie opnieuw wegen.

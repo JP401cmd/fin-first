@@ -47,6 +47,30 @@ describe('KrantWeekmetingPanel', () => {
     expect(screen.getByText('Geen enkel artikel binnengekomen deze week')).toBeInTheDocument()
   })
 
+  it('toont Wacht, markeert een week in de wachtrij als voorlopig en toont echte lezers per type', async () => {
+    const wachtrij = {
+      ...RECORD,
+      artikelen: { ...RECORD.artikelen, binnen: 107, geduid: 1, wacht: 106 },
+      verversingen: { ...RECORD.verversingen, perProfieltype: { 'p-echt': { edities: 'klein' as const, leeg: 'klein' as const } } },
+    }
+    mockFetch({ weken: [{ status: 'partial', startedAt: '2026-09-29T06:24:00Z', record: wachtrij }] })
+    render(<KrantWeekmetingPanel ververs={0} />)
+    expect(await screen.findByText('voorlopig')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Wacht' })).toBeInTheDocument()
+    expect(screen.getByText('106')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Details week 2026-W40' }))
+    await waitFor(() => expect(screen.getByText(/Echte lezers/)).toBeInTheDocument())
+    expect(screen.getByText(/p-echt:/)).toBeInTheDocument()
+  })
+
+  it('een record van vóór 29 sep zonder verdeling van echte lezers breekt niet', async () => {
+    const oud = { ...RECORD, verversingen: { edities: 0, leeg: 0, onvolledig: false, testaccounts: {} } }
+    mockFetch({ weken: [{ status: 'success', startedAt: '2026-09-29T06:24:00Z', record: oud }] })
+    render(<KrantWeekmetingPanel ververs={0} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Details week 2026-W40' }))
+    await waitFor(() => expect(screen.getByText('niet vastgelegd in deze run')).toBeInTheDocument())
+  })
+
   it('meldt een fout met role=alert', async () => {
     mockFetch({ error: 'Geen toegang' }, false)
     render(<KrantWeekmetingPanel ververs={0} />)
