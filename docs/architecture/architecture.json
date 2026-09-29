@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T18:46:16.827Z",
+  "generatedAt": "2026-09-29T20:11:06.885Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.22"
+    "version": "0.92.23"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -195,7 +195,7 @@
     "tables": 105,
     "migrations": 271,
     "integrations": 24,
-    "components": 1286,
+    "components": 1289,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -9488,11 +9488,11 @@
     }
   ],
   "components": {
-    "total": 1286,
+    "total": 1289,
     "groups": [
       {
         "group": "app",
-        "count": 492,
+        "count": 494,
         "items": [
           "aandacht-lijst",
           "aandelen-holdings.config",
@@ -9623,6 +9623,7 @@
           "debt-detail-modal",
           "debt-form",
           "debt-form.berekend-toggle.test",
+          "debt-form.indeling.test",
           "debt-form.min-betaling-sync.test",
           "debt-form.negatieve-invoer.test",
           "debt-pane",
@@ -9674,6 +9675,7 @@
           "floating-nav-button.test",
           "form-error",
           "form-error.test",
+          "form-inklapblok",
           "freedom-card",
           "freedom-card.weinig.test",
           "freedom-days-animation",
@@ -10396,7 +10398,7 @@
       },
       {
         "group": "core",
-        "count": 83,
+        "count": 84,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -10410,6 +10412,7 @@
           "asset-form-iban.test",
           "asset-return-modal",
           "assets-client",
+          "assets-client.indeling.test",
           "assets-client.rendement-leeg.test",
           "box3-comparison",
           "card-kpi-strip",
@@ -19327,7 +19330,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 68
+        "commits": 69
       },
       {
         "path": "app/(app)/toekomst",
@@ -19370,13 +19373,13 @@
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4878,
+        "loc": 4937,
         "commits": 40
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 4028,
-        "commits": 27
+        "loc": 4080,
+        "commits": 28
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -19385,7 +19388,7 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3147,
+        "loc": 3148,
         "commits": 66
       },
       {
@@ -20669,8 +20672,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-29",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+3"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -21159,7 +21170,7 @@
     {
       "date": "2026-09-29",
       "api": 344,
-      "components": 1286,
+      "components": 1289,
       "tables": 105,
       "routesProduction": 91
     }

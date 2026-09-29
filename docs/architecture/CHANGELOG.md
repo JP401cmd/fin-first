@@ -1305,3 +1305,7 @@
 ## 2026-09-29
 
 - Geen wijzigingen.
+
+## 2026-09-29
+
+- **Componenten (aantal)** toegevoegd: +3
