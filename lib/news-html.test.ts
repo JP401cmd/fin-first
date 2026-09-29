@@ -349,3 +349,63 @@ describe('artikelTekst', () => {
     ).toBe('2026-09-01T00:00:00.000Z')
   })
 })
+
+// ── ADR 0191 — kaartkoppen, padfilter en Dublin Core ─────────────────────────
+
+describe('extractLinks — een kaart draagt zijn eigen kop; padfilter vóór de cap (ADR 0191)', () => {
+  // Zoals de ministeriepagina van rijksoverheid.nl (gemeten 29 sep 2026): tegels
+  // naar thema's en bewindspersonen tussen de nieuwstegels.
+  const MINISTERIE = `<main>
+<ol>
+<li><a href="/themas/werk/pensioen" class="card"><div class="card__content"><h3>Pensioen</h3><p>Elk jaar stelt het kabinet vast op welke leeftijd mensen over 5 jaar AOW krijgen.</p></div></a></li>
+<li><a href="/actueel/nieuws/2026/09/29/noodfonds-energie-gaat-open" class="card"><figure><img src="/x.svg"/></figure><div class="card__content"><h3 class="card__title">Noodfonds Energie gaat open</h3><div><p class="card__text">Het Noodfonds Energie opent. Vanaf 1 december kunnen mensen contact opnemen.</p><div class="meta"><span>29-09-2026</span><span>14:15</span></div></div></div></a></li>
+<li><a href="/regering/bewindspersonen/eelco-heinen" class="card"><div><h3>Eelco Heinen</h3><p>Minister van Financiën Lees verder</p></div></a></li>
+<li><a href="/documenten/2026/09/25/letterlijke-tekst-persconferentie-na-ministerraad-25-september-2026">Letterlijke tekst persconferentie na ministerraad 25 september 2026</a></li>
+</ol></main>`
+  const BRON = 'https://www.rijksoverheid.nl/ministeries/ministerie-van-financien'
+
+  it('de kop van een kaart is de kop in de kaart, niet de hele kaarttekst; teaser en datum blijven in het fragment', () => {
+    const { links } = extractLinks(MINISTERIE, BRON, 120)
+    const nieuws = links.find((l) => l.url.endsWith('/noodfonds-energie-gaat-open'))!
+    expect(nieuws.tekst).toBe('Noodfonds Energie gaat open')
+    expect(nieuws.fragment).toContain('Vanaf 1 december')
+    expect(nieuws.fragment).toContain('29-09-2026 14:15')
+    // Zonder kop-element blijft de linktekst de kop (gedrag van vóór ADR 0191).
+    expect(links.find((l) => l.url.includes('/documenten/'))!.tekst).toBe('Letterlijke tekst persconferentie na ministerraad 25 september 2026')
+  })
+
+  it('een te korte kop in de kaart: dan de hele linktekst', () => {
+    const html = '<main><a href="/actueel/nieuws/2026/09/29/kort"><h3>Kort</h3><p>Een langere tekst die wel een kop kan zijn</p></a></main>'
+    expect(extractLinks(html, BRON, 120).links[0].tekst).toBe('Kort Een langere tekst die wel een kop kan zijn')
+  })
+
+  it('met padfilter: alleen nieuws en documenten, geen thema- of bewindspersoontegels', () => {
+    const { links } = extractLinks(MINISTERIE, BRON, 120, BRON, ['/actueel/nieuws/', '/documenten/'])
+    expect(links.map((l) => new URL(l.url).pathname)).toEqual([
+      '/actueel/nieuws/2026/09/29/noodfonds-energie-gaat-open',
+      '/documenten/2026/09/25/letterlijke-tekst-persconferentie-na-ministerraad-25-september-2026',
+    ])
+    // Zonder filter komen de tegels mee — precies wat de terugval anders als "eerste vier" nam.
+    expect(extractLinks(MINISTERIE, BRON, 120).links).toHaveLength(4)
+  })
+
+  it('het padfilter werkt vóór de cap: de cap gaat naar bruikbare links', () => {
+    const { links, afgekapt } = extractLinks(MINISTERIE, BRON, 1, BRON, ['/documenten/'])
+    expect(links.map((l) => new URL(l.url).pathname)).toEqual(['/documenten/2026/09/25/letterlijke-tekst-persconferentie-na-ministerraad-25-september-2026'])
+    expect(afgekapt).toBe(0)
+  })
+})
+
+describe('extractBronDatums — Dublin Core als laatste terugval (CBS, ADR 0191)', () => {
+  it('CBS: DCTERMS.modified wordt de wijzigingsdatum', () => {
+    const html = '<head><meta name="DCTERMS.modified" title="XSD.dateTime" content="2026-09-22T06:30:00+02:00" /></head><main><h1>Prijsstijging koopwoningen vlakt af</h1></main>'
+    expect(extractBronDatums(html)).toEqual({ gewijzigd: '2026-09-22T04:30:00.000Z', gepubliceerd: null })
+  })
+
+  it('DCTERMS.issued wordt de publicatiedatum; JSON-LD gaat voor', () => {
+    const issued = '<meta name="dcterms.issued" content="2026-09-20T08:00:00Z">'
+    expect(extractBronDatums(issued).gepubliceerd).toBe('2026-09-20T08:00:00.000Z')
+    const beide = `<script type="application/ld+json">{"datePublished":"2026-09-18T10:00:00Z"}</script>${issued}`
+    expect(extractBronDatums(beide).gepubliceerd).toBe('2026-09-18T10:00:00.000Z')
+  })
+})

@@ -1,5 +1,5 @@
 {
-  "matcherVersie": 5,
+  "matcherVersie": 6,
   "sjabloonVersie": 2,
   "profielType": "onder-35·wonen-onbekend·alleen",
   "items": [
@@ -10,6 +10,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a05-eigen-risico",
       "gepubliceerd": "2026-09-19T05:10:00Z",
+      "gezienOp": null,
       "vorm": "direct",
       "score": 4,
       "mechanisme": "eigen-risico",
@@ -50,6 +51,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a02-box1-schijf1",
       "gepubliceerd": "2026-09-19T05:10:00Z",
+      "gezienOp": null,
       "vorm": "direct",
       "score": 3,
       "mechanisme": "box1-parameter",
@@ -91,6 +93,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a03-aow-leeftijd",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "De AOW-leeftijd stijgt in 2033 met drie maanden. Dat volgt uit de nieuwe levensverwachting."
       },
       {
@@ -100,6 +103,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a01-box3-heffingsvrij",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "Het heffingsvrij vermogen in box 3 gaat in 2027 naar 60.000 euro. Het tarief blijft 36 procent."
       },
       {
@@ -109,6 +113,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a09-huurverhoging",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "De maximale huurverhoging in de vrije sector is voor 2027 vastgesteld op 4,1 procent."
       },
       {
@@ -118,6 +123,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a04-studieschuld-rente",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "De rente op studieschulden wordt in 2027 vastgesteld op 3 procent. Dat geldt voor wie dan een nieuwe rentevaste periode ingaat."
       },
       {
@@ -127,6 +133,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a11-inflatie",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "De inflatie kwam in augustus uit op 2,6 procent. Vooral de huren en energie stegen."
       }
     ]

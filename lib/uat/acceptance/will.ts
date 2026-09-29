@@ -12,7 +12,8 @@
  * is UAT-WILL-23, zie hieronder) — dit domein is dus, net als SCHULD/TOEK, NIET
  * volledig aaneengesloten op WF-nummer, maar WEL 1-op-1 met de catalogus-
  * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 t/m 32 = 29
- * + UAT-WILL-33 t/m 39 (Krant 1C fase 2, zie hieronder) = 36).
+ * + UAT-WILL-33 t/m 39 (Krant 1C fase 2, zie hieronder) = 36, + UAT-WILL-40
+ * (matcher v5) + UAT-WILL-41 (redactieregels, ADR 0191) = 38).
  *
  * UAT-WILL-33 t/m 39 (Krant 1C fase 2 — B31/B32/B37/B40/U11/U13, ADR 0183):
  * /nieuws koos vóór deze release altijd de AI-Krant; sindsdien is dat een
@@ -668,12 +669,31 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De matcher toetst het leescontract (`voldoetAanLeescontract` → `inVenster`) — dezelfde pure toets voor de dagelijkse tijdlijncron, de vernieuwknop (WF-WILL-34), de weekcron (schaduweditie) en de herberekening.',
     then:
-      'Een publicatiedatum ouder dan `NIEUWS_MAX_OUDERDOM_DAGEN` (45) telt NIET als nieuw, ook al is het artikel deze week opgehaald: het verschijnt niet in de tijdlijn of editie. Bij 44 dagen telt het wel. Zonder (bruikbare) publicatiedatum beslist de ophaaldatum. Een aankomende deadline gaat voor: dan blijft ook een oud bericht in het venster. Uitkomst draagt `matcherVersie` 5 (eigenaarsbesluit 29-09-2026).',
+      'Een publicatiedatum ouder dan `NIEUWS_MAX_OUDERDOM_DAGEN` (45) telt NIET als nieuw, ook al is het artikel deze week opgehaald: het verschijnt niet in de tijdlijn of editie. Bij 44 dagen telt het wel. Zonder (bruikbare) publicatiedatum beslist de ophaaldatum — sinds matcher v6 (ADR 0191) telt alleen een ECHTE publicatiedatum (feed, metadata of de datum bij de kop); `eerste_gezien` is het ophaalmoment en maakt niets "oud". Een aankomende deadline gaat voor: dan blijft ook een oud bericht in het venster. Uitkomst draagt `matcherVersie` 6 (v5: eigenaarsbesluit 29-09-2026; v6: redactieregels).',
     assertion: {
       kind: 'exact',
-      expected: 'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=5; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudMetDeadline=true',
+      expected: 'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=6; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudZonderEchteDatum=true; oudMetDeadline=true',
       source:
         'lib/krant/matcher.ts#voldoetAanLeescontract + inVenster/isOudNieuws + #NIEUWS_MAX_OUDERDOM_DAGEN + #MATCHER_VERSIE — echte, pure productiefunctie op de gedeelde fixture lib/krant/editie.fixture.ts (zelfde invoer als matcher.test.ts), geen mirror — zie will-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-WILL-41',
+    scenarioId: 'UAT-WILL-41',
+    titel: 'De redactieregels van de tijdlijn: verandering is nieuws, het bericht past bij de lezer, de echte datum',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Geduide artikelen in het venster (ADR 0191, steekproef eigenaar 29-09-2026): (1) een sectie van een vaste uitlegpagina die binnenkwam omdat de pagina nieuw was (`bron_wijziging` basis) en dezelfde sectie als wijziging op een bekende pagina (gewijzigd); (2a) een AFM-bericht met "Caribisch Nederland" in de kop, en een Nederlands bericht dat Bonaire één keer terloops noemt; (2b) de AFM-blog "betaal jezelf eerst: spaarbuffer" met thema sparen-rente, bij een lezer met spaargeld tot € 5.000 en een lezer met € 50.000–100.000; (2c) een cijfer zonder rekenregel met een thema dat raakt; (3) een artikel zonder echte publicatiedatum (`published_bron` eerste_gezien).',
+    when:
+      'De tijdlijn ververst (dagcron of de vernieuwknop, WF-WILL-34) en de matcher (`matchEditie`, modus tijdlijn, MATCHER_VERSIE 6) bouwt de berichten, Achtergrond en het katern.',
+    then:
+      '(1) De basissectie komt nooit in de tijdlijn en draagt dus nooit het label Nieuw; ze mag in Achtergrond staan, ACHTER al het nieuws. De gewijzigde sectie komt wél als bericht. (2a) Het Caribische bericht staat nergens — niet als bericht, niet in Achtergrond, niet in het katern; het terloopse bericht blijft gewoon. (2b) De bufferblog is "Over jouw situatie" voor de lezer met weinig spaargeld (zonder zichtbare reden: die is gevoelig) en géén bericht voor de lezer met veel spaargeld (wel Achtergrond). (2c) Het cijfer is nooit een bericht of Achtergrond, alleen katern. (3) Onder het bericht staat "gezien op <datum>" en nooit de ophaaldag als publicatiedatum; met een echte datum (feed, metadata, of de datum bij de kop — AFM "Nieuws 24/08/26") staat de publicatiedatum er.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'MATCHER_VERSIE=6; basisInTijdlijn=0; gewijzigdInTijdlijn=1; basisInAchtergrond=1; caribischOveral=0; terloopsInTijdlijn=1; bufferWeinigSpaargeld=raakt; bufferVeelSpaargeld=0; cijferZonderRekenregel=0; gezienOp=true; gepubliceerd=null',
+      source:
+        'lib/krant/matcher.ts#matchEditie (v6) + lib/krant/redactie.ts (isBasisSectie, isCaribischBericht, isBufferBericht, lezersDatum) — echte, pure productiefuncties op de gedeelde fixture lib/krant/editie.fixture.ts, geen mirror — zie will-checks.ts; weergave "gezien op": components/berichten/tijdlijn-client.tsx#Bron',
     },
   },
 ]

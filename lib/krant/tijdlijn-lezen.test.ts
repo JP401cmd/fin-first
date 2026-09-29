@@ -125,8 +125,15 @@ describe('rijNaarBericht', () => {
       bron: 'B',
       url: 'https://x.test',
       gepubliceerd: '2026-09-28',
+      gezienOp: null,
       samenvatting: 'S',
     })
+  })
+
+  it('ADR 0191: zonder echte datum draagt het snapshot gezienOp en geen publicatiedatum', () => {
+    const b = rijNaarBericht({ ...basisRij, snapshot: { ...basisRij.snapshot, gepubliceerd: null, gezienOp: '2026-09-22T05:25:00.000Z' } })
+    expect(b.gepubliceerd).toBeNull()
+    expect(b.gezienOp).toBe('2026-09-22T05:25:00.000Z')
   })
 
   it('vorm "raakt" → kop is het raakt-kop-sjabloon ("Over jouw situatie")', () => {
@@ -155,6 +162,7 @@ describe('rijNaarBericht', () => {
     expect(b.bron).toBeNull()
     expect(b.url).toBeNull()
     expect(b.gepubliceerd).toBeNull()
+    expect(b.gezienOp).toBeNull()
     expect(b.samenvatting).toBeNull()
   })
 

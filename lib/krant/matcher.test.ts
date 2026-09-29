@@ -303,7 +303,7 @@ describe('matcher — uitkomst', () => {
 
   it('draagt de matcher- en sjabloonversie en het profieltype, zonder id', () => {
     const u = matchEditie(PROFIEL_DAAN, ARTIKELEN, context())
-    expect(u.matcherVersie).toBe(5)
+    expect(u.matcherVersie).toBe(6)
     expect(u.sjabloonVersie).toBe(2)
     expect(u.profielType).toBe('onder-35·wonen-onbekend·alleen')
     expect(JSON.stringify(u)).not.toMatch(/user_id|userId/)
@@ -508,5 +508,156 @@ describe('matcher — tijdlijn (1C, B37): "Over jouw situatie", drempel 2, Achte
     for (const p of [huurder, PROFIEL_TESSA, PROFIEL_DAAN, PROFIEL_WILLEM, LEEG_PROFIEL]) {
       for (const i of matchEditie(p, ARTIKELEN, tijdlijn()).items) expect(vindWftOvertreding(i.tekst), i.tekst).toBeNull()
     }
+  })
+})
+
+// ── Redactieregels (v6, ADR 0191) ────────────────────────────────────────────
+
+describe('matcher v6 — redactieregels (ADR 0191)', () => {
+  const RECENT = '2026-09-19T05:10:00Z'
+  const tijdlijn = (o: Partial<MatchContext> = {}) => context({ modus: 'tijdlijn', ...o })
+  function art(d: Partial<DuidingV1>, o: Partial<KandidaatArtikel> = {}): KandidaatArtikel {
+    const basis = fixture('a15-oud')
+    return {
+      ...basis,
+      id: 'r1',
+      category: 'wonen',
+      fetched_at: RECENT,
+      published_at: RECENT,
+      published_bron: 'feed',
+      bron_soort: 'rss',
+      bron_wijziging: null,
+      bron_fragment: null,
+      ...o,
+      duiding: { ...basis.duiding!, ...d },
+    }
+  }
+  const HUUR: DuidingV1['themas'] = [{ thema: 'huur', citaat: 'De maximale huurverhoging wordt 4 procent' }]
+  const huurder: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'huur-sociaal', rubrieken: ['wonen'] }
+
+  describe('regel 1 — verandering is nieuws, de standaard niet', () => {
+    const sectie = (wijziging: 'basis' | 'gewijzigd' | null, id: string) =>
+      art({ themas: HUUR }, { id, bron_soort: 'web_pagina', bron_wijziging: wijziging })
+
+    it('een basissectie is nooit een bericht in de tijdlijn en nooit een item in de editie', () => {
+      expect(matchEditie(huurder, [sectie('basis', 'r-basis')], tijdlijn()).items).toHaveLength(0)
+      expect(matchEditie(huurder, [sectie('basis', 'r-basis')], context()).items).toHaveLength(0)
+      // Zonder status (de oude ingest na de migratie) geldt de voorzichtige lezing: basis.
+      expect(matchEditie(huurder, [sectie(null, 'r-null')], tijdlijn()).items).toHaveLength(0)
+    })
+
+    it('een gewijzigde sectie is nieuws: dezelfde sectie haalt de tijdlijn als "Over jouw situatie"', () => {
+      const t = matchEditie(huurder, [sectie('gewijzigd', 'r-gewijzigd')], tijdlijn())
+      expect(t.items.map((i) => i.artikelId)).toEqual(['r-gewijzigd'])
+      expect(t.items[0].vorm).toBe('raakt')
+    })
+
+    it('in Achtergrond en het katern staat de basis ACHTER al het nieuws, ook als hij nieuwer is', () => {
+      const oudNieuws = art({}, { id: 'r-nieuws', fetched_at: '2026-09-15T05:10:00Z', published_at: '2026-09-15T05:10:00Z' })
+      const verseBasis = art({}, { id: 'r-basis', fetched_at: '2026-09-20T05:10:00Z', published_at: '2026-09-20T05:10:00Z', bron_soort: 'web_pagina', bron_wijziging: 'basis' })
+      const t = matchEditie(LEEG_PROFIEL, [verseBasis, oudNieuws], tijdlijn())
+      expect(t.algemeen.achtergrond?.items.map((i) => i.artikelId)).toEqual(['r-nieuws', 'r-basis'])
+      const e = matchEditie(LEEG_PROFIEL, [verseBasis, oudNieuws], context())
+      expect(e.algemeen.items.map((i) => i.artikelId)).toEqual(['r-nieuws', 'r-basis'])
+    })
+  })
+
+  describe('regel 2a — Caribisch Nederland', () => {
+    const koper: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'koop-met-hypotheek' }
+    const HYPOTHEEK: DuidingV1['themas'] = [{ thema: 'eigen-woning', citaat: 'hypotheekadviseurs bij het geven van passend advies' }]
+
+    it('kop: nergens — geen item, geen Achtergrond, geen katern (de AFM-leidraad uit de steekproef)', () => {
+      const titel = 'Caribisch Nederland: leidraad voor hypotheekadvisering in Caribisch Nederland beschikbaar'
+      const leidraad = art({ themas: HYPOTHEEK }, { id: 'r-cn', title: titel })
+      expect(voldoetAanLeescontract(leidraad, context())).toBe(false)
+      // Zonder de Caribische kop was dit wél "Over jouw situatie" voor een koper geweest.
+      expect(matchEditie(koper, [{ ...leidraad, title: 'Leidraad voor hypotheekadvisering beschikbaar' }], tijdlijn()).items).toHaveLength(1)
+      const t = matchEditie(koper, [leidraad], tijdlijn())
+      expect(t.items).toHaveLength(0)
+      expect(t.algemeen.achtergrond?.items).toEqual([])
+      expect(t.algemeen.items).toEqual([])
+      expect(matchEditie(koper, [leidraad], context()).algemeen.items).toEqual([])
+    })
+
+    it('fragment: twee treffers in de aanhef sluiten uit; één terloopse vermelding niet', () => {
+      const tweeKeer = art({ themas: HUUR }, { id: 'r-frag', title: 'Huurtoeslag verandert', bron_fragment: 'De huurtoeslag verandert voor Bonaire, Sint Eustatius en Saba.' })
+      const terloops = art({ themas: HUUR }, { id: 'r-terloops', title: 'Huurtoeslag verandert', bron_fragment: 'De huurtoeslag verandert per 1 januari. Ook op Bonaire gelden nieuwe bedragen.' })
+      expect(voldoetAanLeescontract(tweeKeer, context())).toBe(false)
+      expect(voldoetAanLeescontract(terloops, context())).toBe(true)
+      expect(matchEditie(huurder, [terloops], tijdlijn()).items.map((i) => i.artikelId)).toEqual(['r-terloops'])
+    })
+  })
+
+  describe('regel 2b — een bufferbericht raakt wie weinig spaargeld heeft', () => {
+    const SPAREN: DuidingV1['themas'] = [{ thema: 'sparen-rente', citaat: 'een spaarbuffer voor onverwachte uitgaven' }]
+    const weinig: NieuwsprofielV1 = { ...LEEG_PROFIEL, spaargeld: 'tot-5k' }
+    const veel: NieuwsprofielV1 = { ...LEEG_PROFIEL, spaargeld: '50k-100k' }
+    const blog = art({ themas: SPAREN }, { id: 'r-buffer', title: 'Blog: betaal jezelf eerst: spaarbuffer' })
+    const rente = art({ themas: SPAREN }, { id: 'r-rente', title: 'Spaarrente daalt verder' })
+
+    it('bufferbericht: lezer met weinig spaargeld → "Over jouw situatie", zonder zichtbare (gevoelige) reden', () => {
+      const t = matchEditie(weinig, [blog], tijdlijn())
+      expect(t.items.map((i) => i.artikelId)).toEqual(['r-buffer'])
+      expect(t.items[0].vorm).toBe('raakt')
+      expect(t.items[0].waarom).toEqual(expect.arrayContaining(['thema:sparen-rente', 'redactie:spaarbuffer']))
+      expect(t.items[0].tekst).not.toMatch(/spaargeld/i)
+      expect(toetsThema('sparen-rente', weinig)).toBe('nee') // de standaardkoppeling zou hem missen
+    })
+
+    it('bufferbericht: lezer met veel spaargeld → geen bericht, wel Achtergrond', () => {
+      const t = matchEditie(veel, [blog], tijdlijn())
+      expect(t.items).toHaveLength(0)
+      expect(t.algemeen.achtergrond?.items.map((i) => i.artikelId)).toEqual(['r-buffer'])
+    })
+
+    it('rentebericht: het omgekeerde — de spaarder vanaf € 5.000 wel, de lezer met weinig spaargeld niet', () => {
+      expect(matchEditie(veel, [rente], tijdlijn()).items.map((i) => i.artikelId)).toEqual(['r-rente'])
+      expect(matchEditie(weinig, [rente], tijdlijn()).items).toHaveLength(0)
+    })
+
+    it('onbekend spaargeld: geen bericht (onbevestigd is nooit een grond)', () => {
+      expect(matchEditie(LEEG_PROFIEL, [blog], tijdlijn()).items).toHaveLength(0)
+    })
+  })
+
+  describe('regel 2c — cijfers, verwachtingen en marktbewegingen zonder rekenregel zijn nooit persoonlijk', () => {
+    // Klachten bij verzekeraars, belastingdruk sinds 2011, uitkeringsontvangers per 100 werkenden:
+    // een thema dat raakt, een rubriekvoorkeur én een deadline — en tóch geen bericht.
+    const deadline = { datum: '2026-12-31', soort: 'aanvraag' as const }
+    for (const soort of ['cijfer', 'verwachting', 'marktbeweging'] as const) {
+      it(`${soort}: nooit in de tijdlijn (ook niet als "Over jouw situatie"), en niet in Achtergrond`, () => {
+        const a = art({ soort, themas: HUUR, mechanisme: null, deadline }, { id: `r-${soort}` })
+        const t = matchEditie(huurder, [a], tijdlijn())
+        expect(t.items).toHaveLength(0)
+        expect(t.algemeen.achtergrond?.items).toEqual([])
+        expect(t.algemeen.items.map((i) => i.artikelId)).toEqual([`r-${soort}`])
+      })
+    }
+  })
+
+  describe('regel 3 — de echte datum', () => {
+    it('zonder echte datum: gepubliceerd null en gezienOp het ophaalmoment — in items, Achtergrond en katern', () => {
+      const gezien = art({ themas: HUUR }, { id: 'r-gezien', published_bron: 'eerste_gezien' })
+      const t = matchEditie(huurder, [gezien], tijdlijn())
+      expect(t.items[0]).toMatchObject({ gepubliceerd: null, gezienOp: RECENT })
+      const bg = matchEditie(LEEG_PROFIEL, [gezien], tijdlijn())
+      expect(bg.algemeen.achtergrond?.items[0]).toMatchObject({ gepubliceerd: null, gezienOp: RECENT })
+      const k = matchEditie(LEEG_PROFIEL, [art({ soort: 'cijfer' }, { id: 'r-k', published_bron: 'eerste_gezien' })], tijdlijn())
+      expect(k.algemeen.items[0]).toMatchObject({ gepubliceerd: null, gezienOp: RECENT })
+    })
+
+    it('met een echte datum (feed, meta, pagina): gepubliceerd, geen gezienOp', () => {
+      for (const published_bron of ['feed', 'meta', 'pagina']) {
+        const t = matchEditie(huurder, [art({ themas: HUUR }, { published_bron, published_at: '2026-09-18T00:00:00.000Z' })], tijdlijn())
+        expect(t.items[0]).toMatchObject({ gepubliceerd: '2026-09-18T00:00:00.000Z', gezienOp: null })
+      }
+    })
+
+    it('"oud nieuws" (> 45 dagen) werkt alleen op een echte datum; zonder echte datum beslist het venster', () => {
+      const oud = '2026-07-01T00:00:00.000Z'
+      expect(voldoetAanLeescontract(art({}, { published_at: oud, published_bron: 'pagina' }), context())).toBe(false)
+      expect(voldoetAanLeescontract(art({}, { published_at: oud, published_bron: 'eerste_gezien' }), context())).toBe(true)
+      expect(voldoetAanLeescontract(art({}, { published_at: oud, published_bron: undefined }), context())).toBe(true)
+    })
   })
 })

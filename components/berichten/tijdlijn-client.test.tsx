@@ -55,6 +55,7 @@ function bericht(p: Partial<TijdlijnBericht> & { id: string }): TijdlijnBericht 
     bron: 'Rijksoverheid',
     url: 'https://www.rijksoverheid.nl/artikel',
     gepubliceerd: '2026-09-28',
+    gezienOp: null,
     samenvatting: 'Korte samenvatting.',
     ...p,
   }
@@ -175,6 +176,30 @@ describe('TijdlijnClient', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Achtergrondstuk' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 2, name: 'Algemeen nieuws' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Artikel uit het katern' })).toBeTruthy()
+  })
+
+  it('ADR 0191 regel 3: zonder echte publicatiedatum "gezien op", nooit het ophaalmoment als publicatiedatum', () => {
+    const o = overzicht({
+      pagina: {
+        berichten: [
+          bericht({ id: 'echt', titel: 'Met feeddatum', gepubliceerd: '2026-08-24T10:00:00.000Z', gezienOp: null }),
+          bericht({ id: 'gezien', titel: 'Alleen gezien', gepubliceerd: null, gezienOp: '2026-09-22T05:25:00.000Z' }),
+        ],
+        volgende: null,
+      },
+      achtergrond: {
+        kop: 'Achtergrond',
+        label: 'Geen regel voor jou',
+        items: [{ artikelId: 'z1', titel: 'Uitleg', rubriek: null, bron: 'AFM', url: 'https://www.afm.nl/a', gepubliceerd: null, gezienOp: '2026-09-21T05:25:00.000Z', samenvatting: null }],
+      },
+    })
+    const { container } = render(<TijdlijnClient overzicht={o} kanAiKiezen={false} bezwaar={false} />)
+    const tekst = container.textContent ?? ''
+    expect(tekst).toContain('24 augustus 2026')
+    expect(tekst).toContain('gezien op 22 september 2026')
+    expect(tekst).toContain('gezien op 21 september 2026')
+    // Het ophaalmoment staat nooit los als publicatiedatum.
+    expect(tekst).not.toMatch(/Rijksoverheid · 22 september 2026/)
   })
 
   it('lege tijdlijn: toont de lege tekst (of de standaard) en de Vernieuwen-knop', () => {

@@ -21,6 +21,11 @@ import {
   detailToegestaan,
   fetchDetailPagina,
   isHtmlAntwoord,
+  paginaDatum,
+  PAGINA_DATUM_AANHEF_TEKENS,
+  PAGINA_DATUM_MAX_OUDERDOM_DAGEN,
+  lijstPadFilter,
+  LIJST_PAD_FILTER,
 } from './news-sources'
 import { isVeiligeBronUrl } from './safe-url'
 import { stripHtml } from './news-html'
@@ -539,8 +544,13 @@ describe('isHtmlAntwoord — content-type vóór de body', () => {
 })
 
 describe('detailToegestaan — alleen hosts en paden uit DETAIL_HOSTS', () => {
-  it('de hostlijst is precies CBS-nieuws, CPB en AFM-sectornieuws (besluit eigenaar 28 sep)', () => {
-    expect(DETAIL_HOSTS).toEqual({ 'www.cbs.nl': '/nl-nl/nieuws/', 'www.cpb.nl': '/', 'www.afm.nl': '/nl-nl/sector/actueel/' })
+  it('de hostlijst is precies CBS-nieuws, CPB, AFM-sectornieuws (28 sep) en het nieuws en de documenten van rijksoverheid.nl (ADR 0191)', () => {
+    expect(DETAIL_HOSTS).toEqual({
+      'www.cbs.nl': ['/nl-nl/nieuws/'],
+      'www.cpb.nl': ['/'],
+      'www.afm.nl': ['/nl-nl/sector/actueel/'],
+      'www.rijksoverheid.nl': ['/actueel/nieuws/', '/documenten/'],
+    })
   })
 
   it.each([
@@ -553,6 +563,18 @@ describe('detailToegestaan — alleen hosts en paden uit DETAIL_HOSTS', () => {
     ['http://www.cpb.nl/x', false],
     ['https://www.cpb.nl:8443/x', false],
     ['https://www.rijksoverheid.nl/nieuws/x', false],
+    // ADR 0191: twee paden op rijksoverheid.nl — elk ander pad op dezelfde host blijft dicht.
+    ['https://www.rijksoverheid.nl/actueel/nieuws/2026/09/29/noodfonds-energie-gaat-open', true],
+    ['https://www.rijksoverheid.nl/documenten/2026/09/25/letterlijke-tekst-persconferentie-na-ministerraad-25-september-2026', true],
+    ['https://www.rijksoverheid.nl/themas/werk/minimumloon', false],
+    ['https://www.rijksoverheid.nl/regering/bewindspersonen/eelco-heinen', false],
+    ['https://www.rijksoverheid.nl/actueel/agenda/2026/09/25/ministerraad', false],
+    ['https://www.rijksoverheid.nl/documentenzoeker/x', false],
+    ['https://rijksoverheid.nl/actueel/nieuws/2026/09/29/x', false],
+    ['https://www.rijksoverheid.nl.kwaadaardig.nl/actueel/nieuws/x', false],
+    ['http://www.rijksoverheid.nl/actueel/nieuws/x', false],
+    ['https://www.rijksoverheid.nl/actueel/nieuws/uit?url=https://kwaadaardig.nl', false],
+    ['https://www.rijksoverheid.nl/documenten/out/https%3A%2F%2Fkwaadaardig.nl', false],
     ['https://www.cpb.nl/uit?url=https://kwaadaardig.nl', false],
     ['https://www.cpb.nl/out/https%3A%2F%2Fkwaadaardig.nl', false],
     ['https://www.cpb.nl/uit?url=//kwaadaardig.nl', false],
@@ -683,5 +705,96 @@ describe('fetchWebPage — content-type los (geconfigureerde webbronnen)', () =>
     expect(text).not.toHaveBeenCalled()
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null }, text: async () => '<p>Tekst</p>' })))
     expect(await fetchWebPage({ url: 'https://www.cpb.nl/x' })).toMatchObject({ ok: true })
+  })
+})
+
+// ── ADR 0191 — regel 3 (datum bij de kop) en regel 4 (Rijksoverheid) ────────
+
+describe('paginaDatum — de zichtbare datum bij de kop, per host een expliciet patroon (ADR 0191)', () => {
+  const RUN = '2026-09-29T05:25:00.000Z'
+  const AFM = 'https://www.afm.nl/nl-nl/sector/actueel/2026/sep/sb-cn-leidraad-hypotheekadvies'
+  const CPB = 'https://www.cpb.nl/publicatie/doorrekening-beleidsopties-ww'
+  const RO = 'https://www.rijksoverheid.nl/actueel/nieuws/2026/09/29/noodfonds-energie-gaat-open'
+
+  it('AFM: "Nieuws 24/08/26" op de regel onder de kop (de voorbeelden uit de steekproef)', () => {
+    expect(paginaDatum(AFM, '2025: minder klachten bij verzekeraars\nNieuws 24/08/26\n\nTekst', RUN)).toBe('2026-08-24T00:00:00.000Z')
+    expect(paginaDatum(AFM, 'Vodafone krijgt boete\nMaatregel 20/08/26\n\nTekst', RUN)).toBe('2026-08-20T00:00:00.000Z')
+    expect(paginaDatum(AFM, 'Blog: betaal jezelf eerst: spaarbuffer\nArtikel 03/09/26\n\nTekst', RUN)).toBe('2026-09-03T00:00:00.000Z')
+    expect(paginaDatum(AFM, 'Online beleggingstips? Herken de red flags!\nPersbericht 29/09/26\n\nTekst', RUN)).toBe('2026-09-29T00:00:00.000Z')
+  })
+
+  it('CPB: "15 september 2026" op een eigen regel direct na de titel', () => {
+    expect(paginaDatum(CPB, 'Doorrekening beleidsopties WW\n15 september 2026\n\nDoorrekening beleidsopties WW\nEen kortere…', RUN)).toBe('2026-09-15T00:00:00.000Z')
+    // Een datum midden in een zin is geen publicatiedatum.
+    expect(paginaDatum(CPB, 'Raming\nDe raming van 15 september 2026 laat zien…', RUN)).toBeNull()
+  })
+
+  it('Rijksoverheid: "Nieuwsbericht 29-09-2026 | 14:15" en "Mediatekst 25-09-2026"', () => {
+    expect(paginaDatum(RO, 'Noodfonds Energie gaat open\nNieuwsbericht 29-09-2026 | 14:15 Het Noodfonds…', RUN)).toBe('2026-09-29T00:00:00.000Z')
+    expect(paginaDatum('https://www.rijksoverheid.nl/documenten/2026/09/25/x', 'Letterlijke tekst\nMediatekst 25-09-2026 Letterlijke…', RUN)).toBe('2026-09-25T00:00:00.000Z')
+  })
+
+  it('een datum in de toekomst (na de dag van de run) is geen datum; de dag zelf wel', () => {
+    expect(paginaDatum(AFM, 'Kop\nNieuws 30/09/26\n', RUN)).toBeNull()
+    expect(paginaDatum(AFM, 'Kop\nNieuws 29/09/26\n', RUN)).toBe('2026-09-29T00:00:00.000Z')
+  })
+
+  it('onleesbaar of onmogelijk: 31/02, maand 13, dag 00 → null', () => {
+    expect(paginaDatum(AFM, 'Kop\nNieuws 31/02/26\n', RUN)).toBeNull()
+    expect(paginaDatum(AFM, 'Kop\nNieuws 12/13/26\n', RUN)).toBeNull()
+    expect(paginaDatum(AFM, 'Kop\nNieuws 00/09/26\n', RUN)).toBeNull()
+    expect(paginaDatum(AFM, 'Kop\nnieuws 24/08/26\n', RUN)).toBeNull() // soortwoord met hoofdletter
+    expect(paginaDatum(AFM, 'Kop\nNieuws 24-08-26\n', RUN)).toBeNull() // ander patroon dan deze host
+  })
+
+  it('ouder dan de grens is eerder een leesfout: 730 dagen wel, 731 niet', () => {
+    expect(PAGINA_DATUM_MAX_OUDERDOM_DAGEN).toBe(730)
+    expect(paginaDatum(CPB, 'Kop\n29 september 2024\n', RUN)).toBe('2024-09-29T00:00:00.000Z')
+    expect(paginaDatum(CPB, 'Kop\n28 september 2024\n', RUN)).toBeNull()
+  })
+
+  it('alleen in de aanhef, alleen op een host met een patroon', () => {
+    const laat = `Kop\n${'x'.repeat(PAGINA_DATUM_AANHEF_TEKENS)}\nNieuws 24/08/26\n`
+    expect(paginaDatum(AFM, laat, RUN)).toBeNull()
+    expect(paginaDatum('https://www.cbs.nl/nl-nl/nieuws/2026/39/x', 'Kop\nNieuws 24/08/26\n', RUN)).toBeNull()
+    expect(paginaDatum('geen url', 'Kop\nNieuws 24/08/26\n', RUN)).toBeNull()
+    expect(paginaDatum(AFM, 'Kop\nNieuws 24/08/26\n', 'geen datum')).toBeNull()
+  })
+})
+
+describe('lijstPadFilter — alleen artikel-links van een lijstpagina (ADR 0191)', () => {
+  it('rijksoverheid.nl: nieuws en documenten; Tweede Kamer: de brieven; andere hosts: geen filter', () => {
+    expect(lijstPadFilter('https://www.rijksoverheid.nl/ministeries/ministerie-van-financien')).toEqual(['/actueel/nieuws/', '/documenten/'])
+    expect(lijstPadFilter('https://www.tweedekamer.nl/kamerstukken/brieven_regering?qry=%2A')).toEqual(['/kamerstukken/brieven_regering/detail'])
+    expect(lijstPadFilter('https://www.afm.nl/nl-nl/sector/actueel')).toBeNull()
+    expect(lijstPadFilter('geen url')).toBeNull()
+    expect(LIJST_PAD_FILTER['www.rijksoverheid.nl']).toEqual(DETAIL_HOSTS['www.rijksoverheid.nl'])
+  })
+})
+
+describe('standaardbronnen — nieuws van de Rijksoverheid (ADR 0191, gemeten 29 sep 2026)', () => {
+  const WEB = standaardWebBronnen(new Date('2026-09-29T05:23:00.000Z'))
+  const vind = (label: string) => WEB.find((w) => w.label === label)
+
+  it('drie ministeriepagina\'s en twee Kamerbrievenlijsten, alle als lijstbron en SSRF-veilig', () => {
+    for (const label of [
+      'Rijksoverheid — Ministerie van Financiën',
+      'Rijksoverheid — Ministerie van SZW',
+      'Rijksoverheid — Ministerie van Algemene Zaken',
+      'Tweede Kamer — Kamerbrieven Financiën',
+      'Tweede Kamer — Kamerbrieven SZW',
+    ]) {
+      const bron = vind(label)
+      expect(bron, label).toBeDefined()
+      expect(bron!.soort).toBe('web_lijst')
+      expect(isVeiligeBronUrl(bron!.url)).toBe(true)
+      expect(lijstPadFilter(bron!.url), label).not.toBeNull()
+    }
+  })
+
+  it('niet de lijsten die niets leveren: /actueel/nieuws (JavaScript) en de oude feed (DNS)', () => {
+    const urls = WEB.map((w) => w.url)
+    expect(urls).not.toContain('https://www.rijksoverheid.nl/actueel/nieuws')
+    expect(urls.some((u) => u.includes('feeds.rijksoverheid.nl'))).toBe(false)
   })
 })

@@ -55,6 +55,8 @@ import {
   type MatchContext,
 } from '@/lib/krant/matcher'
 import { standaardImpactContext } from '@/lib/krant/impact'
+import { matchEditie } from '@/lib/krant/matcher'
+import { LEEG_PROFIEL, type NieuwsprofielV1 } from '@/lib/krant/profiel'
 import { AOW_RIJEN, ARTIKELEN as KRANT_ARTIKELEN, NU as KRANT_NU } from '@/lib/krant/editie.fixture'
 import { WILL_ACCEPTANCE } from './will'
 import type { AcceptanceCriterion } from './types'
@@ -611,7 +613,7 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
   {
     workflow: 'WF-WILL-40',
     scenarioId: 'UAT-WILL-40',
-    label: 'Oud nieuws telt niet als nieuw (echte voldoetAanLeescontract, NIEUWS_MAX_OUDERDOM_DAGEN, matcher v5)',
+    label: 'Oud nieuws telt niet als nieuw (echte voldoetAanLeescontract, NIEUWS_MAX_OUDERDOM_DAGEN, matcher v5; v6: alleen een echte datum)',
     run: () => {
       criterion('WF-WILL-40')
       const ctx: MatchContext = {
@@ -630,13 +632,74 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
       const metDeadline = artikel('a08-kinderopvangtoeslag') // deadline in de toekomst
       return {
         expected:
-          'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=5; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudMetDeadline=true',
+          'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=6; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudZonderEchteDatum=true; oudMetDeadline=true',
         actual:
           `NIEUWS_MAX_OUDERDOM_DAGEN=${NIEUWS_MAX_OUDERDOM_DAGEN}; MATCHER_VERSIE=${MATCHER_VERSIE}; ` +
           `gepubliceerd46=${voldoetAanLeescontract({ ...vers, published_at: dagenTerug(46) }, ctx)}; ` +
           `gepubliceerd44=${voldoetAanLeescontract({ ...vers, published_at: dagenTerug(44) }, ctx)}; ` +
           `zonderPublicatiedatum=${voldoetAanLeescontract({ ...vers, published_at: null }, ctx)}; ` +
+          `oudZonderEchteDatum=${voldoetAanLeescontract({ ...vers, published_at: dagenTerug(200), published_bron: 'eerste_gezien' }, ctx)}; ` +
           `oudMetDeadline=${voldoetAanLeescontract({ ...metDeadline, published_at: dagenTerug(200) }, ctx)}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-41',
+    scenarioId: 'UAT-WILL-41',
+    label: 'De redactieregels van de tijdlijn (echte matchEditie v6 + lib/krant/redactie.ts, ADR 0191)',
+    run: () => {
+      criterion('WF-WILL-41')
+      const ctx: MatchContext = {
+        now: KRANT_NU,
+        gezienArtikelIds: new Set(),
+        gedemptRubrieken: new Set(),
+        impact: standaardImpactContext(AOW_RIJEN, KRANT_NU.getUTCFullYear()),
+        modus: 'tijdlijn',
+      }
+      const RECENT = '2026-09-19T05:10:00Z'
+      const basis = KRANT_ARTIKELEN.find((x) => x.id === 'a15-oud')
+      if (!basis?.duiding) throw new Error('fixture a15-oud ontbreekt')
+      const art = (id: string, d: Partial<NonNullable<KandidaatArtikel['duiding']>>, o: Partial<KandidaatArtikel> = {}): KandidaatArtikel => ({
+        ...basis,
+        id,
+        category: 'wonen',
+        fetched_at: RECENT,
+        published_at: RECENT,
+        published_bron: 'feed',
+        bron_soort: 'rss',
+        bron_wijziging: null,
+        bron_fragment: null,
+        ...o,
+        duiding: { ...basis.duiding!, ...d },
+      })
+      const huur = [{ thema: 'huur' as const, citaat: 'De maximale huurverhoging wordt 4 procent' }]
+      const sparen = [{ thema: 'sparen-rente' as const, citaat: 'een spaarbuffer voor onverwachte uitgaven' }]
+      const huurder: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'huur-sociaal', rubrieken: ['wonen'] }
+      const koper: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'koop-met-hypotheek' }
+
+      const basisSectie = art('w41-basis', { themas: huur }, { bron_soort: 'web_pagina', bron_wijziging: 'basis' })
+      const gewijzigd = art('w41-gewijzigd', { themas: huur }, { bron_soort: 'web_pagina', bron_wijziging: 'gewijzigd' })
+      const t1 = matchEditie(huurder, [basisSectie], ctx)
+      const t1b = matchEditie(huurder, [gewijzigd], ctx)
+      const caribisch = art('w41-cn', { themas: [{ thema: 'eigen-woning', citaat: 'hypotheekadviseurs bij het geven van passend advies' }] }, { title: 'Caribisch Nederland: leidraad voor hypotheekadvisering' })
+      const t2a = matchEditie(koper, [caribisch], ctx)
+      const terloops = art('w41-terloops', { themas: huur }, { title: 'Huurtoeslag verandert', bron_fragment: 'De huurtoeslag verandert per 1 januari. Ook op Bonaire gelden nieuwe bedragen.' })
+      const blog = art('w41-buffer', { themas: sparen }, { title: 'Blog: betaal jezelf eerst: spaarbuffer' })
+      const weinig = matchEditie({ ...LEEG_PROFIEL, spaargeld: 'tot-5k' }, [blog], ctx)
+      const veel = matchEditie({ ...LEEG_PROFIEL, spaargeld: '50k-100k' }, [blog], ctx)
+      const cijfer = matchEditie(huurder, [art('w41-cijfer', { soort: 'cijfer', themas: huur, mechanisme: null })], ctx)
+      const gezien = matchEditie(huurder, [art('w41-gezien', { themas: huur }, { published_bron: 'eerste_gezien' })], ctx)
+      return {
+        expected:
+          'MATCHER_VERSIE=6; basisInTijdlijn=0; gewijzigdInTijdlijn=1; basisInAchtergrond=1; caribischOveral=0; terloopsInTijdlijn=1; bufferWeinigSpaargeld=raakt; bufferVeelSpaargeld=0; cijferZonderRekenregel=0; gezienOp=true; gepubliceerd=null',
+        actual:
+          `MATCHER_VERSIE=${MATCHER_VERSIE}; basisInTijdlijn=${t1.items.length}; gewijzigdInTijdlijn=${t1b.items.length}; ` +
+          `basisInAchtergrond=${t1.algemeen.achtergrond?.items.length ?? 0}; ` +
+          `caribischOveral=${t2a.items.length + (t2a.algemeen.achtergrond?.items.length ?? 0) + t2a.algemeen.items.length}; ` +
+          `terloopsInTijdlijn=${matchEditie(huurder, [terloops], ctx).items.length}; ` +
+          `bufferWeinigSpaargeld=${weinig.items[0]?.vorm ?? 'geen'}; bufferVeelSpaargeld=${veel.items.length}; ` +
+          `cijferZonderRekenregel=${cijfer.items.length + (cijfer.algemeen.achtergrond?.items.length ?? 0)}; ` +
+          `gezienOp=${gezien.items[0]?.gezienOp === RECENT}; gepubliceerd=${gezien.items[0]?.gepubliceerd ?? 'null'}`,
       }
     },
   },

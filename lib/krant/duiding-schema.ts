@@ -184,8 +184,13 @@ export type DuidingModelUitvoer = z.infer<typeof duidingModelSchema>
 export const GRONDSLAG_SOORTEN = ['fragment', 'kop'] as const
 export type GrondslagSoort = (typeof GRONDSLAG_SOORTEN)[number]
 
-/** Waar `published_at` vandaan komt (kolom `news_articles.published_bron`, ADR 0176). */
-export const PUBLISHED_BRONNEN = ['feed', 'meta', 'eerste_gezien'] as const
+/**
+ * Waar `published_at` vandaan komt (kolom `news_articles.published_bron`, ADR 0176).
+ * `pagina` (ADR 0191): de zichtbare datum bij de kop in de artikeltekst. De duiding behandelt die
+ * bewust als onbekend (alleen 'feed' en 'meta' gaan als "Datum:" de prompt in) — zo verandert er
+ * aan de duidingsinvoer niets en hoeft er niets opnieuw geduid te worden.
+ */
+export const PUBLISHED_BRONNEN = ['feed', 'meta', 'pagina', 'eerste_gezien'] as const
 export type PublishedBron = (typeof PUBLISHED_BRONNEN)[number]
 
 /** De uitslag van de TEKSTPOORT (B26). Alleen de code, nooit modeltekst. */

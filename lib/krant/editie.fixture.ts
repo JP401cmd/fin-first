@@ -184,6 +184,12 @@ function artikel(o: ArtikelOpties): KandidaatArtikel {
     fetched_at: fetched,
     duiding_status: o.duiding_status ?? 'geduid',
     duiding: o.duiding,
+    // v6 (ADR 0191): de fixtures dragen een echte feeddatum, zodat de goldens hun
+    // publicatiedatum houden; regel 3 zelf staat in matcher.test.ts.
+    published_bron: 'feed',
+    bron_soort: 'rss',
+    bron_wijziging: null,
+    bron_fragment: null,
   }
 }
 

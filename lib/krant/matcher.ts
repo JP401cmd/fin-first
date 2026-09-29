@@ -61,7 +61,8 @@
 
 import { type DuidingV1, type DoelgroepRegel, type Deadline } from './duiding-schema'
 import { vindWftOvertreding } from './wft-woordenlijst'
-import { THEMAS, type ThemaId } from './themas'
+import { THEMAS, type ThemaDefinitie, type ThemaId } from './themas'
+import { SPAARBUFFER_RAAKT, heeftEchteDatum, isBasisSectie, isBufferBericht, isCaribischBericht, lezersDatum } from './redactie'
 import { DOELGROEP_SLEUTELS, type DoelgroepSleutel } from './profiel-velden'
 import type { MechanismeId, MechanismeVorm } from './mechanismen'
 import {
@@ -104,8 +105,13 @@ import {
  *   een bedrag van € 0 nooit als som (compliance-check §3a) en de relevant-tekst naar de grond.
  * 5 (29-09-2026, eigenaarsbesluit): een publicatiedatum ouder dan NIEUWS_MAX_OUDERDOM_DAGEN telt niet als
  *   nieuw, ook als het artikel binnen het venster is opgehaald; een aankomende deadline gaat voor.
+ * 6 (29-09-2026, redactieregels ADR 0191 · lib/krant/redactie.ts): (1) een basissectie van een vaste
+ *   uitlegpagina is nooit een item en staat in Achtergrond en katern ACHTER al het nieuws; (2a) een bericht
+ *   over Caribisch Nederland haalt het leescontract niet; (2b) een bufferbericht raakt via `sparen-rente`
+ *   de laagste spaarband in plaats van spaarders vanaf € 5.000; (3) alleen een echte datum (feed, meta,
+ *   pagina) is `gepubliceerd` en telt voor "oud nieuws" — anders `gezienOp`.
  */
-export const MATCHER_VERSIE = 5
+export const MATCHER_VERSIE = 6
 
 /** Volgorde bij gelijke datum in het algemeen katern: wat vastligt of gemeten is, vóór verwachting en uitleg. */
 const KATERN_SOORT_RANG: Record<DuidingV1['soort'], number> = {
@@ -193,6 +199,17 @@ export interface KandidaatArtikel {
   fetched_at: string
   duiding_status: string
   duiding: DuidingV1 | null
+  /**
+   * Redactieregels (v6, ADR 0191). Optioneel zodat oudere fixtures blijven
+   * werken; de loader levert ze altijd. Ontbreekt `published_bron`, dan is er
+   * geen echte datum (regel 3); ontbreekt `bron_soort`, dan is het geen
+   * basissectie (regel 1); ontbreekt `bron_fragment`, dan telt alleen de kop
+   * (regel 2a/2b).
+   */
+  published_bron?: string | null
+  bron_soort?: string | null
+  bron_wijziging?: string | null
+  bron_fragment?: string | null
 }
 
 export interface MatchContext {
@@ -222,7 +239,10 @@ export interface EditieItem {
   rubriek: string | null
   bron: string
   url: string
+  /** Alleen een echte publicatiedatum (feed, meta, pagina); anders null (regel 3). */
   gepubliceerd: string | null
+  /** Zonder echte publicatiedatum: wanneer wij het bericht zagen ("gezien op …"); anders null. */
+  gezienOp: string | null
   vorm: EditieVorm
   score: number
   mechanisme: MechanismeId | null
@@ -249,6 +269,8 @@ export interface AlgemeenItem {
   bron: string
   url: string
   gepubliceerd: string | null
+  /** Zie EditieItem.gezienOp. Optioneel: Achtergrond en katern van vóór v6 staan als jsonb zonder dit veld. */
+  gezienOp?: string | null
   samenvatting: string | null
 }
 
@@ -284,11 +306,13 @@ function inVenster(a: KandidaatArtikel, ctx: MatchContext): boolean {
 
 /**
  * De bron publiceerde het lang geleden — dat we het nu pas ophalen (een nieuwe
- * bron, een backfill) maakt het geen nieuws. Zonder bruikbare publicatiedatum
- * beslist de ophaaldatum.
+ * bron, een backfill) maakt het geen nieuws. Zonder ECHTE publicatiedatum
+ * (v6, regel 3: `published_bron` = eerste_gezien of onbekend) beslist de
+ * ophaaldatum via het venster hierboven; een basissectie van een uitlegpagina
+ * is dan al uitgesloten door regel 1.
  */
 function isOudNieuws(a: KandidaatArtikel, now: Date): boolean {
-  if (!a.published_at) return false
+  if (!a.published_at || !heeftEchteDatum(a.published_bron)) return false
   const t = Date.parse(a.published_at)
   if (!Number.isFinite(t)) return false
   return t < now.getTime() - NIEUWS_MAX_OUDERDOM_DAGEN * DAG_MS
@@ -298,9 +322,19 @@ function isDeadlineToekomst(deadline: Deadline, now: Date): boolean {
   return new Date(`${deadline.datum}T23:59:59Z`).getTime() >= now.getTime()
 }
 
-/** Voldoet een rij aan het leescontract van 1A? Geëxporteerd zodat de loader (fase 2) dezelfde regel draagt. */
+/**
+ * Voldoet een rij aan het leescontract van 1A? Geëxporteerd zodat de loader (fase 2) dezelfde regel draagt.
+ * v6 (regel 2a): een bericht over Caribisch Nederland is voor geen enkele lezer leesbaar — niet als
+ * item, niet in Achtergrond en niet in het katern.
+ */
 export function voldoetAanLeescontract(a: KandidaatArtikel, ctx: MatchContext): a is KandidaatArtikel & { duiding: DuidingV1 } {
-  return a.duiding_status === 'geduid' && a.duiding != null && !ctx.gezienArtikelIds.has(a.id) && inVenster(a, ctx)
+  return (
+    a.duiding_status === 'geduid' &&
+    a.duiding != null &&
+    !ctx.gezienArtikelIds.has(a.id) &&
+    inVenster(a, ctx) &&
+    !isCaribischBericht(a.title, a.bron_fragment)
+  )
 }
 
 // ── 2. Doelgroep ─────────────────────────────────────────────────────────────
@@ -360,13 +394,25 @@ function toetsDoelgroep(duiding: DuidingV1, profiel: NieuwsprofielV1): Doelgroep
   return { past: true, onbekend }
 }
 
+type Raakt = ThemaDefinitie['raakt']
+
+/**
+ * Wie dit thema raakt VOOR DIT ARTIKEL. Standaard de tabel in themas.ts; v6
+ * (regel 2b): een bufferbericht (`isBufferBericht`) raakt via `sparen-rente`
+ * de laagste spaarband in plaats van spaarders vanaf € 5.000. Het thema zelf
+ * kiest het model niet anders — alleen de koppeling thema → lezer wijkt af.
+ */
+export function raaktVoorThema(thema: ThemaId, artikel?: Pick<KandidaatArtikel, 'title' | 'bron_fragment'>): Raakt {
+  if (thema === 'sparen-rente' && artikel && isBufferBericht(artikel.title, artikel.bron_fragment)) return SPAARBUFFER_RAAKT
+  return THEMAS[thema].raakt
+}
+
 /**
  * Raakt dit thema het profiel? OF-semantiek over de `raakt`-regels: één 'ja'
  * → ja; alle 'nee' → nee; anders onbekend. 'iedereen' is bewust 'nee': het
  * raakt elk profiel en maakt dus niemand in het bijzonder gericht.
  */
-export function toetsThema(thema: ThemaId, profiel: NieuwsprofielV1): RegelUitkomst {
-  const raakt = THEMAS[thema].raakt
+export function toetsThema(thema: ThemaId, profiel: NieuwsprofielV1, raakt: Raakt = THEMAS[thema].raakt): RegelUitkomst {
   if (raakt === 'iedereen') return 'nee'
   let onbekend = false
   for (const regel of raakt) {
@@ -378,8 +424,7 @@ export function toetsThema(thema: ThemaId, profiel: NieuwsprofielV1): RegelUitko
 }
 
 /** De raakt-regels van een thema die voor dit profiel 'ja' geven, in themavolgorde. */
-export function jaRegels(thema: ThemaId, profiel: NieuwsprofielV1): DoelgroepRegel[] {
-  const raakt = THEMAS[thema].raakt
+export function jaRegels(thema: ThemaId, profiel: NieuwsprofielV1, raakt: Raakt = THEMAS[thema].raakt): DoelgroepRegel[] {
   if (raakt === 'iedereen') return []
   return raakt.filter((r) => toetsRegel(r, profiel) === 'ja')
 }
@@ -430,9 +475,9 @@ export const GEVOELIGE_REDENEN: ReadonlySet<SjabloonId> = new Set([
   'reden-krediet',
 ] as SjabloonId[])
 
-/** De thema's van de duiding die dit profiel raken ('ja'), in duidingvolgorde. */
-function themasVoorProfiel(duiding: DuidingV1, profiel: NieuwsprofielV1): ThemaId[] {
-  return duiding.themas.filter((t) => toetsThema(t.thema, profiel) === 'ja').map((t) => t.thema)
+/** De thema's van de duiding die dit profiel raken ('ja'), in duidingvolgorde — met de koppeling voor dít artikel (v6). */
+function themasVoorProfiel(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profiel: NieuwsprofielV1): ThemaId[] {
+  return artikel.duiding.themas.filter((t) => toetsThema(t.thema, profiel, raaktVoorThema(t.thema, artikel)) === 'ja').map((t) => t.thema)
 }
 
 // ── 4. Vorm en score ─────────────────────────────────────────────────────────
@@ -532,13 +577,17 @@ interface Kandidaat {
 }
 
 function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profiel: NieuwsprofielV1, ctx: MatchContext): Kandidaat | null {
+  // v6, regel 1: de stand van zaken van een uitlegpagina is geen bericht voor
+  // jou — in geen van beide modi. Hij mag alleen achteraan in Achtergrond/katern.
+  if (isBasisSectie(artikel)) return null
   const duiding = artikel.duiding
   const dg = toetsDoelgroep(duiding, profiel)
   if (!dg.past) return null
 
   const waarom: string[] = duiding.doelgroep.map((r) => `doelgroep:${r.veld}`)
-  const themaJa = themasVoorProfiel(duiding, profiel)
+  const themaJa = themasVoorProfiel(artikel, profiel)
   for (const id of themaJa) waarom.push(`thema:${id}`)
+  if (themaJa.includes('sparen-rente') && raaktVoorThema('sparen-rente', artikel) === SPAARBUFFER_RAAKT) waarom.push('redactie:spaarbuffer')
   const watMist = [...dg.onbekend]
   // Een ONBEVESTIGDE doelgroep (een regel onbekend) krijgt geen som en geen
   // bonus: "misschien raakt dit jou" mag geen stellige zin met een bedrag
@@ -622,7 +671,7 @@ function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profi
       : duiding.soort === 'verwachting'
         ? renderSjabloon('voorbehoud-verwachting', 0)
         : null
-  const regel = zonderBedrag ? raaktTekst(duiding, profiel, grond!, slotGrond, themaJa, waarom) : renderSjabloon(sjabloonId, variant, slots)
+  const regel = zonderBedrag ? raaktTekst(artikel, profiel, grond!, slotGrond, themaJa, waarom) : renderSjabloon(sjabloonId, variant, slots)
   const samenvatting = samenvattingVoor(duiding, waarom)
   const item: EditieItem = {
     artikelId: artikel.id,
@@ -630,7 +679,7 @@ function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profi
     rubriek,
     bron: artikel.source_name,
     url: artikel.source_url,
-    gepubliceerd: artikel.published_at,
+    ...lezersDatum(artikel),
     vorm,
     score,
     mechanisme: duiding.mechanisme?.soort ?? null,
@@ -657,14 +706,18 @@ function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profi
  * alleen in `waarom`; is er geen andere, dan vervalt de zichtbare reden.
  */
 function raaktTekst(
-  duiding: DuidingV1,
+  artikel: KandidaatArtikel & { duiding: DuidingV1 },
   profiel: NieuwsprofielV1,
   grond: 'doelgroep' | 'thema',
   slotGrond: 'doelgroep' | 'thema',
   themaJa: readonly ThemaId[],
   waarom: string[],
 ): string {
-  const kandidaten: DoelgroepRegel[] = [...(grond === 'doelgroep' ? duiding.doelgroep : []), ...themaJa.flatMap((t) => jaRegels(t, profiel))]
+  const duiding = artikel.duiding
+  const kandidaten: DoelgroepRegel[] = [
+    ...(grond === 'doelgroep' ? duiding.doelgroep : []),
+    ...themaJa.flatMap((t) => jaRegels(t, profiel, raaktVoorThema(t, artikel))),
+  ]
   const redenen = kandidaten.map((r) => REDEN_PER_REGEL[regelSleutel(r)]).filter((id): id is SjabloonId => id != null)
   for (const id of new Set(redenen)) waarom.push(`reden:${id}`)
   const zichtbaar = redenen.find((id) => !GEVOELIGE_REDENEN.has(id))
@@ -791,8 +844,14 @@ export function matchEditie(profiel: NieuwsprofielV1, artikelen: readonly Kandid
   }
 }
 
-/** Katernvolgorde: nieuwste eerst; bij gelijke datum de soort (besluit/cijfer vóór uitleg), dan de kop, dan het id. */
+/**
+ * Katernvolgorde: eerst al het nieuws, dan de basissecties (v6, regel 1: de stand van zaken komt ACHTER
+ * wat wél nieuws is); daarbinnen nieuwste eerst; bij gelijke datum de soort (besluit/cijfer vóór uitleg),
+ * dan de kop, dan het id.
+ */
 function katernVolgorde(a: KandidaatArtikel & { duiding: DuidingV1 }, b: KandidaatArtikel & { duiding: DuidingV1 }): number {
+  const basis = Number(isBasisSectie(a)) - Number(isBasisSectie(b))
+  if (basis !== 0) return basis
   const ta = a.published_at ?? a.fetched_at
   const tb = b.published_at ?? b.fetched_at
   if (ta !== tb) return ta < tb ? 1 : -1
@@ -810,7 +869,7 @@ function naarAlgemeenItem(a: KandidaatArtikel & { duiding: DuidingV1 }): Algemee
     rubriek: a.category,
     bron: a.source_name,
     url: a.source_url,
-    gepubliceerd: a.published_at,
+    ...lezersDatum(a),
     samenvatting: samenvattingVoor(a.duiding, []),
   }
 }

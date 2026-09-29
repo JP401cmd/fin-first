@@ -1,5 +1,5 @@
 {
-  "matcherVersie": 5,
+  "matcherVersie": 6,
   "sjabloonVersie": 2,
   "profielType": "35-49·koop·partner",
   "items": [
@@ -10,6 +10,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a13-box3-forfait",
       "gepubliceerd": "2026-09-19T05:10:00Z",
+      "gezienOp": null,
       "vorm": "direct",
       "score": 5,
       "mechanisme": "box3-parameter",
@@ -49,6 +50,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a16-box3-tarief",
       "gepubliceerd": "2026-09-19T05:10:00Z",
+      "gezienOp": null,
       "vorm": "direct",
       "score": 5,
       "mechanisme": "box3-parameter",
@@ -88,6 +90,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a02-box1-schijf1",
       "gepubliceerd": "2026-09-19T05:10:00Z",
+      "gezienOp": null,
       "vorm": "direct",
       "score": 4,
       "mechanisme": "box1-parameter",
@@ -125,6 +128,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a05-eigen-risico",
       "gepubliceerd": "2026-09-19T05:10:00Z",
+      "gezienOp": null,
       "vorm": "direct",
       "score": 4,
       "mechanisme": "eigen-risico",
@@ -165,6 +169,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a06-spaarrente",
       "gepubliceerd": "2026-09-19T05:10:00Z",
+      "gezienOp": null,
       "vorm": "gevoeligheid",
       "score": 3,
       "mechanisme": "spaarrente-markt",
@@ -200,6 +205,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a07-hypotheekrente",
       "gepubliceerd": "2026-09-19T05:10:00Z",
+      "gezienOp": null,
       "vorm": "gevoeligheid",
       "score": 3,
       "mechanisme": "hypotheekrente-markt",
@@ -235,6 +241,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a08-kinderopvangtoeslag",
       "gepubliceerd": "2026-09-01T05:10:00Z",
+      "gezienOp": null,
       "vorm": "relevant",
       "score": 4,
       "mechanisme": "toeslag-regel",
@@ -264,6 +271,7 @@
       "bron": "Voorbeeldbron",
       "url": "https://voorbeeld.nl/a01-box3-heffingsvrij",
       "gepubliceerd": "2026-09-19T05:10:00Z",
+      "gezienOp": null,
       "vorm": "relevant",
       "score": 3,
       "mechanisme": "box3-parameter",
@@ -293,6 +301,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a03-aow-leeftijd",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "De AOW-leeftijd stijgt in 2033 met drie maanden. Dat volgt uit de nieuwe levensverwachting."
       },
       {
@@ -302,6 +311,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a09-huurverhoging",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "De maximale huurverhoging in de vrije sector is voor 2027 vastgesteld op 4,1 procent."
       },
       {
@@ -311,6 +321,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a04-studieschuld-rente",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "De rente op studieschulden wordt in 2027 vastgesteld op 3 procent. Dat geldt voor wie dan een nieuwe rentevaste periode ingaat."
       },
       {
@@ -320,6 +331,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a11-inflatie",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "De inflatie kwam in augustus uit op 2,6 procent. Vooral de huren en energie stegen."
       },
       {
@@ -329,6 +341,7 @@
         "bron": "Voorbeeldbron",
         "url": "https://voorbeeld.nl/a12-beurs",
         "gepubliceerd": "2026-09-19T05:10:00Z",
+        "gezienOp": null,
         "samenvatting": "De AEX sloot de week 1,4 procent hoger af. Vooral chipbedrijven stegen."
       }
     ]

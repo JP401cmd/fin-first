@@ -18,6 +18,16 @@
 // `raw_content` = `bron_fragment` (de eigen brontekst), `published_at` komt
 // uit de feed of de paginametadata (anders het moment van eerste zien).
 //
+// Redactieregels (ADR 0191, 29 sep 2026) — vastgelegd BIJ DE INGEST, niet
+// achteraf geraden:
+//   - `bron_wijziging` (alleen web_pagina): een sectie van een pagina die we
+//     voor het eerst zien is `basis` (de stand van zaken), een nieuwe sectie op
+//     een pagina die we al kenden is `gewijzigd` (nieuws). De toets is "bestaat
+//     er al een web_pagina-rij voor deze bron_pagina_url" — de toestand VÓÓR
+//     deze run, per pagina, met een expliciete bestaanscheck (limit 1).
+//   - `published_bron = 'pagina'`: geen metadata, wel een datum bij de kop in de
+//     artikeltekst (per host een expliciet patroon, `paginaDatum`).
+//
 // Stappen:
 // 1. Ophalen per bron, met een OORZAAK per bron (ok · leeg · http_fout · dns …)
 // 2. Kandidaten bouwen per bronsoort (hierboven)
@@ -62,6 +72,8 @@ import {
   detailToegestaan,
   isDoorstuurVorm,
   isTerugvalOorzaak,
+  lijstPadFilter,
+  paginaDatum,
   DETAIL_HOSTS,
   type BronOorzaak,
   type BronSoort,
@@ -76,6 +88,7 @@ import {
   type DuidingSummary,
 } from '@/lib/krant/duiding'
 import type { JobStatus } from '@/lib/job-runs'
+import type { BronWijziging } from '@/lib/krant/redactie'
 
 /** Bewaartermijn van de artikelbak. Het editievenster (30 dagen) valt hier ruim binnen. */
 export const ARTICLE_RETENTION_DAYS = 120
@@ -169,6 +182,12 @@ export interface IngestSummary {
   uitgesteld: number
   /** Linknummers van het model die niet in de aangeboden lijst stonden. */
   linksGeweigerd: number
+  /**
+   * ADR 0191, regel 1: geschreven web_pagina-secties per status. `basis` = de
+   * stand van zaken van een pagina die we voor het eerst zagen; `gewijzigd` =
+   * een nieuwe sectie op een pagina die we al kenden (nieuws).
+   */
+  wijziging?: { basis: number; gewijzigd: number }
   /** Detailpagina's van NIEUWE items in deze run (Krant 1F fase 3). */
   details: DetailTellers
   /** Detailpagina's van BESTAANDE rijen (backfill); `herduid` = rijen terug in de duidingswachtrij. */
@@ -250,6 +269,10 @@ export interface SourceHealthEntry {
   detailTerugval?: number
   detailGeenHtml?: number
   detailUitgesteld?: number
+  /** ADR 0191: geschreven secties van een pagina die we voor het eerst zagen (web_pagina). */
+  basis?: number
+  /** ADR 0191: geschreven secties die een wijziging zijn op een bekende pagina (web_pagina). */
+  gewijzigd?: number
   /** Alleen nog op gezondheid van vóór ADR 0176. */
   error?: string
 }
@@ -371,11 +394,17 @@ interface ArticleCandidate {
   bron_soort: BronSoort
   bron_pagina_url: string
   inhoud_hash: string
-  published_bron: 'feed' | 'meta' | 'eerste_gezien'
+  /** `pagina` (ADR 0191): de datum bij de kop in de artikeltekst, geen metadata. */
+  published_bron: 'feed' | 'meta' | 'pagina' | 'eerste_gezien'
   bron_kop: string
   bron_fragment: string | null
   /** Krant 1F fase 3: null = niet geprobeerd (andere host); zie de migratie 20261003120000. */
   bron_detail: 'gelezen' | 'terugval' | 'geen_html' | null
+  /**
+   * ADR 0191 (migratie 20261009120000): alleen voor web_pagina, gezet ná de
+   * ontdubbeling op basis van de toestand vóór deze run. Null voor rss/web_lijst.
+   */
+  bron_wijziging: BronWijziging | null
 }
 
 type Kandidaat = { rij: ArticleCandidate; bron: number }
@@ -429,6 +458,7 @@ export function rssKandidaat(
     bron_kop: knipTekens(item.title, BRON_KOP_MAX_TEKENS),
     bron_fragment: fragment,
     bron_detail: null,
+    bron_wijziging: null,
   }
 }
 
@@ -459,6 +489,9 @@ export function webPaginaKandidaten(
       bron_kop: knipTekens(s.kop, BRON_KOP_MAX_TEKENS),
       bron_fragment: fragment,
       bron_detail: null,
+      // Basis of gewijzigd hangt af van de TABEL (kennen we de pagina al?),
+      // niet van de HTML: `runNewsIngest` zet het ná de ontdubbeling.
+      bron_wijziging: null,
     }
   })
   return { kandidaten, afgekapt }
@@ -524,6 +557,7 @@ export function webLijstKandidaat(
     bron_kop: kop,
     bron_fragment: fragment,
     bron_detail: null,
+    bron_wijziging: null,
   }
 }
 
@@ -535,18 +569,37 @@ export function webLijstKandidaat(
  * veranderen; de sleutel en de inhoud-hash blijven die van de aankondiging
  * (besluit eigenaar 28 sep), zodat de identiteit niet afhangt van het netwerk.
  * Een datum uit de feed wint; anders geldt de metadata van de pagina, nooit
- * later dan het run-moment.
+ * later dan het run-moment; zonder metadata de datum bij de kop in de
+ * artikeltekst (ADR 0191, `paginaDatum`, `published_bron = 'pagina'`).
  */
 export function pasDetailToe(rij: ArticleCandidate, u: DetailUitkomst, runMoment: string): ArticleCandidate {
   if (u.uitkomst === 'geen_html') return { ...rij, bron_detail: 'geen_html' }
   if (u.uitkomst === 'terugval') return { ...rij, bron_detail: 'terugval' }
   const uit: ArticleCandidate = { ...rij, bron_fragment: u.tekst, raw_content: u.tekst, bron_detail: 'gelezen' }
-  const meta = u.datums.gepubliceerd ?? u.datums.gewijzigd
-  if (meta && rij.published_bron !== 'feed') {
-    uit.published_at = meta > runMoment ? runMoment : meta
-    uit.published_bron = 'meta'
+  if (rij.published_bron === 'feed') return uit
+  const datum = detailDatum(rij.source_url, u, runMoment)
+  if (datum) {
+    uit.published_at = datum.published_at
+    uit.published_bron = datum.published_bron
   }
   return uit
+}
+
+/**
+ * De publicatiedatum van een gelezen detailpagina: eerst de metadata (nooit
+ * later dan het run-moment), anders de zichtbare datum bij de kop. Null als
+ * geen van beide er is — dan blijft het ophaalmoment staan (`eerste_gezien`).
+ * Eén functie voor nieuwe items en de backfill, zodat beide dezelfde regel dragen.
+ */
+export function detailDatum(
+  url: string,
+  u: Extract<DetailUitkomst, { uitkomst: 'gelezen' }>,
+  runMoment: string,
+): { published_at: string; published_bron: 'meta' | 'pagina' } | null {
+  const meta = u.datums.gepubliceerd ?? u.datums.gewijzigd
+  if (meta) return { published_at: meta > runMoment ? runMoment : meta, published_bron: 'meta' }
+  const zichtbaar = paginaDatum(url, u.tekst, runMoment)
+  return zichtbaar ? { published_at: zichtbaar, published_bron: 'pagina' } : null
 }
 
 /**
@@ -578,7 +631,7 @@ export function omEnOm<T extends { bron: number }>(lijst: readonly T[]): T[] {
  */
 export function backfillUrlFilter(): string {
   return Object.entries(DETAIL_HOSTS)
-    .map(([host, pad]) => `source_url.like."https://${host}${pad}*"`)
+    .flatMap(([host, paden]) => paden.map((pad) => `source_url.like."https://${host}${pad}*"`))
     .join(',')
 }
 
@@ -703,6 +756,42 @@ async function bestaandeWaarden(
   return gevonden
 }
 
+/**
+ * Welke van deze web_pagina-bronnen kennen we al (minstens één web_pagina-rij)?
+ * Per pagina één BESTAANSCHECK met `limit(1)`: dat is geen stille afkap maar
+ * precies de vraag ("is er ten minste één"). Bewust niet één `.in()` over alle
+ * pagina's: die leest alle rijen van alle pagina's (een pagina met veel
+ * wijzigingen telt tientallen rijen) en kan dan op max_rows afkappen — en een
+ * afgekapte pagina zou stil "onbekend", dus `basis`, worden. Werpt bij een
+ * leesfout: de aanroeper beslist dan niet (en schrijft niets).
+ */
+async function bekendePaginas(supabase: SupabaseClient, paginas: readonly string[]): Promise<Set<string>> {
+  const bekend = new Set<string>()
+  for (const pagina of paginas) {
+    const { data, error } = await supabase
+      .from('news_articles')
+      .select('id')
+      .eq('bron_soort', 'web_pagina')
+      .eq('bron_pagina_url', pagina)
+      .limit(1)
+    if (error) throw error
+    if ((data ?? []).length > 0) bekend.add(pagina)
+  }
+  return bekend
+}
+
+/**
+ * De rij zoals de database hem kent vóór migratie 20261009120000: zonder
+ * `bron_wijziging` en zonder de herkomst `pagina` (die haalt de CHECK dan niet).
+ * Alleen voor de terugval bij PGRST204/23514 — de rij staat er dan, en de
+ * volgende run of de backfill van de migratie vult de rest.
+ */
+function zonderNieuweKolommen(rij: Record<string, unknown>, runMoment: string): Record<string, unknown> {
+  const { bron_wijziging: _w, ...rest } = rij
+  void _w
+  return rest.published_bron === 'pagina' ? { ...rest, published_bron: 'eerste_gezien', published_at: runMoment } : rest
+}
+
 // ── Pipeline ─────────────────────────────────────────────────────────
 
 export async function runNewsIngest(
@@ -768,7 +857,7 @@ export async function runNewsIngest(
       // Relatieve hrefs lossen op tegen het eindadres (haalOp volgt alleen
       // redirects binnen dezelfde site); de "zelfde site"-grens is de
       // GECONFIGUREERDE bron-URL, zodat een redirect die grens niet verschuift.
-      const { links, afgekapt } = extractLinks(u.html, u.finalUrl, MAX_LINKS_AANBOD, source.url)
+      const { links, afgekapt } = extractLinks(u.html, u.finalUrl, MAX_LINKS_AANBOD, source.url, lijstPadFilter(source.url))
 
       // Kan het model kiezen? Zo niet, dan valt de klasse NIET weg: de server
       // heeft de links al, en `terugvalLinks` kiest er deterministisch uit.
@@ -841,6 +930,28 @@ export async function runNewsIngest(
   // twee keer zetten verandert niets.
   await markeerGezien(supabase, 'source_url', [...bekendeUrls], runMoment)
   await markeerGezien(supabase, 'inhoud_hash', [...bekendeHashes], runMoment)
+
+  // ── Regel 1 (ADR 0191): basis of gewijzigd, per pagina ─────────
+  // De toestand VÓÓR deze run beslist: kennen we de pagina (minstens één
+  // web_pagina-rij), dan is een nieuwe sectie een wijziging; anders is elke
+  // sectie de stand van zaken. Mislukt de check, dan RADEN we niet: de secties
+  // van die pagina's gaan deze run niet de tabel in (uitgesteld) en komen de
+  // volgende run gewoon terug — de sleutel is server-bepaald.
+  let paginaUitgesteld = 0
+  const nieuwePaginas = [...new Set(nieuw.filter((k) => k.rij.bron_soort === 'web_pagina').map((k) => k.rij.bron_pagina_url))]
+  if (nieuwePaginas.length > 0) {
+    try {
+      const bekend = await bekendePaginas(supabase, nieuwePaginas)
+      for (const k of nieuw) {
+        if (k.rij.bron_soort === 'web_pagina') k.rij.bron_wijziging = bekend.has(k.rij.bron_pagina_url) ? 'gewijzigd' : 'basis'
+      }
+    } catch (err) {
+      console.error('[news-ingest] paginacontrole mislukt:', err instanceof Error ? err.message : err)
+      const voor = nieuw.length
+      nieuw = nieuw.filter((k) => k.rij.bron_soort !== 'web_pagina')
+      paginaUitgesteld = voor - nieuw.length
+    }
+  }
 
   // ── Om-en-om per bron (tegen uithongering van de staart) ───────
   nieuw = omEnOm(nieuw)
@@ -925,8 +1036,8 @@ export async function runNewsIngest(
                 ? { bron_fragment: u.tekst, raw_content: u.tekst, bron_detail: 'gelezen', ...DUIDING_RESET }
                 : { bron_detail: u.uitkomst }
             if (u.uitkomst === 'gelezen' && r.published_bron === 'eerste_gezien') {
-              const meta = u.datums.gepubliceerd ?? u.datums.gewijzigd
-              if (meta) Object.assign(velden, { published_at: meta > runMoment ? runMoment : meta, published_bron: 'meta' })
+              const datum = detailDatum(r.source_url, u, runMoment)
+              if (datum) Object.assign(velden, datum)
             }
             // Guards: alleen een rij die nog nooit geprobeerd is, en nooit een
             // teruggetrokken duiding (B4: dat is een menselijke beslissing).
@@ -965,7 +1076,8 @@ export async function runNewsIngest(
   // budget vooruitgang boekt (release-review 1F, H1).
   let inserted = 0
   let skipped = 0
-  let uitgesteld = details.uitgesteld
+  let uitgesteld = details.uitgesteld + paginaUitgesteld
+  const wijziging = { basis: 0, gewijzigd: 0 }
   const brokken: Kandidaat[][] = []
   for (let i = 0; i < nieuw.length; i += CATEGORISATIE_BROK) brokken.push(nieuw.slice(i, i + CATEGORISATIE_BROK))
   const nu = klok
@@ -989,30 +1101,51 @@ export async function runNewsIngest(
         k.rij.potential_impact = e.potentialImpact
       })
     }
-    for (const k of brok) {
-      // `bron_detail` alleen meesturen als hij iets zegt: een rij die niet
-      // geprobeerd is, blijft zo schrijfbaar als de kolom (nog) ontbreekt.
-      const { bron_detail, ...rest } = k.rij
+    for (const k of brok) await schrijfKandidaat(k)
+  }
+
+  /** Kandidaten die een schrijfpoging kregen (voor de afronding van regel 1 hieronder). */
+  const aangeboden = new Set<Kandidaat>()
+
+  /** Schrijf één kandidaat en tel de uitkomst (inserted/alBekend/skipped + regel 1-tellers). */
+  async function schrijfKandidaat(k: Kandidaat): Promise<void> {
+    aangeboden.add(k)
+    {
+      // `bron_detail` en `bron_wijziging` alleen meesturen als ze iets zeggen:
+      // een rij zonder waarde blijft zo schrijfbaar als de kolom (nog) ontbreekt.
+      const { bron_detail, bron_wijziging, ...kaal } = k.rij
+      const rest: Record<string, unknown> = bron_wijziging === null ? kaal : { ...kaal, bron_wijziging }
       const schrijf = (rij: Record<string, unknown>) =>
         supabase
           .from('news_articles')
           .upsert({ ...rij, fetched_at: runMoment, laatst_gezien_at: runMoment }, { onConflict: 'source_url', ignoreDuplicates: true })
           .select('id')
-      let { data, error } = await schrijf(bron_detail === null ? rest : k.rij)
+      let { data, error } = await schrijf(bron_detail === null ? rest : { ...rest, bron_detail })
       // Draait deze code vóór de migratie 20261003120000, dan kent PostgREST de
       // kolom niet (PGRST204) en zou élk item van CBS/CPB/AFM stil wegvallen.
       // Dan zonder de kolom schrijven: de rij staat er, met `bron_detail` null,
-      // en de backfill pakt hem op zodra de kolom bestaat.
-      if (error && bron_detail !== null && (error as { code?: string }).code === 'PGRST204') {
-        ;({ data, error } = await schrijf(rest))
+      // en de backfill pakt hem op zodra de kolom bestaat. Hetzelfde vóór
+      // migratie 20261009120000 (ADR 0191): zonder `bron_wijziging` (PGRST204)
+      // en zonder de herkomst 'pagina' (23514, CHECK) — dan valt de rij terug op
+      // de vorm van vóór de migratie in plaats van weg te vallen.
+      const code = (error as { code?: string } | null)?.code
+      if (error && code === 'PGRST204') {
+        // Welke kolom ontbreekt zegt de code niet: schrijf de vorm van vóór beide migraties.
+        ;({ data, error } = await schrijf(zonderNieuweKolommen(rest, runMoment)))
+      } else if (error && code === '23514' && rest.published_bron === 'pagina') {
+        ;({ data, error } = await schrijf(zonderNieuweKolommen(bron_detail === null ? rest : { ...rest, bron_detail }, runMoment)))
       }
       if (error) {
         skipped++
-        continue
+        return
       }
       if ((data?.length ?? 0) > 0) {
         inserted++
         health[k.bron].nieuw++
+        if (bron_wijziging) {
+          wijziging[bron_wijziging]++
+          health[k.bron][bron_wijziging] = (health[k.bron][bron_wijziging] ?? 0) + 1
+        }
       } else {
         // Conflict: een parallelle run schreef dezelfde sleutel net eerder.
         alBekend++
@@ -1043,6 +1176,28 @@ export async function runNewsIngest(
     }
   }
   await Promise.all(Array.from({ length: Math.min(CATEGORISATIE_PARALLEL, brokken.length) }, werker))
+
+  // ── Regel 1: de eerste waarneming van een pagina maakt het af ──
+  // Viel een deel van de basissecties van een pagina buiten het tijdbudget
+  // terwijl een ander deel wél geschreven is, dan kent de volgende run de
+  // pagina al en zou hij de rest als `gewijzigd` (nieuws) lezen — precies de
+  // fout die regel 1 verbiedt. Daarom schrijven we die rest NU, zonder
+  // categorisatie (geen modelcall; de categorisatie-inhaalslag vult de rubriek
+  // later). Werd er van een pagina nog niets geschreven, dan blijft alles
+  // uitgesteld: de volgende run ziet de pagina dan opnieuw als onbekend.
+  // Bekende beperking: een basissectie die een SCHRIJFFOUT kreeg (`skipped`)
+  // komt de volgende run terug op een pagina die dan bekend is, dus als
+  // `gewijzigd`. Dat is een fout per rij die al geteld en gelogd wordt.
+  const paginaGestart = new Set(
+    [...aangeboden].filter((k) => k.rij.bron_wijziging === 'basis').map((k) => k.rij.bron_pagina_url),
+  )
+  const basisRest = brokken
+    .flat()
+    .filter((k) => !aangeboden.has(k) && k.rij.bron_wijziging === 'basis' && paginaGestart.has(k.rij.bron_pagina_url))
+  for (const k of basisRest) {
+    uitgesteld--
+    await schrijfKandidaat(k)
+  }
 
   // ── Bewaren op tijd: niet meer gezien sinds ARTICLE_RETENTION_DAYS ─
   const retentionCutoff = new Date(runMoment)
@@ -1099,6 +1254,7 @@ export async function runNewsIngest(
       skipped,
       uitgesteld,
       linksGeweigerd,
+      wijziging,
       details,
       backfill,
       duiding,

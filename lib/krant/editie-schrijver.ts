@@ -67,6 +67,8 @@ export function itemNaarRij(item: EditieItem, editieId: string, userId: string, 
       bron: item.bron,
       url: item.url,
       gepubliceerd: item.gepubliceerd,
+      // ADR 0191 regel 3: zonder echte publicatiedatum het moment van zien.
+      gezienOp: item.gezienOp,
       samenvatting: item.samenvatting,
     },
   }

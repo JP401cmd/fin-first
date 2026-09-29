@@ -88,9 +88,15 @@ function voegToe(bestaand: TijdlijnBericht[], nieuw: TijdlijnBericht[]): Tijdlij
 
 // ── Bericht ──────────────────────────────────────────────────────────────────
 
-function Bron({ bron, datum, url }: { bron: string | null; datum: string | null; url: string | null }) {
+/**
+ * ADR 0191 regel 3: een publicatiedatum alleen als de bron hem gaf (feed,
+ * metadata of een datum bij de kop). Zonder die datum nooit het ophaalmoment
+ * als publicatiedatum, maar "gezien op …".
+ */
+function Bron({ bron, datum, gezienOp, url }: { bron: string | null; datum: string | null; gezienOp?: string | null; url: string | null }) {
   const href = safeHttpUrl(url)
-  const datumTekst = formatDatum(datum)
+  const gezienTekst = formatDatum(gezienOp ?? null)
+  const datumTekst = formatDatum(datum) ?? (gezienTekst ? `gezien op ${gezienTekst}` : null)
   if (!bron && !datumTekst && !href) return null
   return (
     <p className="mt-3 font-mono text-[11px] tabular-nums text-[var(--ink-4)]">
@@ -184,7 +190,7 @@ function Bericht({ bericht, nieuw }: { bericht: TijdlijnBericht; nieuw: boolean 
         </details>
       )}
 
-      <Bron bron={bericht.bron} datum={bericht.gepubliceerd} url={bericht.url} />
+      <Bron bron={bericht.bron} datum={bericht.gepubliceerd} gezienOp={bericht.gezienOp} url={bericht.url} />
     </article>
   )
 }
@@ -241,7 +247,7 @@ function BlokSectie({ blok }: { blok: TijdlijnBlok }) {
                 {item.samenvatting}
               </p>
             )}
-            <Bron bron={item.bron} datum={item.gepubliceerd} url={item.url} />
+            <Bron bron={item.bron} datum={item.gepubliceerd} gezienOp={item.gezienOp} url={item.url} />
           </li>
         ))}
       </ul>

@@ -98,6 +98,7 @@ export const WILL_FLOW: UatFlow = {
     { id: 'tijdlijn-bezwaar', scenarioId: 'UAT-WILL-37', label: 'WF-WILL-37 · Bezwaar maken tegen verwerking (en intrekken)', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
     { id: 'tijdlijn-naar-ai', scenarioId: 'UAT-WILL-38', label: 'WF-WILL-38 · Naar de AI-Krant wist de tijdlijn; terug kan altijd', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
     { id: 'tijdlijn-oud-nieuws', scenarioId: 'UAT-WILL-40', label: 'WF-WILL-40 · Oud nieuws (publicatie > 45 dagen) telt niet als nieuw', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'tijdlijn-redactieregels', scenarioId: 'UAT-WILL-41', label: 'WF-WILL-41 · Redactieregels: basis/wijziging, Caribisch NL, spaarbuffer, "gezien op"', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
     { id: 'nieuwsstip', scenarioId: 'UAT-WILL-39', label: 'WF-WILL-39 · Nieuwsstip in de zijbalk (tijdlijnlezer)', kind: 'screen', stage: 3, lane: 'krant' },
 
     // ── 4 · uitkomst ──────────────────────────────────────────────────────

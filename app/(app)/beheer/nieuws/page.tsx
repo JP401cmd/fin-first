@@ -87,6 +87,9 @@ interface SourceHealthEntry {
   detailTerugval?: number
   detailGeenHtml?: number
   detailUitgesteld?: number
+  /** ADR 0191: web_pagina-secties die de stand van zaken zijn (pagina voor het eerst gezien) of een wijziging. */
+  basis?: number
+  gewijzigd?: number
   error?: string
 }
 
@@ -116,9 +119,11 @@ function detailRegel(d?: DetailTellers, b?: BackfillTellers): string | null {
 
 /** De detailtellers van één bron, of een lege tekst. */
 function bronDetailTekst(s: SourceHealthEntry): string {
+  // ADR 0191, regel 1: van een themapagina telt alleen een wijziging als nieuws.
+  const wijziging = (s.basis ?? 0) + (s.gewijzigd ?? 0) > 0 ? ` · ${s.gewijzigd ?? 0} gewijzigd, ${s.basis ?? 0} stand van zaken` : ''
   const totaal = (s.detailGelezen ?? 0) + (s.detailTerugval ?? 0) + (s.detailGeenHtml ?? 0) + (s.detailUitgesteld ?? 0)
-  if (totaal === 0) return ''
-  return ` · artikelpagina's ${s.detailGelezen ?? 0}/${totaal} gelezen${s.detailTerugval ? `, ${s.detailTerugval} terugval` : ''}${s.detailGeenHtml ? `, ${s.detailGeenHtml} geen webpagina` : ''}${s.detailUitgesteld ? `, ${s.detailUitgesteld} uitgesteld` : ''}`
+  if (totaal === 0) return wijziging
+  return wijziging + ` · artikelpagina's ${s.detailGelezen ?? 0}/${totaal} gelezen${s.detailTerugval ? `, ${s.detailTerugval} terugval` : ''}${s.detailGeenHtml ? `, ${s.detailGeenHtml} geen webpagina` : ''}${s.detailUitgesteld ? `, ${s.detailUitgesteld} uitgesteld` : ''}`
 }
 
 /** Eén bron in de editor: web (lijst/pagina) en RSS in één lijst, gesplitst bij opslaan. */

@@ -64,7 +64,9 @@ const runNewsIngest: typeof runNewsIngestEcht = (supabase, model, opties = {}) =
 type Rij = Record<string, unknown> & { source_url: string }
 interface Stap { m: string; args: unknown[] }
 
-function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean; zonderBronDetailKolom?: boolean } = {}) {
+function maakClient(
+  opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean; zonderBronDetailKolom?: boolean; paginaLeesFout?: boolean; zonderWijzigingKolom?: boolean } = {},
+) {
   const rijen: Rij[] = []
   const stappen: { table: string; stappen: Stap[] }[] = []
   let volgnummer = 0
@@ -81,6 +83,8 @@ function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean; 
       const isFilters: { kolom: string; waarde: unknown }[] = []
       const neqFilters: { kolom: string; waarde: unknown }[] = []
       let eqFilter: { kolom: string; waarde: unknown } | null = null
+      // ADR 0191: de bestaanscheck per pagina filtert op twee kolommen.
+      const eqAlle: { kolom: string; waarde: unknown }[] = []
       let limiet: number | null = null
       let upsertRij: Rij | null = null
       const chain: Record<string, unknown> = {}
@@ -98,7 +102,7 @@ function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean; 
       chain.update = stap('update', (v) => { modus = 'update'; updateVelden = v as Record<string, unknown> })
       chain.is = stap('is', (k, v) => { isFilters.push({ kolom: String(k), waarde: v }) })
       chain.neq = stap('neq', (k, v) => { neqFilters.push({ kolom: String(k), waarde: v }) })
-      chain.eq = stap('eq', (k, v) => { eqFilter = { kolom: String(k), waarde: v } })
+      chain.eq = stap('eq', (k, v) => { eqFilter = { kolom: String(k), waarde: v }; eqAlle.push({ kolom: String(k), waarde: v }) })
       chain.limit = stap('limit', (n) => { limiet = n as number })
       for (const m of ['lt', 'gte', 'order', 'or']) chain[m] = stap(m)
       const past = (r: Rij) =>
@@ -110,6 +114,12 @@ function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean; 
           const f = inFilter as { kolom: string; waarden: string[] }
           const treffers = rijen.filter((r) => f.waarden.includes(r[f.kolom] as string) && past(r))
           uitkomst = { data: limiet === null ? treffers : treffers.slice(0, limiet), error: null }
+        } else if (table === 'news_articles' && modus === 'select' && !inFilter && eqAlle.length > 0) {
+          // Bestaanscheck (ADR 0191): rijen die aan álle eq-filters voldoen, tot de limiet.
+          const treffers = rijen.filter((r) => eqAlle.every((f) => r[f.kolom] === f.waarde))
+          uitkomst = opties.paginaLeesFout
+            ? { data: null, error: { message: 'nep: paginacontrole faalt' } }
+            : { data: (limiet === null ? treffers : treffers.slice(0, limiet)).map((r) => ({ id: r.id })), error: null }
         } else if (table === 'news_articles' && modus === 'update' && eqFilter) {
           const f = eqFilter as { kolom: string; waarde: unknown }
           const geraakt = rijen.filter((r) => r[f.kolom] === f.waarde && past(r))
@@ -126,7 +136,13 @@ function maakClient(opties: { racePerUrl?: Set<string>; hashLeesFout?: boolean; 
         } else if (table === 'news_articles' && modus === 'upsert' && upsertRij) {
           const rij = upsertRij as Rij
           const bestaat = rijen.some((r) => r.source_url === rij.source_url)
-          if (opties.zonderBronDetailKolom && 'bron_detail' in rij) {
+          if (opties.zonderWijzigingKolom && 'bron_wijziging' in rij) {
+            // Vóór de migratie 20261009120000: PostgREST kent de kolom niet.
+            uitkomst = { data: null, error: { code: 'PGRST204', message: "Could not find the 'bron_wijziging' column" } }
+          } else if (opties.zonderWijzigingKolom && rij.published_bron === 'pagina') {
+            // …en de CHECK op published_bron kent 'pagina' nog niet.
+            uitkomst = { data: null, error: { code: '23514', message: 'violates check constraint' } }
+          } else if (opties.zonderBronDetailKolom && 'bron_detail' in rij) {
             // Vóór de migratie 20261003120000: PostgREST kent de kolom niet.
             uitkomst = { data: null, error: { code: 'PGRST204', message: "Could not find the 'bron_detail' column" } }
           } else if (!bestaat && opties.racePerUrl?.has(rij.source_url)) {
@@ -990,7 +1006,9 @@ describe('pasDetailToe — alleen fragment, detailstatus en datum veranderen', (
 describe('backfillUrlFilter', () => {
   it('volgt DETAIL_HOSTS, met waarden tussen aanhalingstekens', () => {
     expect(backfillUrlFilter()).toBe(
-      'source_url.like."https://www.cbs.nl/nl-nl/nieuws/*",source_url.like."https://www.cpb.nl/*",source_url.like."https://www.afm.nl/nl-nl/sector/actueel/*"',
+      'source_url.like."https://www.cbs.nl/nl-nl/nieuws/*",source_url.like."https://www.cpb.nl/*",source_url.like."https://www.afm.nl/nl-nl/sector/actueel/*",' +
+        // ADR 0191: twee paden op rijksoverheid.nl, elk een eigen prefix.
+        'source_url.like."https://www.rijksoverheid.nl/actueel/nieuws/*",source_url.like."https://www.rijksoverheid.nl/documenten/*"',
     )
   })
 })
@@ -1232,5 +1250,187 @@ describe('bepaalIngestUitkomst — trigger 4: detailpagina\'s', () => {
     expect(bepaalIngestUitkomst(summary({}, { gelezen: 1, terugval: 4 }), health).status).toBe('success')
     expect(bepaalIngestUitkomst(summary({ geenHtml: 3 }), health).status).toBe('success')
     expect(bepaalIngestUitkomst(summary({ uitgesteld: 5 }), health).status).toBe('success')
+  })
+})
+
+// ── ADR 0191: redactieregels bij de ingest ─────────────────────────────────
+
+describe('runNewsIngest — regel 1: basis of gewijzigd, vastgelegd bij de ingest (ADR 0191)', () => {
+  it('eerste run: elke sectie van een nieuwe pagina is basis; rss en lijst krijgen geen status', async () => {
+    zetBronnen()
+    const { client, rijen } = maakClient()
+    const { summary, health } = await runNewsIngest(client as never, null, { now: NU })
+    const secties = rijen.filter((r) => r.bron_soort === 'web_pagina')
+    expect(secties).toHaveLength(2)
+    expect(secties.every((r) => r.bron_wijziging === 'basis')).toBe(true)
+    expect(rijen.filter((r) => r.bron_soort !== 'web_pagina').every((r) => !('bron_wijziging' in r))).toBe(true)
+    expect(summary.wijziging).toEqual({ basis: 2, gewijzigd: 0 })
+    expect(health.sources.find((s) => s.url === PAGINA.url)).toMatchObject({ basis: 2, nieuw: 2 })
+  })
+
+  it('een gewijzigde sectie op een bekende pagina is gewijzigd; een derde, gelijke run verandert niets', async () => {
+    zetBronnen()
+    const { client, rijen } = maakClient()
+    await runNewsIngest(client as never, null, { now: NU })
+    const gewijzigdeHtml = PAGINA_HTML.replace('1 januari 2028', '1 januari 2029')
+    vi.mocked(fetchWebPage).mockImplementation(async (s) =>
+      s.url === LIJST.url ? { ok: true, html: LIJST_HTML, finalUrl: LIJST.url } : { ok: true, html: gewijzigdeHtml, finalUrl: PAGINA.url },
+    )
+    const twee = await runNewsIngest(client as never, null, { now: new Date('2026-09-23T05:25:00.000Z') })
+    expect(twee.summary.inserted).toBe(1)
+    expect(twee.summary.wijziging).toEqual({ basis: 0, gewijzigd: 1 })
+    const nieuw = rijen[rijen.length - 1]
+    expect(nieuw).toMatchObject({ bron_soort: 'web_pagina', bron_wijziging: 'gewijzigd' })
+    // De eerste rijen houden hun status: de upsert raakt een bestaande rij nooit.
+    expect(rijen.filter((r) => r.bron_wijziging === 'basis')).toHaveLength(2)
+
+    const status = rijen.map((r) => `${r.source_url}|${String(r.bron_wijziging)}`)
+    const drie = await runNewsIngest(client as never, null, { now: new Date('2026-09-24T05:25:00.000Z') })
+    expect(drie.summary.inserted).toBe(0)
+    expect(drie.summary.wijziging).toEqual({ basis: 0, gewijzigd: 0 })
+    expect(rijen.map((r) => `${r.source_url}|${String(r.bron_wijziging)}`)).toEqual(status)
+  })
+
+  it('mislukt de paginacontrole, dan raden we niet: de secties gaan deze run niet de tabel in en komen later als basis', async () => {
+    zetBronnen()
+    const fout = maakClient({ paginaLeesFout: true })
+    const een = await runNewsIngest(fout.client as never, null, { now: NU })
+    expect(fout.rijen.filter((r) => r.bron_soort === 'web_pagina')).toHaveLength(0)
+    expect(fout.rijen.filter((r) => r.bron_soort !== 'web_pagina')).toHaveLength(3)
+    expect(een.summary.uitgesteld).toBe(2)
+
+    // Dezelfde tabel, nu zonder fout: de pagina is nog steeds onbekend, dus basis.
+    const goed = maakClient()
+    goed.rijen.push(...fout.rijen)
+    await runNewsIngest(goed.client as never, null, { now: new Date('2026-09-23T05:25:00.000Z') })
+    expect(goed.rijen.filter((r) => r.bron_soort === 'web_pagina').map((r) => r.bron_wijziging)).toEqual(['basis', 'basis'])
+  })
+
+  it('de eerste waarneming van een pagina wordt afgemaakt: basissecties buiten het budget komen zonder rubriek mee', async () => {
+    const FEED_VEEL = { url: 'https://www.ecb.europa.eu/rss/press.html', label: 'ECB' }
+    const items = Array.from({ length: 35 }, (_, n) => ({
+      title: `Feedbericht nummer ${n}`,
+      description: `Beschrijving van bericht ${n}`,
+      link: `https://www.ecb.europa.eu/press/${n}.html`,
+      publishedAt: '2026-09-20T10:00:00.000Z',
+      sourceName: FEED_VEEL.label,
+    }))
+    const secties = Array.from(
+      { length: 12 },
+      (_, n) => `<h2>Onderdeel ${n} van de regeling</h2><p>Dit onderdeel ${n} beschrijft de stand van de regeling zoals die op deze uitlegpagina staat, zonder wijziging.</p>`,
+    ).join('')
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [FEED_VEEL], webSources: [PAGINA] })
+    vi.mocked(fetchRssFeed).mockResolvedValue({ items, oorzaak: 'ok', afgekapt: 0, geweigerd: 0 })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: `<main><h1>Regeling</h1>${secties}</main>`, finalUrl: PAGINA.url })
+    const { client, rijen } = maakClient()
+    // Budget 0 en een stilstaande klok: alleen het eerste brok (20 van 47) loopt.
+    const { summary } = await runNewsIngest(client as never, MODEL, { now: NU, categorisatieTijdBudgetMs: 0, klok: () => 1_000 })
+    const basis = rijen.filter((r) => r.bron_soort === 'web_pagina')
+    expect(basis).toHaveLength(12)
+    expect(basis.every((r) => r.bron_wijziging === 'basis')).toBe(true)
+    // Het eerste brok is gecategoriseerd; de afronding niet (geen modelcall).
+    expect(categorizeArticles).toHaveBeenCalledTimes(1)
+    expect(basis.filter((r) => r.category === null)).toHaveLength(2)
+    expect(summary.uitgesteld).toBe(47 - 20 - 2)
+    expect(summary.inserted).toBe(22)
+  })
+
+  it('vóór migratie 20261009120000 (PGRST204): de sectie komt er alsnog, zonder status', async () => {
+    zetBronnen()
+    const { client, rijen } = maakClient({ zonderWijzigingKolom: true })
+    const { summary } = await runNewsIngest(client as never, null, { now: NU })
+    expect(summary.skipped).toBe(0)
+    const secties = rijen.filter((r) => r.bron_soort === 'web_pagina')
+    expect(secties).toHaveLength(2)
+    expect(secties.every((r) => !('bron_wijziging' in r))).toBe(true)
+  })
+})
+
+describe('runNewsIngest — regel 3: de datum bij de kop (ADR 0191)', () => {
+  const AFM = { url: 'https://www.afm.nl/nl-nl/sector/actueel', label: 'AFM — Sector actueel', soort: 'web_lijst' as const }
+  const AFM_LIJST = `<main><ul><li><a href="/nl-nl/sector/actueel/2026/aug/klachten-verzekeraars">2025: minder klachten bij verzekeraars</a></li></ul></main>`
+  const TEKST = '2025: minder klachten bij verzekeraars\nNieuws 24/08/26\n\n2025: minder klachten bij verzekeraars\nHet aantal klachten daalde in 2025.'
+  const RUN = '2026-09-22T05:25:00.000Z'
+  const lijstRij = () => webLijstKandidaat({ url: 'https://www.afm.nl/nl-nl/sector/actueel/2026/aug/x', tekst: 'Kop van het bericht', fragment: 'Kop van het bericht' }, AFM, RUN)
+
+  beforeEach(() => {
+    vi.mocked(fetchDetailPagina).mockReset()
+  })
+
+  it('pasDetailToe: metadata gaat voor, dan de datum bij de kop (pagina), anders blijft eerste_gezien', () => {
+    const rij = lijstRij()
+    const zonderMeta = { uitkomst: 'gelezen' as const, tekst: TEKST, datums: { gepubliceerd: null, gewijzigd: null } }
+    expect(pasDetailToe(rij, zonderMeta, RUN)).toMatchObject({ published_bron: 'pagina', published_at: '2026-08-24T00:00:00.000Z' })
+    const metMeta = { ...zonderMeta, datums: { gepubliceerd: '2026-08-25T10:00:00.000Z', gewijzigd: null } }
+    expect(pasDetailToe(rij, metMeta, RUN)).toMatchObject({ published_bron: 'meta', published_at: '2026-08-25T10:00:00.000Z' })
+    const zonderDatum = { ...zonderMeta, tekst: 'Kop\nGeen datum hier.' }
+    expect(pasDetailToe(rij, zonderDatum, RUN)).toMatchObject({ published_bron: 'eerste_gezien', published_at: RUN })
+    // Een feeddatum wint altijd.
+    const feed = { ...rij, published_bron: 'feed' as const, published_at: '2026-08-01T00:00:00.000Z' }
+    expect(pasDetailToe(feed, zonderMeta, RUN)).toMatchObject({ published_bron: 'feed', published_at: '2026-08-01T00:00:00.000Z' })
+  })
+
+  it('een nieuw AFM-item krijgt de datum uit de pagina, niet de ophaaldag', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [AFM] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: AFM_LIJST, finalUrl: AFM.url })
+    vi.mocked(fetchDetailPagina).mockResolvedValue({ uitkomst: 'gelezen', tekst: TEKST, datums: { gepubliceerd: null, gewijzigd: null } })
+    const { client, rijen } = maakClient()
+    await runNewsIngest(client as never, null, { now: NU })
+    expect(rijen).toHaveLength(1)
+    expect(rijen[0]).toMatchObject({ published_bron: 'pagina', published_at: '2026-08-24T00:00:00.000Z', bron_detail: 'gelezen' })
+  })
+
+  it('de backfill van een bestaande rij doet hetzelfde', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [] })
+    vi.mocked(fetchDetailPagina).mockResolvedValue({ uitkomst: 'gelezen', tekst: TEKST, datums: { gepubliceerd: null, gewijzigd: null } })
+    const { client, rijen } = maakClient()
+    rijen.push({
+      id: 'afm-1',
+      source_url: 'https://www.afm.nl/nl-nl/sector/actueel/2026/aug/klachten-verzekeraars',
+      bron_pagina_url: AFM.url,
+      bron_soort: 'web_lijst',
+      published_bron: 'eerste_gezien',
+      published_at: '2026-09-22T05:25:00.000Z',
+      duiding_status: 'geduid',
+    })
+    await runNewsIngest(client as never, null, { now: NU })
+    expect(rijen[0]).toMatchObject({ published_bron: 'pagina', published_at: '2026-08-24T00:00:00.000Z', bron_detail: 'gelezen' })
+  })
+
+  it('vóór de migratie (23514 op de CHECK): de rij komt er als eerste_gezien, niet weg', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [AFM] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: AFM_LIJST, finalUrl: AFM.url })
+    vi.mocked(fetchDetailPagina).mockResolvedValue({ uitkomst: 'gelezen', tekst: TEKST, datums: { gepubliceerd: null, gewijzigd: null } })
+    const { client, rijen } = maakClient({ zonderWijzigingKolom: true })
+    const { summary } = await runNewsIngest(client as never, null, { now: NU })
+    expect(summary.skipped).toBe(0)
+    expect(rijen[0]).toMatchObject({ published_bron: 'eerste_gezien', published_at: NU.toISOString() })
+  })
+})
+
+describe('runNewsIngest — regel 4: een ministeriepagina levert alleen artikel-links (ADR 0191)', () => {
+  const FIN = { url: 'https://www.rijksoverheid.nl/ministeries/ministerie-van-financien', label: 'Rijksoverheid — Ministerie van Financiën', soort: 'web_lijst' as const }
+  const HTML = `<main><ol>
+<li><a href="/themas/overheid-en-democratie/prinsjesdag"><h3>Prinsjesdag in het kort</h3><p>15 september 2026 was Prinsjesdag.</p></a></li>
+<li><a href="/actueel/nieuws/2026/09/25/kabinet-en-private-financierders"><h3>Kabinet en private financierders geven startschot</h3><p>Teaser.</p><span>25-09-2026</span></a></li>
+<li><a href="/regering/bewindspersonen/eelco-heinen"><h3>Eelco Heinen</h3><p>Minister van Financiën Lees verder</p></a></li>
+<li><a href="/actueel/nieuws/2026/09/18/steeds-meer-ouders-ronden-hun-aanvullende-schade-af"><h3>Steeds meer ouders ronden hun schade af</h3></a></li>
+</ol></main>`
+
+  it('zonder model neemt de terugval alleen nieuws- en documentlinks, met de kaartkop als kop', async () => {
+    vi.mocked(fetchDetailPagina).mockClear()
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [FIN] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: HTML, finalUrl: FIN.url })
+    const { client, rijen } = maakClient()
+    const { health } = await runNewsIngest(client as never, null, { now: NU })
+    expect(rijen.map((r) => new URL(r.source_url).pathname)).toEqual([
+      '/actueel/nieuws/2026/09/25/kabinet-en-private-financierders',
+      '/actueel/nieuws/2026/09/18/steeds-meer-ouders-ronden-hun-aanvullende-schade-af',
+    ])
+    expect(rijen.map((r) => r.bron_kop)).toEqual(['Kabinet en private financierders geven startschot', 'Steeds meer ouders ronden hun schade af'])
+    // Zichtbare terugkoppeling: de bron verschijnt met zijn oorzaak en telling.
+    expect(health.sources[0]).toMatchObject({ label: FIN.label, soort: 'web_lijst', items: 2, nieuw: 2, oorzaak: 'terugval_geen_model' })
+    // En de artikelpagina's staan in DETAIL_HOSTS: de server haalt ze op.
+    expect(fetchDetailPagina).toHaveBeenCalledTimes(2)
   })
 })

@@ -23,8 +23,18 @@ import { demotedCategories, demotionWindowStartIso } from '@/lib/news-feedback-s
 import { duidingV1Schema } from './duiding-schema'
 import { WEEK_VENSTER_DAGEN, type KandidaatArtikel } from './matcher'
 
-/** De kolommen van `news_articles` die de matcher leest — bewust zonder `summary`, `is_used`, `potential_impact`. */
-export const KANDIDAAT_KOLOMMEN = 'id, title, source_url, source_name, category, published_at, fetched_at, duiding_status, duiding'
+/**
+ * De kolommen van `news_articles` die de matcher leest — bewust zonder `summary`, `is_used`, `potential_impact`.
+ * Sinds MATCHER_VERSIE 6 (redactieregels, ADR 0191) ook de herkomst: `published_bron` (echte datum of
+ * ophaalmoment), `bron_soort` + `bron_wijziging` (basis of wijziging) en `bron_fragment` (Caribisch
+ * Nederland, spaarbuffer — op de aanhef). Het fragment is ≤ 4.000 tekens per rij, over ~240 rijen in
+ * het venster ~0,3 MB per lezing (gemeten 29 sep): één lezing per cron-run of knopdruk.
+ *
+ * VOLGORDE BIJ RELEASE: `bron_wijziging` bestaat pas na migratie 20261009120000. Deze select vóór de
+ * migratie geeft 42703 en de Krant-loaders werpen — dus migratie eerst, dan de code.
+ */
+export const KANDIDAAT_KOLOMMEN =
+  'id, title, source_url, source_name, category, published_at, fetched_at, duiding_status, duiding, published_bron, bron_soort, bron_wijziging, bron_fragment'
 
 /** Sleutel van de leesstatus in app_settings (app/api/news/read/route.ts). */
 export function newsReadKey(userId: string): string {

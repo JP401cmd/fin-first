@@ -264,6 +264,22 @@ export function standaardWebBronnen(nu: Date = new Date()): WebSource[] {
     { url: 'https://www.afm.nl/nl-nl/sector/themas/duurzaamheid/sfdr', label: 'AFM — SFDR duurzaam beleggen', soort: 'web_pagina' },
     { url: 'https://www.cpb.nl/publicaties', label: 'CPB — Publicaties', soort: 'web_lijst' },
     { url: 'https://www.cpb.nl/ramingen', label: 'CPB — Ramingen', soort: 'web_lijst' },
+    // Nieuws van de Rijksoverheid (ADR 0191, regel 4; gemeten 29-09-2026). De
+    // oude feed (feeds.rijksoverheid.nl) bestaat niet meer (DNS) en
+    // /actueel/nieuws bouwt zijn lijst in de browser (0 links in de HTML). De
+    // ministeriepagina's zetten hun laatste nieuws WÉL in de HTML: Financiën 4,
+    // SZW 3, AZ 4 artikel-links (na `LIJST_PAD_FILTER`). De artikelpagina's staan
+    // in `DETAIL_HOSTS` en dragen JSON-LD-datums.
+    { url: 'https://www.rijksoverheid.nl/ministeries/ministerie-van-financien', label: 'Rijksoverheid — Ministerie van Financiën', soort: 'web_lijst' },
+    { url: 'https://www.rijksoverheid.nl/ministeries/ministerie-van-sociale-zaken-en-werkgelegenheid', label: 'Rijksoverheid — Ministerie van SZW', soort: 'web_lijst' },
+    { url: 'https://www.rijksoverheid.nl/ministeries/ministerie-van-algemene-zaken', label: 'Rijksoverheid — Ministerie van Algemene Zaken', soort: 'web_lijst' },
+    // Kamerbrieven van de regering, per voortouwcommissie (Tweede Kamer). De
+    // lijst staat in de HTML (15 brieven per pagina, nieuwste eerst); de kop is
+    // de titel van de brief. Hier stond op 29-09 "Voorstellen op box 3,
+    // koopkracht werkenden en sociale zekerheid" — het bericht dat de eigenaar
+    // miste. De briefpagina's staan NIET in DETAIL_HOSTS: alleen de kop.
+    { url: 'https://www.tweedekamer.nl/kamerstukken/brieven_regering?qry=%2A&fld_tk_categorie=Kamerstukken&fld_prl_kamerstuk=Brieven%20regering&srt=date%3Adesc%3Adate&fld_prl_voortouwcommissie=Vaste%20commissie%20voor%20Financi%C3%ABn', label: 'Tweede Kamer — Kamerbrieven Financiën', soort: 'web_lijst' },
+    { url: 'https://www.tweedekamer.nl/kamerstukken/brieven_regering?qry=%2A&fld_tk_categorie=Kamerstukken&fld_prl_kamerstuk=Brieven%20regering&srt=date%3Adesc%3Adate&fld_prl_voortouwcommissie=Vaste%20commissie%20voor%20Sociale%20Zaken%20en%20Werkgelegenheid', label: 'Tweede Kamer — Kamerbrieven SZW', soort: 'web_lijst' },
   ]
 }
 
@@ -657,11 +673,28 @@ export async function fetchWebPage(source: { url: string }): Promise<WebPaginaUi
  *               nieuws géén description (35 van 36 fragmenten leeg, 28 sep)
  *   www.cpb.nl  /                       publicaties en ramingen (lijstbron)
  *   www.afm.nl  /nl-nl/sector/actueel/  sectornieuws (lijstbron)
+ *   www.rijksoverheid.nl  /actueel/nieuws/ en /documenten/  het nieuws en de
+ *               documenten (persconferentie, Kamerbrief) van de ministerie-
+ *               pagina's (lijstbronnen, ADR 0191)
+ *
+ * Meerdere paden per host (ADR 0191): elk pad is een PREFIX op het pad van de
+ * URL; de host moet exact gelijk zijn. Een ander pad op dezelfde host (bv.
+ * `/themas/…`) wordt niet opgehaald.
  */
-export const DETAIL_HOSTS: Readonly<Record<string, string>> = {
-  'www.cbs.nl': '/nl-nl/nieuws/',
-  'www.cpb.nl': '/',
-  'www.afm.nl': '/nl-nl/sector/actueel/',
+export const DETAIL_HOSTS: Readonly<Record<string, readonly string[]>> = {
+  'www.cbs.nl': ['/nl-nl/nieuws/'],
+  'www.cpb.nl': ['/'],
+  'www.afm.nl': ['/nl-nl/sector/actueel/'],
+  // ADR 0191, regel 4 (29 sep 2026): het nieuws en de documenten van de
+  // ministeriepagina's (Financiën, SZW, AZ). Twee paden, meer niet: de rest van
+  // rijksoverheid.nl (thema's, bewindspersonen, organogram) staat op dezelfde
+  // host maar is geen artikel, en de server bezoekt het dus niet.
+  'www.rijksoverheid.nl': ['/actueel/nieuws/', '/documenten/'],
+}
+
+/** De toegestane padprefixen voor deze host (exacte hostnaam, kleine letters), of een lege lijst. */
+function detailPaden(hostname: string): readonly string[] {
+  return DETAIL_HOSTS[hostname.toLowerCase()] ?? []
 }
 
 /** Bovengrens van de bewaarde artikeltekst (besluit eigenaar 28 sep: 4.000 tekens). */
@@ -722,11 +755,111 @@ export function detailToegestaan(url: string): boolean {
   if (!isVeiligeBronUrl(url) || isDoorstuurVorm(url)) return false
   try {
     const u = new URL(url)
-    const pad = DETAIL_HOSTS[u.hostname.toLowerCase()]
-    return pad !== undefined && u.pathname.startsWith(pad)
+    return detailPaden(u.hostname).some((pad) => u.pathname.startsWith(pad))
   } catch {
     return false
   }
+}
+
+// ── Lijstbronnen: alleen artikel-links (ADR 0191, regel 4) ───────────
+
+/**
+ * Per host: welke links van een LIJSTPAGINA een artikel kunnen zijn. Zoals
+ * `RSS_PAD_FILTER`, maar voor `web_lijst`. Een ministeriepagina van
+ * rijksoverheid.nl zet haar laatste nieuws tussen tegels naar thema's,
+ * bewindspersonen en het organogram; de Tweede Kamer zet filterknoppen boven
+ * de lijst. Zonder dit filter kiest de terugval (geen model) de eerste vier
+ * links in paginavolgorde — dat zijn dan tegels, geen nieuws.
+ *
+ * Bewust in code, per host: het geldt ook als de beheerder de bronnenlijst
+ * opslaat. Een host zonder regel houdt het gedrag van vóór ADR 0191.
+ */
+export const LIJST_PAD_FILTER: Readonly<Record<string, readonly string[]>> = {
+  'www.rijksoverheid.nl': ['/actueel/nieuws/', '/documenten/'],
+  'www.tweedekamer.nl': ['/kamerstukken/brieven_regering/detail'],
+}
+
+/** Het padfilter voor een lijstbron-URL, of null als de host er geen heeft. */
+export function lijstPadFilter(bronUrl: string): readonly string[] | null {
+  try {
+    return LIJST_PAD_FILTER[new URL(bronUrl).hostname.toLowerCase()] ?? null
+  } catch {
+    return null
+  }
+}
+
+// ── De datum bij de kop (ADR 0191, regel 3) ──────────────────────────
+
+const MAANDNUMMER: Readonly<Record<string, number>> = {
+  januari: 1, februari: 2, maart: 3, april: 4, mei: 5, juni: 6,
+  juli: 7, augustus: 8, september: 9, oktober: 10, november: 11, december: 12,
+}
+
+/** Alleen de aanhef van de artikeltekst: kop, soort en datum staan bovenaan. */
+export const PAGINA_DATUM_AANHEF_TEKENS = 400
+/** Een zichtbare datum die ouder is dan dit, is eerder een leesfout dan een publicatiedatum. */
+export const PAGINA_DATUM_MAX_OUDERDOM_DAGEN = 730
+
+/**
+ * Per host één EXPLICIET patroon voor de publicatiedatum vlak bij de kop, in de
+ * artikeltekst zoals `artikelTekst` hem levert (en zoals hij als
+ * `bron_fragment` bewaard wordt — de backfill in migratie 20261009120000 leest
+ * hetzelfde patroon uit dezelfde tekst). Groepen: dag, maand, jaar.
+ *
+ *   www.afm.nl           "Nieuws 24/08/26", "Persbericht 24/09/26", "Maatregel
+ *                        20/08/26", "Artikel 03/09/26" — soortwoord + dd/mm/jj
+ *                        op een eigen regel onder de kop (geen metadata)
+ *   www.cpb.nl           "15 september 2026" op een eigen regel direct na de
+ *                        titel (terugval; de pagina heeft ook metadata)
+ *   www.rijksoverheid.nl "Nieuwsbericht 29-09-2026 | 14:15", "Mediatekst
+ *                        25-09-2026" (terugval; JSON-LD is er ook)
+ *
+ * CBS staat hier niet: de artikeltekst draagt geen datum, de metadata wel
+ * (`DCTERMS.modified`, zie `extractBronDatums`).
+ */
+export const PAGINA_DATUM_PATRONEN: Readonly<Record<string, { patroon: RegExp; maand: 'getal' | 'naam'; jaar: 'jj' | 'jjjj' }>> = {
+  'www.afm.nl': { patroon: /(?:^|\n)[A-Z][A-Za-z]{2,24} (\d{2})\/(\d{2})\/(\d{2})(?=\s|$)/, maand: 'getal', jaar: 'jj' },
+  'www.cpb.nl': {
+    patroon: /(?:^|\n)(\d{1,2}) (januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december) (\d{4})[ \t]*(?=\n|$)/i,
+    maand: 'naam',
+    jaar: 'jjjj',
+  },
+  'www.rijksoverheid.nl': { patroon: /(?:^|\n)[A-Z][a-z]{2,24} (\d{1,2})-(\d{1,2})-(\d{4})(?=\s|$)/, maand: 'getal', jaar: 'jjjj' },
+}
+
+/**
+ * De publicatiedatum uit de ZICHTBARE tekst bij de kop, als ISO (middernacht
+ * UTC), of null. Alleen op een host met een patroon, alleen in de aanhef, alleen
+ * een bestaande kalenderdag, nooit na de dag van `runMoment` en nooit meer dan
+ * `PAGINA_DATUM_MAX_OUDERDOM_DAGEN` ervoor. Wat niet past is geen datum: dan
+ * blijft het ophaalmoment staan (`eerste_gezien`) — liever geen datum dan een
+ * verkeerde.
+ */
+export function paginaDatum(url: string, tekst: string, runMoment: string): string | null {
+  let host: string
+  try {
+    host = new URL(url).hostname.toLowerCase()
+  } catch {
+    return null
+  }
+  const def = PAGINA_DATUM_PATRONEN[host]
+  if (!def) return null
+  const m = def.patroon.exec(tekst.slice(0, PAGINA_DATUM_AANHEF_TEKENS))
+  if (!m) return null
+  const dag = Number(m[1])
+  const maand = def.maand === 'naam' ? MAANDNUMMER[m[2].toLowerCase()] : Number(m[2])
+  const jaar = def.jaar === 'jj' ? 2000 + Number(m[3]) : Number(m[3])
+  if (!Number.isInteger(dag) || !Number.isInteger(maand) || !Number.isInteger(jaar) || maand < 1 || maand > 12 || dag < 1) return null
+  const t = Date.UTC(jaar, maand - 1, dag)
+  const d = new Date(t)
+  // 31/02 rolt in `Date.UTC` door naar maart: dan is het geen bestaande dag.
+  if (d.getUTCFullYear() !== jaar || d.getUTCMonth() !== maand - 1 || d.getUTCDate() !== dag) return null
+  const run = new Date(runMoment)
+  if (Number.isNaN(run.getTime())) return null
+  const runDag = Date.UTC(run.getUTCFullYear(), run.getUTCMonth(), run.getUTCDate())
+  if (t > runDag) return null
+  if (t < runDag - PAGINA_DATUM_MAX_OUDERDOM_DAGEN * 86_400_000) return null
+  return d.toISOString()
 }
 
 export type DetailUitkomst =

@@ -68,6 +68,8 @@ export interface TijdlijnBericht {
   bron: string | null
   url: string | null
   gepubliceerd: string | null
+  /** ADR 0191 regel 3: zonder echte publicatiedatum wanneer wij het zagen; null bij een echte datum of een oude momentopname. */
+  gezienOp: string | null
   samenvatting: string | null
 }
 
@@ -177,6 +179,7 @@ export function rijNaarBericht(r: ItemRij): TijdlijnBericht {
     bron: str(s.bron),
     url: str(s.url),
     gepubliceerd: str(s.gepubliceerd),
+    gezienOp: str(s.gezienOp),
     samenvatting: str(s.samenvatting),
   }
 }

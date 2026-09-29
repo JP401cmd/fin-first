@@ -441,6 +441,24 @@ function zelfdeSite(a: URL, b: URL): boolean {
 }
 
 /**
+ * De kop van een link. Is de link een KAART (een kop-element erin: h1–h6, zoals
+ * de nieuwstegels van rijksoverheid.nl en de lijst van CPB), dan is de kop van
+ * die kaart de kop — niet de hele kaarttekst met teaser en datum ("Noodfonds
+ * Energie gaat open Het Noodfonds Energie opent. Vanaf 1 december …"). De
+ * teaser en de datum blijven in het fragment staan. Zonder kop-element, of met
+ * een kop die te kort is voor een artikelkop: de hele linktekst, zoals vóór
+ * ADR 0191.
+ */
+function linkKop(linkHtml: string): string {
+  const kop = vindElementen(linkHtml, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']).find((e) => e.sluit >= 0)
+  if (kop) {
+    const tekst = stripHtml(linkHtml.slice(kop.binnen, kop.sluit))
+    if (tekst.length >= MIN_LINKTEKST_TEKENS) return tekst
+  }
+  return stripHtml(linkHtml)
+}
+
+/**
  * Alle links in de hoofdinhoud die een artikel kúnnen zijn: http(s), dezelfde
  * site als de GECONFIGUREERDE bron-URL, niet de pagina zelf en geen variant
  * van de pagina met alleen een andere query (filters als `?facet_author=`),
@@ -460,6 +478,12 @@ export function extractLinks(
   max: number,
   /** De geconfigureerde bron-URL: de grens voor "dezelfde site". Standaard `paginaUrl`. */
   siteUrl: string = paginaUrl,
+  /**
+   * Alleen links waarvan het pad met een van deze prefixen begint (ADR 0191,
+   * `LIJST_PAD_FILTER`). Toegepast VÓÓR de cap, zodat de cap naar bruikbare
+   * links gaat. Null = geen filter (gedrag van vóór ADR 0191).
+   */
+  alleenPaden: readonly string[] | null = null,
 ): { links: PaginaLink[]; afgekapt: number } {
   let basis: URL
   let site: URL
@@ -494,8 +518,9 @@ export function extractLinks(
     doel.hash = ''
     // De pagina zelf, of dezelfde pagina met alleen een andere query (filter/sortering): geen artikel.
     if (zelfPaden.has(padVan(doel))) continue
+    if (alleenPaden && !alleenPaden.some((p) => doel.pathname.startsWith(p))) continue
     const url = doel.toString()
-    const tekst = stripHtml(inhoud.slice(a.binnen, a.sluit))
+    const tekst = linkKop(inhoud.slice(a.binnen, a.sluit))
     if (tekst.length < MIN_LINKTEKST_TEKENS) continue
     if (gezien.has(url)) continue
     gezien.add(url)
@@ -596,5 +621,10 @@ export function extractBronDatums(html: string): BronDatums {
   // CPB heeft geen JSON-LD en geen Open Graph, wel deze meta (Krant 1F fase 3).
   // Metadata, geen lopende tekst: dezelfde regel als hierboven.
   gepubliceerd ??= isoOfNull(metaInhoud(html, 'publicationdatetime'))
+  // CBS (ADR 0191, regel 3): geen JSON-LD en geen Open Graph, wel Dublin Core
+  // (`<meta name="DCTERMS.modified" content="2026-09-22T06:30:00+02:00">`).
+  // Metadata, geen lopende tekst — als laatste terugval.
+  gepubliceerd ??= isoOfNull(metaInhoud(html, 'dcterms.issued'))
+  gewijzigd ??= isoOfNull(metaInhoud(html, 'dcterms.modified'))
   return { gewijzigd, gepubliceerd }
 }

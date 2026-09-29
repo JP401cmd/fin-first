@@ -68,7 +68,7 @@ describe('editie-schrijver', () => {
   it('itemNaarRij bewaart de kop, bron, url en samenvatting in het snapshot (leesbaar na opruimen van het artikel)', () => {
     const item = matchEditie(PROFIEL_TESSA, ARTIKELEN, ctx()).items[0]
     const rij = itemNaarRij(item, 'e1', UID, 0)
-    expect(rij.snapshot).toEqual({ titel: item.titel, rubriek: item.rubriek, bron: item.bron, url: item.url, gepubliceerd: item.gepubliceerd, samenvatting: item.samenvatting })
+    expect(rij.snapshot).toEqual({ titel: item.titel, rubriek: item.rubriek, bron: item.bron, url: item.url, gepubliceerd: item.gepubliceerd, gezienOp: item.gezienOp, samenvatting: item.samenvatting })
     expect(rij.wat_mist).toEqual(item.watMist)
     expect(rij.waarom).toEqual(item.waarom)
   })
