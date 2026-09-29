@@ -127,7 +127,9 @@ export async function screenPublishMetadata(
       schema: ScreenResultSchema,
       system: buildSystemPrompt(),
       prompt: userPrompt,
-      maxOutputTokens: 300,
+      // Ruime cap: op Sonnet 5 tellen denktokens mee (ADR 0186); afgekapte JSON
+      // zou via de fail-closed tak élke publicatie blokkeren.
+      maxOutputTokens: 1200,
     })
 
     if (object.ok) {

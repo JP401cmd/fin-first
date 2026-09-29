@@ -70,7 +70,7 @@ export function tokenFeatureLabel(key: string): string {
 
 /** Structureel subset van LanguageModelV3Usage — alleen wat we opslaan. */
 export interface TokenUsageLike {
-  inputTokens?: { total?: number | undefined } | null
+  inputTokens?: { total?: number | undefined; cacheRead?: number | undefined; cacheWrite?: number | undefined } | null
   outputTokens?: { total?: number | undefined } | null
 }
 
@@ -105,15 +105,31 @@ export async function logAiTokens(
   try {
     const input = Math.round(opts.usage?.inputTokens?.total ?? 0)
     const output = Math.round(opts.usage?.outputTokens?.total ?? 0)
+    const cacheRead = Math.round(opts.usage?.inputTokens?.cacheRead ?? 0)
+    const cacheWrite = Math.round(opts.usage?.inputTokens?.cacheWrite ?? 0)
     const userId = await resolveUserId(opts.supabase, opts.userId)
-    await getServiceClient().from('ai_token_usage').insert({
+    const basis = {
       user_id: userId,
       feature: opts.feature,
       provider: opts.provider,
       model: opts.modelId,
+      // Totaal, inclusief het gecachete deel hieronder.
       input_tokens: input,
       output_tokens: output,
-    })
+    }
+    const cache = {
+      ...(cacheRead > 0 ? { cache_read_tokens: cacheRead } : {}),
+      ...(cacheWrite > 0 ? { cache_write_tokens: cacheWrite } : {}),
+    }
+    const tabel = getServiceClient().from('ai_token_usage')
+    const { error } = await tabel.insert({ ...basis, ...cache })
+    // Staat migratie 20261007120000 nog niet op deze omgeving, dan faalt de
+    // insert op de onbekende kolom — en supabase-js throwt dan niet. Zonder
+    // deze tak verdween de héle meetrij van elke gecachete call stil.
+    if (error && Object.keys(cache).length > 0 && (error.code === '42703' || error.code === 'PGRST204')) {
+      console.error('[token-usage] cache-kolommen ontbreken — gelogd zonder cache-deel:', error.code)
+      await tabel.insert(basis)
+    }
   } catch {
     // Metering mag de AI-actie nooit breken.
   }

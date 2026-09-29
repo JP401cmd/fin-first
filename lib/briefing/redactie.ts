@@ -224,7 +224,9 @@ export async function redactBriefing(
       schema: redactieSchema,
       system,
       prompt: buildRedactiePrompt(entries),
-      maxOutputTokens: 1200,
+      // Ruime cap: op Sonnet 5 tellen denktokens mee (ADR 0186). De temperature
+      // laat de SDK daar vallen (met waarschuwing); op Sonnet 4.5 geldt hij nog.
+      maxOutputTokens: 2500,
       temperature: 0.6,
     })
 
