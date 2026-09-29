@@ -9,6 +9,7 @@ import { aiFailureMiddleware, logAiFailure } from '@/lib/ai/ai-failure-middlewar
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { decryptField } from '@/lib/crypto/field-encryption'
 import { AI_ERROR_CODE } from '@/lib/ai/error-copy'
+import { featureSleutels, kiesAnthropicModel, kiesEffort, type Effort } from '@/lib/ai/model-keuze'
 
 // AI-provider-keys worden versleuteld opgeslagen in app_settings (zie
 // app/api/admin/settings/route.ts). Dual-read: een `v1:`-prefixte waarde wordt
@@ -70,7 +71,7 @@ export async function getModel(supabase: SupabaseClient, feature?: string, opts:
   const { data, error } = await getServiceClient()
     .from('app_settings')
     .select('key, value')
-    .in('key', ['ai_provider', 'ai_model_anthropic', 'ai_model_openai', 'anthropic_api_key', 'openai_api_key', 'ai_model_mistral', 'mistral_api_key', 'ollama_base_url', 'ai_model_ollama', 'platform_status'])
+    .in('key', ['ai_provider', 'ai_model_anthropic', 'ai_model_openai', 'anthropic_api_key', 'openai_api_key', 'ai_model_mistral', 'mistral_api_key', 'ollama_base_url', 'ai_model_ollama', 'platform_status', ...featureSleutels(feature)])
 
   // De leesfout werd hier eerder weggegooid. Gevolg: een mislukte
   // service-lezing (verkeerde service-role-key, RLS, netwerk) leverde een leeg
@@ -98,6 +99,7 @@ export async function getModel(supabase: SupabaseClient, feature?: string, opts:
 
   let modelId: string
   let base: WrappableModel
+  let effort: Effort | null = null
 
   switch (provider) {
     case 'openai': {
@@ -136,7 +138,10 @@ export async function getModel(supabase: SupabaseClient, feature?: string, opts:
         await logAiFailure('ai:config', new Error(message), { supabase })
         throw new AIConfigError(message, 'anthropic')
       }
-      modelId = settings.ai_model_anthropic || 'claude-sonnet-4-5-20250929'
+      // Model per feature (`ai_model_anthropic:<feature>`), anders het globale
+      // model — zie lib/ai/model-keuze.ts.
+      modelId = kiesAnthropicModel(settings, feature)
+      effort = kiesEffort(settings, feature, modelId)
       base = createAnthropic({ apiKey })(modelId)
       break
     }
@@ -151,5 +156,25 @@ export async function getModel(supabase: SupabaseClient, feature?: string, opts:
   if (feature) {
     middleware.push(tokenLoggingMiddleware({ supabase, feature, provider, modelId, userId: opts.userId }))
   }
+  if (effort) middleware.push(effortMiddleware(effort))
   return wrapLanguageModel({ model: base, middleware })
+}
+
+/**
+ * Zet de effort op élke call naar een model dat hem kent, tenzij de callsite
+ * zelf al een effort meegeeft (die wint). Zonder deze middleware denkt Sonnet 5
+ * standaard adaptief op `high` — zie DEFAULT_EFFORT in lib/ai/model-keuze.ts.
+ */
+export function effortMiddleware(effort: Effort): LanguageModelMiddleware {
+  return {
+    specificationVersion: 'v3',
+    transformParams: async ({ params }) => {
+      const anthropic = (params.providerOptions?.anthropic ?? {}) as Record<string, unknown>
+      if (anthropic.effort != null) return params
+      return {
+        ...params,
+        providerOptions: { ...params.providerOptions, anthropic: { ...anthropic, effort } },
+      }
+    },
+  }
 }

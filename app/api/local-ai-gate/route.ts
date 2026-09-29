@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { parseGateConfig, LOCAL_AI_GATE_SETTINGS_KEY } from '@/lib/ai/local/gate-config'
 import { LOCAL_MODEL_CATALOG } from '@/lib/ai/local/model-catalog'
+import { kiesAnthropicModel, modelSleutel } from '@/lib/ai/model-keuze'
 
 /**
  * Leespad voor de sectie "Waar draait de AI?" op /mijn/privacy: welk model wordt
@@ -33,7 +34,9 @@ const PROVIDER_LABELS: Record<string, string> = {
  * Welke cloud-provider + welk model is nu voor iedereen actief? Zelfde
  * resolutie (incl. defaults) als `getModel` in lib/ai/config.ts — alleen de
  * naam, zonder keys of provider-instantie. Wijzigt daar een default, dan hier
- * meebewegen.
+ * meebewegen. Het getoonde model is dat van de chat met Fin — sinds het model
+ * per feature (lib/ai/model-keuze.ts) kan de nieuws-cron een ander draaien, maar
+ * dat is niet het model waar de gebruiker mee praat.
  */
 function resolveCloudModel(settings: Record<string, string>): {
   provider: string
@@ -53,7 +56,7 @@ function resolveCloudModel(settings: Record<string, string>): {
       modelId = settings.ai_model_ollama || 'llama3.2'
       break
     default:
-      modelId = settings.ai_model_anthropic || 'claude-sonnet-4-5-20250929'
+      modelId = kiesAnthropicModel(settings, 'chat')
   }
   return {
     provider,
@@ -77,6 +80,7 @@ export async function GET() {
       LOCAL_AI_GATE_SETTINGS_KEY,
       'ai_provider',
       'ai_model_anthropic',
+      modelSleutel('chat'),
       'ai_model_openai',
       'ai_model_mistral',
       'ai_model_ollama',

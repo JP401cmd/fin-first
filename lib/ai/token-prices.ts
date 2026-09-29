@@ -13,14 +13,11 @@
 // ── Wat dit NIET is ─────────────────────────────────────────────────────────
 // Een schatting, geen factuur. Drie redenen waarom het bedrag kan afwijken:
 //
-//  1. `ai_token_usage` kent alleen `input_tokens` en `output_tokens`. Zodra
-//     ergens prompt-caching aan gaat, verschuift een deel van de input naar
-//     cache-reads (0,1× het basistarief) en cache-writes (1,25× voor 5 min,
-//     2× voor 1 uur) — dan OVERSCHAT deze berekening de kosten, want de SDK
-//     rapporteert cached input in hetzelfde `inputTokens`-totaal. Op het moment
-//     van schrijven (26 sep 2026) gebruikt deze app nergens `cache_control`,
-//     dus die vertekening bestaat nu niet. Voegt iemand caching toe, dan hoort
-//     `ai_token_usage` eerst twee kolommen te krijgen.
+//  1. Prompt-caching wordt verrekend via `cache_read_tokens` (0,1× het
+//     basistarief) en `cache_write_tokens` (1,25×, de 5-minuten-cache) in
+//     `ai_token_usage` (migratie 20261007120000). `input_tokens` is het totaal
+//     inclusief die twee. De 1-uurs-cache (2×) gebruiken we niet; zet iemand
+//     `ttl: '1h'`, dan ONDERSCHAT deze berekening de writes.
 //  2. De Batch API kost de helft; wij gebruiken hem niet.
 //  3. Volumekorting en `inference_geo` (1,1× bij US-only) zijn niet verwerkt.
 //
@@ -28,7 +25,7 @@
 // datum is een stil verouderd tarief niet van een actueel te onderscheiden.
 
 /** Wanneer de tarieven hieronder voor het laatst zijn gecontroleerd. */
-export const PRIJZEN_PEILDATUM = '2026-09-26'
+export const PRIJZEN_PEILDATUM = '2026-09-29'
 
 /** Bron van de tarieven, zodat een lezer ze zelf kan natrekken. */
 export const PRIJZEN_BRON = 'platform.claude.com/docs/en/about-claude/pricing'
@@ -38,6 +35,8 @@ export interface ModelTarief {
   inputPerMTok: number
   /** USD per miljoen outputtokens. */
   outputPerMTok: number
+  /** USD per miljoen cache-reads, waar die afwijkt van 0,1× input. */
+  cacheReadPerMTok?: number
 }
 
 /**
@@ -65,9 +64,9 @@ export const MODEL_TARIEVEN: Record<string, ModelTarief> = {
   'claude-opus-4-7': { inputPerMTok: 5, outputPerMTok: 25 },
   'claude-opus-4-8': { inputPerMTok: 5, outputPerMTok: 25 },
   'claude-opus-5': { inputPerMTok: 5, outputPerMTok: 25 },
-  'claude-opus-5-5': { inputPerMTok: 4, outputPerMTok: 20 },
+  'claude-opus-5-5': { inputPerMTok: 4, outputPerMTok: 20, cacheReadPerMTok: 0.2 },
   'claude-fable-5': { inputPerMTok: 10, outputPerMTok: 50 },
-  'claude-fable-5-1': { inputPerMTok: 10, outputPerMTok: 50 },
+  'claude-fable-5-1': { inputPerMTok: 10, outputPerMTok: 50, cacheReadPerMTok: 0.25 },
 }
 
 /**
@@ -78,6 +77,10 @@ export const MODEL_TARIEVEN: Record<string, ModelTarief> = {
  * die iemand daar invult hoort gratis te zijn.
  */
 const GRATIS_PROVIDERS = new Set(['ollama'])
+
+/** Cache-lezen kost 0,1× het inputtarief; schrijven (5-minuten-cache) 1,25×. */
+export const CACHE_READ_FACTOR = 0.1
+export const CACHE_WRITE_FACTOR = 1.25
 
 /**
  * Brengt een model-id terug naar de tarief-alias. Provider-id's dragen een
@@ -116,12 +119,20 @@ export function estimateCostUsd(
   model: string,
   inputTokens: number,
   outputTokens: number,
+  /** Het deel van `inputTokens` dat uit de cache kwam of erin ging. */
+  cache: { read: number; write: number } = { read: 0, write: 0 },
 ): number | null {
   if (GRATIS_PROVIDERS.has(provider.trim().toLowerCase())) return 0
   const tarief = tariefVoor(model)
   if (!tarief) return null
+  const read = Math.max(0, cache.read)
+  const write = Math.max(0, cache.write)
+  const ongecachet = Math.max(0, inputTokens - read - write)
+  const perToken = tarief.inputPerMTok / 1_000_000
   return (
-    (inputTokens / 1_000_000) * tarief.inputPerMTok +
+    ongecachet * perToken +
+    read * (tarief.cacheReadPerMTok != null ? tarief.cacheReadPerMTok / 1_000_000 : perToken * CACHE_READ_FACTOR) +
+    write * perToken * CACHE_WRITE_FACTOR +
     (outputTokens / 1_000_000) * tarief.outputPerMTok
   )
 }

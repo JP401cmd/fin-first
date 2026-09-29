@@ -101,3 +101,15 @@ describe('tarieventabel', () => {
     expect(PRIJZEN_PEILDATUM).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })
+
+describe('estimateCostUsd — prompt-caching', () => {
+  it('rekent cache-reads tegen 0,1× en cache-writes tegen 1,25× het inputtarief', () => {
+    // Sonnet 4.5: $3 in. 1M input waarvan 800k gelezen en 100k geschreven.
+    const kosten = estimateCostUsd('anthropic', 'claude-sonnet-4-5', 1_000_000, 0, { read: 800_000, write: 100_000 })
+    expect(kosten).toBeCloseTo(0.1 * 3 + 0.8 * 3 * 0.1 + 0.1 * 3 * 1.25, 10)
+  })
+
+  it('zonder cache-deel onveranderd', () => {
+    expect(estimateCostUsd('anthropic', 'claude-haiku-4-5', 1_000_000, 1_000_000)).toBeCloseTo(6, 10)
+  })
+})
