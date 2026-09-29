@@ -39,7 +39,8 @@
 --   5. de momentopnamen van de Krant (krant_editie_items.snapshot en
 --      krant_edities.algemeen) krijgen dezelfde lezing: zonder echte datum
 --      "gezienOp" in plaats van een publicatiedatum. Alleen items die dat veld
---      nog niet dragen. Verwacht: 15 edities, 15 items.
+--      nog niet dragen. Verwacht (29 sep): 15 items (7 schaduw, 8 tijdlijn) en
+--      de algemeen-blokken van hoogstens 17 edities (15 schaduw, 2 tijdlijn).
 --
 -- ── Herhaalbaar ──────────────────────────────────────────────────────────────
 -- Kolom en CHECKs via `if not exists` / pg_constraint; stap 3 raakt alleen
