@@ -97,6 +97,43 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.25',
+    date: '2026-09-30',
+    title: 'De Krant kiest scherper wat nieuws is',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Nieuws van de Rijksoverheid en de Tweede Kamer erbij',
+            description:
+              'De Krant haalt nu ook nieuws op van drie ministeries en de Kamerbrieven over financiën en sociale zaken.',
+          },
+          {
+            title: 'Een uitlegpagina is pas nieuws als er iets verandert',
+            description:
+              'In de tijdlijn telt een vaste uitlegpagina alleen nog mee als er iets op wijzigt. De tijdlijn staat nog uit voor lezers.',
+          },
+          {
+            title: 'De echte datum bij elk bericht',
+            description:
+              'Een bericht toont alleen een publicatiedatum als de bron die gaf. Anders staat er wanneer wij het bericht zagen.',
+          },
+          {
+            title: 'Berichten die bij jou passen',
+            description:
+              'Nieuws over Caribisch Nederland valt af, en een bericht over een kleine spaarbuffer gaat naar lezers met weinig spaargeld.',
+          },
+          {
+            title: '"Waarom zie ik dit?" in gewone taal',
+            description: 'Onder een bericht stonden technische codes. Daar staat nu in een zin waarom je het bericht ziet.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.24',
     date: '2026-09-29',
     title: 'De Krant met AI op de tijdlijn staat klaar',

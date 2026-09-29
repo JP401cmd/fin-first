@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T20:46:26.696Z",
+  "generatedAt": "2026-09-29T22:52:59.080Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.24"
+    "version": "0.92.25"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -193,7 +193,7 @@
     "routesProduction": 91,
     "api": 344,
     "tables": 105,
-    "migrations": 272,
+    "migrations": 273,
     "integrations": 25,
     "components": 1287,
     "providers": 19,
@@ -8930,7 +8930,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 272
+    "migrationCount": 273
   },
   "tablesByDomain": [
     {
@@ -19335,6 +19335,20 @@
       ],
       "summary": "De Krant met AI is sinds Krant 1E geen eigen editie meer. Het is dezelfde tijdlijnverversing als de Krant zonder AI (ADR 0183), met één extra stap tussen de matcher en het schrijven: een model schrijft per bericht een korte toelichting en mag hoogstens drie berichten toevoegen. D",
       "file": "docs/adr/0190-de-krant-met-ai-als-laag-op-de-tijdlijn.md"
+    },
+    {
+      "id": "0191-de-redactieregels-van-de-krant",
+      "title": "De redactieregels van de Krant: verandering is nieuws, het bericht past bij de lezer, de echte datum, Rijksoverheid als bron",
+      "status": "voorgesteld",
+      "date": "2026-09-29",
+      "elements": [
+        "as-nieuws",
+        "sp-nieuws",
+        "do-krant",
+        "t-supabase"
+      ],
+      "summary": "Aanvulling op ADR 0176 (wat is een artikel) en ADR 0172/0183 (de matcher en de tijdlijn).",
+      "file": "docs/adr/0191-de-redactieregels-van-de-krant.md"
     }
   ],
   "churn": {
@@ -19394,8 +19408,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 4103,
-        "commits": 29
+        "loc": 4140,
+        "commits": 30
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -20688,23 +20702,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-29",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Integraties",
-        "added": [
-          "OpenRouter"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [],
-        "removed": [
-          "-2"
-        ]
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
