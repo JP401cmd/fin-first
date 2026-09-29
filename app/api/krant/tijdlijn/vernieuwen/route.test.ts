@@ -18,13 +18,13 @@ vi.mock('@/lib/supabase/service', () => ({ getServiceClient: vi.fn(() => ({ mark
 
 const mockIsCloudAllowed = vi.fn()
 vi.mock('@/lib/ai/privacy-gate', () => ({ isCloudAllowed: (...a: unknown[]) => mockIsCloudAllowed(...a) }))
-const mockMaakAiStap = vi.fn((opties: { cloudToegestaan: boolean }) => ({ stap: 'ai', ...opties }))
-vi.mock('@/lib/krant/tijdlijn-ai', () => ({ maakAiStap: (o: { cloudToegestaan: boolean }) => mockMaakAiStap(o) }))
+const mockMaakAiStap = vi.fn((opties: { cloudToegestaan: boolean; deadline?: number }) => ({ stap: 'ai', cloudToegestaan: opties.cloudToegestaan }))
+vi.mock('@/lib/krant/tijdlijn-ai', () => ({ maakAiStap: (o: { cloudToegestaan: boolean; deadline?: number }) => mockMaakAiStap(o) }))
 
 const mockVerversEigenTijdlijn = vi.fn()
 vi.mock('@/lib/krant/tijdlijn-vernieuwen', () => ({ verversEigenTijdlijn: (...a: unknown[]) => mockVerversEigenTijdlijn(...a) }))
 
-import { POST } from './route'
+import { POST, maxDuration } from './route'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -105,7 +105,17 @@ describe('de privacy-poort vóór de AI-laag (Krant 1E, K6)', () => {
     mockVerversEigenTijdlijn.mockResolvedValue({ status: 'ververst', items: 2, leeg: false, ai: 'geweigerd' })
     const res = await POST()
     expect(res.status).toBe(200)
-    expect(mockMaakAiStap).toHaveBeenCalledWith({ cloudToegestaan: false })
+    expect(mockMaakAiStap).toHaveBeenCalledWith(expect.objectContaining({ cloudToegestaan: false }))
+  })
+
+  it('Y5: maxDuration 90 en een deadline binnen die tijd voor de modelcall', async () => {
+    expect(maxDuration).toBe(90)
+    mockVerversEigenTijdlijn.mockResolvedValue({ status: 'niets-nieuws' })
+    const voor = Date.now()
+    await POST()
+    const { deadline } = mockMaakAiStap.mock.calls[0][0]
+    expect(deadline).toBeGreaterThanOrEqual(voor + 90_000)
+    expect(deadline).toBeLessThanOrEqual(Date.now() + 90_000)
   })
 
   it('een leesfout op de poort telt als "nee" (fail-closed), niet als 500', async () => {
@@ -113,7 +123,7 @@ describe('de privacy-poort vóór de AI-laag (Krant 1E, K6)', () => {
     mockVerversEigenTijdlijn.mockResolvedValue({ status: 'niets-nieuws' })
     const res = await POST()
     expect(res.status).toBe(200)
-    expect(mockMaakAiStap).toHaveBeenCalledWith({ cloudToegestaan: false })
+    expect(mockMaakAiStap).toHaveBeenCalledWith(expect.objectContaining({ cloudToegestaan: false }))
   })
 
   it('401 zonder sessie: geen poort, geen laag', async () => {

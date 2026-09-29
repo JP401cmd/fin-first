@@ -130,7 +130,8 @@ const tests: TestCase[] = [
       const res = await authenticatedFetch('/api/news')
       const body = await res.json()
 
-      // Should require auth (401) or tier gate (403) or return news data
+      // Should require auth (401), tier gate or bron-poort (403 — sinds Krant 1E
+      // alleen nog bron 'oud'; een tijdlijnlezer krijgt 403) or return news data
       assert(
         res.status === 401 || res.status === 403 || res.status === 200,
         `Expected 401, 403 or 200, got ${res.status}`,

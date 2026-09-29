@@ -14,6 +14,10 @@ import { KrantBezwaar } from '@/components/berichten/krant-bezwaar'
 import { safeHttpUrl } from '@/lib/safe-url'
 // Alleen TYPES: tijdlijn-lezen.ts gebruikt Buffer en hoort niet in de clientbundel.
 import type { TijdlijnBericht, TijdlijnBlok, TijdlijnOverzicht, TijdlijnPagina } from '@/lib/krant/tijdlijn-lezen'
+// Alleen TYPES en constanten: de stand komt van de server (ai-laag-stand.ts), de
+// grenzen uit één client-veilige bron (eindreview Y7).
+import type { AiStilstand } from '@/lib/krant/ai-laag-stand'
+import { AI_LAAG_MAX_PER_WEEK, AI_LAAG_MAX_TOEVOEGINGEN, AI_LAAG_QUOTUM_DAGEN, AI_TEKST_MAX_ZINNEN } from '@/lib/krant/ai-laag-grenzen'
 
 /**
  * De Krant zonder AI op /nieuws — de persoonlijke tijdlijn (Krant 1C fase 2,
@@ -124,11 +128,23 @@ function Bericht({ bericht, nieuw }: { bericht: TijdlijnBericht; nieuw: boolean 
   const heeftUitleg = bericht.waarom.length > 0 || bericht.watMist.length > 0
   return (
     <article className="border-b border-[var(--border-ed)] py-5">
-      {(nieuw || bericht.rubriek) && (
+      {(nieuw || bericht.rubriek || bericht.vorm === 'ai-oud') && (
         <div className="mb-1.5 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em]">
           {nieuw && (
             <span className="bg-[var(--module-active-100)] px-1.5 py-0.5 font-semibold text-[var(--module-active-800)]">
               Nieuw
+            </span>
+          )}
+          {/* Krant 1E (K7, security-run R2): een bericht uit de oude AI-Krant.
+              Kop en samenvatting schreef het oude model; het bericht draagt
+              daarom als GEHEEL dit label — niet "Met AI" van de nieuwe laag,
+              die altijd getoetst is. */}
+          {bericht.vorm === 'ai-oud' && (
+            <span
+              data-testid="ai-oud"
+              className="border border-dashed border-[var(--module-active-400)] px-1.5 py-0.5 text-[var(--module-active-700)]"
+            >
+              Uit de eerdere Krant met AI
             </span>
           )}
           {bericht.rubriek && <span className="text-[var(--ink-4)]">{bericht.rubriek}</span>}
@@ -368,12 +384,25 @@ function ArchiefWeek({
 
 type Bevestiging = 'ai' | 'zonder-ai' | null
 
-/** De regel onder de kop als de laatste verversing zonder AI was (K5). */
-function zonderAiTekst(reden: 'quotum' | 'anders'): string {
-  return reden === 'quotum'
-    ? 'Deze keer zonder AI: de vijf verversingen met AI van deze week zijn gebruikt. De regel voor jou staat er wel.'
-    : 'Deze keer zonder AI. De regel voor jou staat er wel.'
+/**
+ * Waarom de laag NU stilstaat (eindreview Y3). De server bepaalt de reden
+ * (lib/krant/ai-laag-stand.ts); geen van deze teksten belooft AI die niet komt.
+ */
+function stilstandTekst(reden: Exclude<AiStilstand, null>): string {
+  switch (reden) {
+    case 'bezwaar':
+      return 'Met AI staat stil zolang je bezwaar staat. De regel voor jou staat er wel.'
+    case 'lokaal':
+      return 'Met AI staat stil zolang nieuws bij jou op lokaal staat of de privé-modus aan is: er gaat dan niets naar een AI-aanbieder. De regel voor jou staat er wel.'
+    case 'quotum':
+      return `Je hebt het maximum van ${AI_LAAG_MAX_PER_WEEK} verversingen met AI in ${AI_LAAG_QUOTUM_DAGEN} dagen bereikt. Tot er weer ruimte is zonder AI; de regel voor jou staat er wel.`
+    case 'tegoed':
+      return 'Je AI-tegoed voor deze maand is op. Tot het weer aanvult zonder AI; de regel voor jou staat er wel.'
+  }
 }
+
+/** Geen stilstand nu, maar de vorige verversing viel terug. */
+const VORIGE_ZONDER_AI = 'De vorige verversing was zonder AI. De regel voor jou staat er wel.'
 
 // ── Hoofdcomponent ───────────────────────────────────────────────────────────
 
@@ -382,14 +411,19 @@ export function TijdlijnClient({
   bron = 'tijdlijn',
   kanAiKiezen,
   bezwaar,
+  aiStilstand = null,
 }: {
   overzicht: TijdlijnOverzicht
   /** 'ai' = de lezer koos de Krant met AI (Krant 1E); 'tijdlijn' = zonder AI. */
   bron?: 'tijdlijn' | 'ai'
   kanAiKiezen: boolean
   bezwaar: boolean
+  /** Staat de AI-laag nu stil, en waarom? (server, ai-laag-stand.ts). null = hij draait. */
+  aiStilstand?: AiStilstand
 }) {
   const metAi = bron === 'ai'
+  // De kop belooft alleen AI als die bij de volgende verversing ook komt (Y3).
+  const aiActief = metAi && !aiStilstand
   const router = useRouter()
   const { pagina, gelezenTot } = overzicht
 
@@ -441,7 +475,7 @@ export function TijdlijnClient({
       }
       const data = (await res.json().catch(() => null)) as { status?: string; items?: number; leeg?: boolean; ai?: string } | null
       const zonderAi =
-        metAi && (data?.ai === 'quotum' || data?.ai === 'teruggevallen' || data?.ai === 'geweigerd') ? ' Deze keer zonder AI.' : ''
+        metAi && (data?.ai === 'quotum' || data?.ai === 'teruggevallen' || data?.ai === 'geweigerd') ? ' Zonder AI.' : ''
       if (data?.status === 'ververst' && !data.leeg && typeof data.items === 'number' && data.items > 0) {
         setStatus((data.items === 1 ? '1 nieuw bericht.' : `${data.items} nieuwe berichten.`) + zonderAi)
       } else {
@@ -516,12 +550,12 @@ export function TijdlijnClient({
     <div className="relative mx-auto max-w-3xl px-4 pb-16 pt-6 sm:px-6">
       <PageInfoButton content={getPageInfo('/nieuws/tijdlijn', '/nieuws')} className="absolute right-4 top-6 sm:right-6 sm:top-8" />
       <PageOpening
-        kicker={metAi ? 'Persoonlijke tijdlijn · met AI' : 'Persoonlijke tijdlijn'}
+        kicker={aiActief ? 'Persoonlijke tijdlijn · met AI' : 'Persoonlijke tijdlijn'}
         titleBefore=""
         emphasis="Krant"
         titleAfter=""
         deck={
-          metAi
+          aiActief
             ? 'Het nieuws dat jouw situatie raakt, met bij elk bericht wat het voor jou betekent en een toelichting van een AI-model.'
             : 'Het nieuws dat jouw situatie raakt, met bij elk bericht wat het voor jou betekent.'
         }
@@ -536,9 +570,9 @@ export function TijdlijnClient({
         </div>
       </PageOpening>
 
-      {metAi && overzicht.laatsteZonderAi && (
+      {metAi && (aiStilstand || overzicht.laatsteZonderAi) && (
         <p data-testid="zonder-ai" className="mt-3 text-[13px] text-[var(--ink-3)]">
-          {zonderAiTekst(overzicht.laatsteZonderAi)}
+          {aiStilstand ? stilstandTekst(aiStilstand) : VORIGE_ZONDER_AI}
         </p>
       )}
 
@@ -650,12 +684,18 @@ export function TijdlijnClient({
           ) : (
             <>
               <p>
-                Je tijdlijn blijft zoals hij is. Vanaf de volgende verversing schrijft een AI-model onder elk bericht een korte
-                toelichting, en het mag hoogstens drie berichten toevoegen. Die herken je aan het label &lsquo;met AI&rsquo;.
+                Je tijdlijn blijft zoals hij is. {aiStilstand ? 'Zodra het kan' : 'Vanaf de volgende verversing'} schrijft een
+                AI-model onder elk bericht een korte toelichting van hoogstens {AI_TEKST_MAX_ZINNEN} zinnen, en het mag hoogstens{' '}
+                {AI_LAAG_MAX_TOEVOEGINGEN} berichten toevoegen. Die herken je aan het label &lsquo;met AI&rsquo;.
               </p>
+              {aiStilstand && (
+                <p data-testid="bevestig-stilstand">
+                  {stilstandTekst(aiStilstand)}
+                </p>
+              )}
               <p>
                 Daarvoor gaan de berichten en je nieuwsprofiel in banden naar de AI-aanbieder, zonder je naam. Met AI kan
-                hoogstens vijf keer per week; daarna gewoon zonder AI. Terug naar zonder AI kan altijd.
+                hoogstens {AI_LAAG_MAX_PER_WEEK} keer in {AI_LAAG_QUOTUM_DAGEN} dagen; daarna gewoon zonder AI. Terug naar zonder AI kan altijd.
               </p>
             </>
           )}

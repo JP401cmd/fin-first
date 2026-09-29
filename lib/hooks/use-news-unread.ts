@@ -85,7 +85,7 @@ export function useNewsUnread(enabled = true, tijdlijnMogelijk = true): boolean 
     let cancelled = false
     ;(async () => {
       try {
-        // Eerst de tijdlijn (geen tier-poort). null = deze lezer leest de AI-Krant.
+        // Eerst de tijdlijn (geen tier-poort). null = deze lezer leest de tijdlijn niet (bron 'oud' of 'wacht'; de Krant met AI leest sinds 1E wél de tijdlijn).
         if (tijdlijnMogelijk && !tijdlijnPeekForbidden) {
           const tijdlijn = await inflight('news-unread-tijdlijn', fetchTijdlijnUnread)
           if (tijdlijn !== null) {

@@ -49,7 +49,6 @@ function bericht(p: Partial<TijdlijnBericht> & { id: string }): TijdlijnBericht 
     tekst: 'Voor jou scheelt dit tussen € 120 en € 240 per jaar.',
     aiTekst: null,
     aiToegevoegd: false,
-    metAi: false,
     waarom: ['Je hebt een koopwoning.'],
     watMist: [],
     deadline: null,
@@ -333,9 +332,9 @@ describe('TijdlijnClient — de Krant met AI (1E, ADR 0190)', () => {
     overzicht({
       pagina: {
         berichten: [
-          bericht({ id: 'a', titel: 'Box 3 in 2027', aiTekst: 'Met jouw spaargeld valt dit bericht in de groep die het raakt.', metAi: true }),
-          bericht({ id: 'b', titel: 'Zonder toelichting', metAi: true }),
-          bericht({ id: 'c', titel: 'Door het model gekozen', vorm: 'ai', tekst: '', aiTekst: 'Dit gaat over huurders.', aiToegevoegd: true, metAi: true }),
+          bericht({ id: 'a', titel: 'Box 3 in 2027', aiTekst: 'Met jouw spaargeld valt dit bericht in de groep die het raakt.' }),
+          bericht({ id: 'b', titel: 'Zonder toelichting' }),
+          bericht({ id: 'c', titel: 'Door het model gekozen', vorm: 'ai', tekst: '', aiTekst: 'Dit gaat over huurders.', aiToegevoegd: true }),
         ],
         volgende: null,
       },
@@ -374,29 +373,77 @@ describe('TijdlijnClient — de Krant met AI (1E, ADR 0190)', () => {
     expect(JSON.parse(call[1].body as string)).toEqual({ variant: 'tijdlijn' })
   })
 
-  it('"deze keer zonder AI": quotum en overige terugval, alleen voor bron ai', () => {
-    const { rerender } = render(<TijdlijnClient overzicht={metAiOverzicht({ laatsteZonderAi: 'quotum' })} bron="ai" kanAiKiezen bezwaar={false} />)
-    expect(screen.getByTestId('zonder-ai').textContent).toMatch(/Deze keer zonder AI: de vijf verversingen met AI van deze week zijn gebruikt/)
-    rerender(<TijdlijnClient overzicht={metAiOverzicht({ laatsteZonderAi: 'anders' })} bron="ai" kanAiKiezen bezwaar={false} />)
-    expect(screen.getByTestId('zonder-ai').textContent).toMatch(/^Deze keer zonder AI./)
-    rerender(<TijdlijnClient overzicht={metAiOverzicht({ laatsteZonderAi: null })} bron="ai" kanAiKiezen bezwaar={false} />)
+  it('Y3: een tekst per reden van stilstand — alleen voor bron ai; zonder stilstand maar met een teruggevallen vorige verversing de algemene regel', () => {
+    const r = (p: { aiStilstand?: 'bezwaar' | 'lokaal' | 'quotum' | 'tegoed' | null; laatsteZonderAi?: 'quotum' | 'anders' | null; bron?: 'ai' | 'tijdlijn' }) => (
+      <TijdlijnClient
+        overzicht={metAiOverzicht({ laatsteZonderAi: p.laatsteZonderAi ?? null })}
+        bron={p.bron ?? 'ai'}
+        kanAiKiezen
+        bezwaar={p.aiStilstand === 'bezwaar'}
+        aiStilstand={p.aiStilstand ?? null}
+      />
+    )
+    const { rerender } = render(r({ aiStilstand: 'bezwaar' }))
+    expect(screen.getByTestId('zonder-ai').textContent).toMatch(/^Met AI staat stil zolang je bezwaar staat/)
+    rerender(r({ aiStilstand: 'lokaal' }))
+    expect(screen.getByTestId('zonder-ai').textContent).toMatch(/zolang nieuws bij jou op lokaal staat of de privé-modus aan is/)
+    rerender(r({ aiStilstand: 'quotum' }))
+    expect(screen.getByTestId('zonder-ai').textContent).toMatch(/maximum van 5 verversingen met AI in 7 dagen bereikt/)
+    expect(screen.getByTestId('zonder-ai').textContent).not.toMatch(/deze week/)
+    rerender(r({ aiStilstand: 'tegoed' }))
+    expect(screen.getByTestId('zonder-ai').textContent).toMatch(/AI-tegoed voor deze maand is op/)
+    rerender(r({ laatsteZonderAi: 'anders' }))
+    expect(screen.getByTestId('zonder-ai').textContent).toMatch(/^De vorige verversing was zonder AI/)
+    rerender(r({}))
     expect(screen.queryByTestId('zonder-ai')).toBeNull()
-    rerender(<TijdlijnClient overzicht={metAiOverzicht({ laatsteZonderAi: 'quotum' })} kanAiKiezen bezwaar={false} />)
+    rerender(r({ aiStilstand: 'bezwaar', bron: 'tijdlijn' }))
     expect(screen.queryByTestId('zonder-ai')).toBeNull()
   })
 
-  it('Vernieuwen met AI: meldt "Deze keer zonder AI." als de laag terugviel', async () => {
+  it('Y3: bij stilstand belooft de kop geen AI (kicker en deck zonder AI)', () => {
+    const { container, rerender } = render(<TijdlijnClient overzicht={metAiOverzicht()} bron="ai" kanAiKiezen bezwaar={false} aiStilstand={null} />)
+    expect(container.textContent).toContain('Persoonlijke tijdlijn · met AI')
+    rerender(<TijdlijnClient overzicht={metAiOverzicht()} bron="ai" kanAiKiezen bezwaar aiStilstand="bezwaar" />)
+    expect(container.textContent).not.toContain('Persoonlijke tijdlijn · met AI')
+    expect(container.textContent).not.toContain('een toelichting van een AI-model')
+  })
+
+  it('Y3/Y7: de bevestiging "Liever de Krant met AI" noemt de stilstand en de grenzen uit één bron', () => {
+    render(<TijdlijnClient overzicht={overzicht()} kanAiKiezen bezwaar aiStilstand="bezwaar" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Liever de Krant met AI' }))
+    const dialoog = screen.getByRole('dialog')
+    expect(within(dialoog).getByTestId('bevestig-stilstand').textContent).toMatch(/zolang je bezwaar staat/)
+    expect(dialoog.textContent).toMatch(/hoogstens 3 zinnen/)
+    expect(dialoog.textContent).toMatch(/hoogstens 3 berichten toevoegen/)
+    expect(dialoog.textContent).toMatch(/hoogstens 5 keer in 7 dagen/)
+    expect(dialoog.textContent).not.toMatch(/Vanaf de volgende verversing schrijft/)
+  })
+
+  it('R2: een omgezet bericht uit de oude AI-Krant draagt als geheel "Uit de eerdere Krant met AI" — niet "Met AI", geen regel', () => {
+    render(
+      <TijdlijnClient
+        overzicht={overzicht({ pagina: { berichten: [bericht({ id: 'o', vorm: 'ai-oud', tekst: '', aiTekst: null, titel: 'Oude kop' })], volgende: null }, totaal: 1 })}
+        kanAiKiezen={false}
+        bezwaar={false}
+      />,
+    )
+    expect(screen.getByTestId('ai-oud').textContent).toBe('Uit de eerdere Krant met AI')
+    expect(screen.queryByTestId('ai-toelichting')).toBeNull()
+    expect(screen.queryByTestId('regel-voor-jou')).toBeNull()
+  })
+
+  it('Vernieuwen met AI: meldt "Zonder AI." als de laag terugviel', async () => {
     fetchMock.mockImplementation(async (url: string) =>
       url === '/api/krant/tijdlijn/vernieuwen' ? jsonRes(200, { status: 'ververst', items: 2, leeg: false, ai: 'quotum' }) : jsonRes(200, {}),
     )
     render(<TijdlijnClient overzicht={metAiOverzicht()} bron="ai" kanAiKiezen bezwaar={false} />)
     fireEvent.click(screen.getByRole('button', { name: 'Vernieuwen' }))
-    await waitFor(() => expect(screen.getByText('2 nieuwe berichten. Deze keer zonder AI.')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('2 nieuwe berichten. Zonder AI.')).toBeTruthy())
   })
 
   it('K9: geen naam of avatar van een assistent', () => {
     const { container } = render(<TijdlijnClient overzicht={metAiOverzicht()} bron="ai" kanAiKiezen bezwaar={false} />)
-    expect(container.textContent ?? '').not.toMatch(/Fin/)
+    expect(container.textContent ?? '').not.toMatch(/\bFin\b/)
     expect(container.querySelector('[data-testid*="fin"], [class*="fin-dots"]')).toBeNull()
   })
 })

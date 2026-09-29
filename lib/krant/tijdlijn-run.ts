@@ -1,7 +1,7 @@
 // ── Tijdlijn-run: één verversing van de tijdlijn-bèta voor één lezer ────────
 //
-// Krant 1C (B31, B32, B37, B38; U11, U12). De keten, per lezer met
-// `nieuwsprofiel.krant_variant = 'tijdlijn'`:
+// Krant 1C (B31, B32, B37, B38; U11, U12). De keten, per lezer wiens /nieuws
+// de tijdlijn is (bepaalKrantBron → 'tijdlijn' of, sinds 1E, 'ai'):
 //
 //   afleidNieuwsprofiel  →  tijdlijnArtikelIds  →  matchEditie(tijdlijn)  →  [AI-stap]  →  schrijfEditie('tijdlijn')
 //
@@ -11,7 +11,7 @@
 //     AI-tekst. Een fout in de stap maakt nooit een lege verversing.
 //
 //   · GEZIEN = wat al in de EIGEN tijdlijn staat — niet `news_read` (dat is de
-//     leesstatus van de AI-Krant). Zo komt een artikel hoogstens één keer in
+//     leesstatus van de oude Krant, bron 'oud'). Zo komt een artikel hoogstens één keer in
 //     iemands tijdlijn; de partiële unieke index lezer + artikel (migratie
 //     20261004120000) is het vangnet daaronder.
 //   · MOMENTOPNAME (U12): elke verversing leidt het profiel opnieuw af; een
@@ -24,9 +24,10 @@
 //   · BEWAREN (B32): 120 dagen, gelijk aan ARTICLE_RETENTION_DAYS van de
 //     artikelen (ADR 0171); `ruimTijdlijnOp` handhaaft dat — de
 //     retentie-cron kent deze tabellen bewust niet (zoals bij de schaduw).
-//   · UITZETTEN (besluit eigenaar 28-09): de bèta uit = de tijdlijn direct
-//     gewist (`wisTijdlijn`). Het nieuwsprofiel blijft: de schaduwrun gebruikt
-//     het onder gerechtvaardigd belang, tenzij de lezer bezwaar maakte.
+//   · UITZETTEN: sinds Krant 1E wist geen enkele keuze van de lezer de tijdlijn
+//     (K1); de helper `wisTijdlijn` had daarna geen aanroeper meer en is weg
+//     (eindreview G8). Het nieuwsprofiel blijft: de schaduwrun gebruikt het
+//     onder gerechtvaardigd belang, tenzij de lezer bezwaar maakte.
 //
 // Alleen de service-role schrijft (cron en, in fase 2, de vernieuwknop voor
 // de EIGEN id). Elke query draagt een eigen `.eq('user_id', …)`.
@@ -161,6 +162,18 @@ export async function ververs(service: SupabaseClient, invoer: VerversInvoer): P
     naSchrijven = stap.naSchrijven
   }
 
+  // Y6: een toegevoegd artikel dat intussen (knop/cron-race) al in de tijdlijn
+  // staat, laat anders de partiële unieke index de HELE verversing weigeren.
+  // Vlak vóór het schrijven eruit; de matcherberichten blijven zoals ze waren.
+  const toegevoegdIds = items.filter((i) => i.aiToegevoegd).map((i) => i.artikelId)
+  if (toegevoegdIds.length > 0) {
+    const alInTijdlijn = await tijdlijnArtikelIds(service, userId, toegevoegdIds)
+    if (alInTijdlijn.size > 0) {
+      items = items.filter((i) => !(i.aiToegevoegd && alInTijdlijn.has(i.artikelId)))
+      if (ai) ai = { ...ai, tellers: { ...ai.tellers, toevoegingen: Math.max(0, ai.tellers.toevoegingen - alInTijdlijn.size) } }
+    }
+  }
+
   // Het model voegt nooit iets weg: `items` is de matcherset (+ hoogstens drie
   // toevoegingen). Leeg alleen als de matcher leeg was én er niets bijkwam.
   const leeg = items.length === 0
@@ -170,17 +183,22 @@ export async function ververs(service: SupabaseClient, invoer: VerversInvoer): P
     leeg,
     legeTekst: leeg ? (actueel.legeTekst ?? renderSjabloon('editie-leeg', 0)) : null,
   }
-  const geschreven = await schrijfEditie(service, {
-    userId,
-    weekKey: amsterdamWeekKey(now),
-    bron: 'tijdlijn',
-    profiel,
-    uitkomst: teSchrijven,
-    now,
-    ...(ai ? { ai: { uitkomst: ai.uitkomst } } : {}),
-  })
-  // Pas ná een geslaagd schrijven: de credit-metering van de modelcall.
-  if (naSchrijven) await naSchrijven().catch(() => {})
+  let geschreven: Awaited<ReturnType<typeof schrijfEditie>>
+  try {
+    geschreven = await schrijfEditie(service, {
+      userId,
+      weekKey: amsterdamWeekKey(now),
+      bron: 'tijdlijn',
+      profiel,
+      uitkomst: teSchrijven,
+      now,
+      ...(ai ? { ai: { uitkomst: ai.uitkomst } } : {}),
+    })
+  } finally {
+    // De credit-metering van een BETAALDE call — ook als het schrijven faalt
+    // (eindreview Y6). Het quotum telt die call via ai_token_usage.
+    if (naSchrijven) await naSchrijven().catch(() => {})
+  }
   return { editieId: geschreven.id, profielType: actueel.profielType, leeg, items: geschreven.items, ...(ai ? { ai } : {}) }
 }
 
@@ -217,6 +235,33 @@ async function draaiAiStap(
     tellers.terugvalBericht = actueel.items.length
     return { items: [...actueel.items], uitkomst: 'geweigerd', reden: 'fout', tellers, naSchrijven: null }
   }
+}
+
+/**
+ * Is er sinds de vorige verversing van deze lezer iets nieuws geduid? Dezelfde
+ * toets als de vernieuwknop (tijdlijn-vernieuwen.ts). Zonder vorige verversing:
+ * ja. De dagcron geeft de AI-stap alleen mee als dit waar is (eindreview Y4):
+ * anders verbruikt hij het quotum op ongewijzigde invoer.
+ */
+export async function ietsNieuwsSindsVorige(service: SupabaseClient, userId: string): Promise<boolean> {
+  const { data: laatste, error } = await service
+    .from('krant_edities')
+    .select('created_at')
+    .eq('user_id', userId)
+    .eq('bron', 'tijdlijn')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(`[krant/tijdlijn-run] laatste verversing lezen mislukt: ${error.message}`)
+  const vorige = (laatste?.created_at as string | undefined) ?? null
+  if (!vorige) return true
+  const { count, error: telFout } = await service
+    .from('news_articles')
+    .select('id', { count: 'exact', head: true })
+    .eq('duiding_status', 'geduid')
+    .gt('geduid_at', vorige)
+  if (telFout) throw new Error(`[krant/tijdlijn-run] nieuw-geduid tellen mislukt: ${telFout.message}`)
+  return (count ?? 0) > 0
 }
 
 /** De id's uit deze set die NU 'geduid' zijn (service-role, één query). Leeg in → leeg uit. */
@@ -298,13 +343,6 @@ export async function ruimTijdlijnOp(service: SupabaseClient, userId: string, no
     .eq('bron', 'tijdlijn')
     .lt('created_at', grens)
   if (error) throw new Error(`[krant/tijdlijn-run] opruimen mislukt: ${error.message}`)
-  return count ?? 0
-}
-
-/** De bèta uit: de hele tijdlijn van deze lezer weg (items cascaden mee). */
-export async function wisTijdlijn(service: SupabaseClient, userId: string): Promise<number> {
-  const { count, error } = await service.from('krant_edities').delete({ count: 'exact' }).eq('user_id', userId).eq('bron', 'tijdlijn')
-  if (error) throw new Error(`[krant/tijdlijn-run] wissen mislukt: ${error.message}`)
   return count ?? 0
 }
 

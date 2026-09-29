@@ -121,7 +121,6 @@ describe('rijNaarBericht', () => {
       tekst: 'De regel voor jou',
       aiTekst: null,
       aiToegevoegd: false,
-      metAi: false,
       waarom: ['w1'],
       watMist: ['m1'],
       deadline: null,
@@ -591,15 +590,16 @@ describe('heeftNieuw', () => {
 // ── Krant 1E: de AI-laag in de leesvorm ──────────────────────────────────────
 
 describe('de AI-laag lezen (Krant 1E, ADR 0190)', () => {
-  it('de kolomlijst vraagt ai_tekst, ai_toegevoegd en met_ai van de verversing op — de eigen rij, geen andere', () => {
+  it('de kolomlijst vraagt ai_tekst en ai_toegevoegd op — de eigen rij, geen andere', () => {
     expect(TIJDLIJN_ITEM_KOLOMMEN).toMatch(/\bai_tekst\b/)
     expect(TIJDLIJN_ITEM_KOLOMMEN).toMatch(/\bai_toegevoegd\b/)
-    expect(TIJDLIJN_ITEM_KOLOMMEN).toMatch(/krant_edities!inner\(week_key, met_ai\)/)
+    expect(TIJDLIJN_ITEM_KOLOMMEN).toMatch(/krant_edities!inner\(week_key\)/)
   })
 
-  it('rijNaarBericht: AI-tekst, "door AI toegevoegd" en met_ai uit de rij; lege AI-tekst telt als geen', () => {
-    const b = rijNaarBericht({ ...basisRij, vorm: 'ai', tekst: '', ai_tekst: 'Toelichting.', ai_toegevoegd: true, krant_edities: { week_key: '2026-W39', met_ai: true } })
-    expect(b).toMatchObject({ vorm: 'ai', tekst: '', aiTekst: 'Toelichting.', aiToegevoegd: true, metAi: true, kop: null })
+  it('rijNaarBericht: AI-tekst en "door AI toegevoegd" uit de rij; lege AI-tekst telt als geen; vorm ai-oud zonder AI-tekst', () => {
+    const b = rijNaarBericht({ ...basisRij, vorm: 'ai', tekst: '', ai_tekst: 'Toelichting.', ai_toegevoegd: true })
+    expect(b).toMatchObject({ vorm: 'ai', tekst: '', aiTekst: 'Toelichting.', aiToegevoegd: true, kop: null })
+    expect(rijNaarBericht({ ...basisRij, vorm: 'ai-oud', tekst: '', ai_tekst: null })).toMatchObject({ vorm: 'ai-oud', aiTekst: null, kop: null })
     expect(rijNaarBericht({ ...basisRij, ai_tekst: '' }).aiTekst).toBeNull()
     expect(rijNaarBericht({ ...basisRij, ai_tekst: null, ai_toegevoegd: null }).aiToegevoegd).toBe(false)
   })

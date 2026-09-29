@@ -7,10 +7,10 @@ import { mapWithConcurrency } from '@/lib/concurrency'
 import { isNewsOnly, resolveActiveModules } from '@/lib/modules/resolve'
 import { isCloudAllowed } from '@/lib/ai/privacy-gate'
 import { laadKandidaten } from '@/lib/krant/editie-loader'
-import { ruimAlleTijdlijnenOp, ververs } from '@/lib/krant/tijdlijn-run'
+import { ietsNieuwsSindsVorige, ruimAlleTijdlijnenOp, ververs } from '@/lib/krant/tijdlijn-run'
 import { inTijdlijnBeta } from '@/lib/krant/tijdlijn-beta'
 import { aiKrantToegestaan, bepaalKrantBron, leestTijdlijn, type KrantBron } from '@/lib/krant/tijdlijn-bron'
-import { maakAiStap } from '@/lib/krant/tijdlijn-ai'
+import { AI_LAAG_MARGE_MS, AI_LAAG_TIMEOUT_MS, maakAiStap } from '@/lib/krant/tijdlijn-ai'
 
 export const maxDuration = 300
 
@@ -102,6 +102,8 @@ export interface TijdlijnCronSummary {
   aiWftTegengehouden: number
   /** Door het model toegevoegde berichten die bleven staan. */
   aiToevoegingen: number
+  /** AI-lezers zonder laag deze run: niets nieuws sinds de vorige verversing, of te weinig tijd over (Y4/Y5). */
+  aiOvergeslagen: number
 }
 
 /** Paginagrootte voor de profielselectie: ruim onder PostgREST max_rows (1000). */
@@ -152,6 +154,7 @@ export async function GET(request: Request) {
     aiGetallenTegengehouden: 0,
     aiWftTegengehouden: 0,
     aiToevoegingen: 0,
+    aiOvergeslagen: 0,
   }
 
   // De bewaartermijn (B32) EERST en los van de rest: een fout in de selectie of
@@ -248,7 +251,15 @@ export async function GET(request: Request) {
           if (bronPerLezer.get(userId) === 'ai') {
             // De privacy-poort per lezer, vóór de laag bestaat. Leesfout = nee.
             const cloudToegestaan = await isCloudAllowed(service, userId, 'nieuws').catch(() => false)
-            aiStap = maakAiStap({ cloudToegestaan })
+            // Y4: alleen een call als er sinds de vorige verversing iets nieuws
+            // geduid is — anders verbruikt de cron het quotum op ongewijzigde
+            // invoer. Y5: alleen als er nog een volledige call plus marge in de
+            // functie past; anders deze keer zonder AI (niets betaald).
+            const deadline = startMs + maxDuration * 1000
+            const tijdOver = deadline - Date.now() >= AI_LAAG_TIMEOUT_MS + AI_LAAG_MARGE_MS
+            const nieuws = tijdOver && (await ietsNieuwsSindsVorige(service, userId).catch(() => false))
+            if (tijdOver && nieuws) aiStap = maakAiStap({ cloudToegestaan, deadline })
+            else summary.aiOvergeslagen++
           }
           const uitkomst = await ververs(service, { userId, now, aowRows, kandidaten: artikelen, hertoetsVoorSchrijven: true, aiStap })
           if (uitkomst.overgeslagen) {

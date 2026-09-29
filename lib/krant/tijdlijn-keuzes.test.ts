@@ -1,20 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-// Sinds Krant 1E (K1) wist de AI-keuze de tijdlijn niet meer. De mock blijft
-// staan als struikeldraad: roept iemand wisTijdlijn weer aan, dan ziet deze
-// suite het.
-const mockWisTijdlijn = vi.fn()
-vi.mock('./tijdlijn-run', () => ({ wisTijdlijn: (...a: unknown[]) => mockWisTijdlijn(...a) }))
+// Sinds Krant 1E (K1) wist de AI-keuze de tijdlijn niet meer; wisTijdlijn is
+// weg (eindreview G8). De struikeldraad is nu: geen enkele delete op
+// krant_edities vanuit zetKrantVariant (zie de test hieronder).
 
 import { maakNepClient } from './nep-client.fixture'
 import { zetKrantVariant, zetSchaduwBezwaar } from './tijdlijn-keuzes'
 
 const UID = 'user-a'
 const PARTNER = 'partner-b'
-
-beforeEach(() => {
-  mockWisTijdlijn.mockReset().mockResolvedValue(3)
-})
 
 // ── zetKrantVariant ──────────────────────────────────────────────────────────
 
@@ -27,7 +21,6 @@ describe('zetKrantVariant', () => {
     const uit = await zetKrantVariant(nep.client as never, UID, 'ai')
     expect(uit).toEqual({ variant: 'ai', profielGewist: false })
     expect(nep.rijen('nieuwsprofiel')).toEqual([expect.objectContaining({ user_id: UID, krant_variant: 'ai' })])
-    expect(mockWisTijdlijn).not.toHaveBeenCalled()
     // Geen enkele delete op de tijdlijn.
     expect(nep.queries.some((q) => q.table === 'krant_edities' && q.stappen.some((st) => st.m === 'delete'))).toBe(false)
   })
@@ -37,7 +30,6 @@ describe('zetKrantVariant', () => {
     const uit = await zetKrantVariant(nep.client as never, UID, 'tijdlijn')
     expect(uit).toEqual({ variant: null, profielGewist: false })
     expect(nep.rijen('nieuwsprofiel')).toEqual([expect.objectContaining({ user_id: UID, krant_variant: null })])
-    expect(mockWisTijdlijn).not.toHaveBeenCalled()
   })
 
   it("'ai' gekozen ná een al staand bezwaar: de banden BLIJVEN — de Krant met AI is sinds 1E dezelfde tijdlijn (security Y2 herzien)", async () => {
@@ -52,7 +44,6 @@ describe('zetKrantVariant', () => {
     expect(uit.profielGewist).toBe(false)
     const [np] = nep.rijen('nieuwsprofiel')
     expect(np.krant_variant).toBe('ai')
-    expect(mockWisTijdlijn).not.toHaveBeenCalled()
   })
 
   it("'ai' bij een DICHTE vlag (gewone lezer, bron 'oud') ná een bezwaar: de banden gaan wél weg", async () => {

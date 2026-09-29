@@ -76,16 +76,19 @@ vrijheidstijd uit — de nummer-guard draaide alleen op het lokale pad (ADR 0080
    ligt onder het cacheminimum (zelfde reden als de ingest, ADR 0186).
 8. **K7 — de oude AI-edities omzetten.** Migratie `20261008120000_krant_ai_laag` zet
    `news_editions` en de lopende `news_cache:*` om naar `krant_edities` (bron `tijdlijn`,
-   `met_ai = true`, `ai_uitkomst` NULL) met items `vorm = 'ai'`, `article_id` NULL, `tijdlijn = true`,
-   `tekst` leeg, `ai_tekst` = de oude `personalImpact`, en de momentopname uit het NewsItem.
+   `met_ai = true`, `ai_uitkomst` NULL) met items `vorm = 'ai-oud'`, `article_id` NULL,
+   `tijdlijn = true`, `tekst` leeg, `ai_tekst` NULL, en de momentopname (kop, rubriek, bron, link,
+   datum, samenvatting) uit het NewsItem. De oude `personalImpact` gaat NIET mee (zie § Na de
+   security-run, R2).
    Herhaalbaar via `oud_ref = 'ai-oud:<user_id>:<md5 van de artikelen>'` (partieel uniek; dekt ook
    een cache die later alsnog in `news_editions` belandt), fail-closed (onbekende sleutel,
    ongeldige JSON, geen lijst of een niet-object bericht → EXCEPTION, hele transactie terug), alleen
    de afgelopen 120 dagen (de bewaartermijn van de tijdlijn) en alleen bestaande accounts. De oude
    tabel en sleutels blijven staan.
 9. **K8 — opslag.** `krant_editie_items.ai_tekst text null`, `ai_toegevoegd boolean not null
-   default false`, vorm-CHECK += `'ai'`; `krant_edities.ai_uitkomst` en `oud_ref`. CHECKs: een
-   toevoeging heeft een tekst, vorm `ai` en AI-tekst alleen in de tijdlijn, `met_ai = (ai_uitkomst =
+   default false`, vorm-CHECK += `'ai'`, `'ai-oud'`; `krant_edities.ai_uitkomst` en `oud_ref`.
+   CHECKs: een toevoeging heeft een tekst; vorm `ai` heeft altijd een AI-tekst, vorm `ai-oud` nooit
+   (en geen artikel); vorm `ai`/`ai-oud` en AI-tekst alleen in de tijdlijn; `met_ai = (ai_uitkomst =
    'met-ai')`. Een toegevoegd bericht heeft wél een `article_id` en valt dus onder de partiële unieke
    index lezer + artikel. Schrijven alleen service-role (geen kolomgrant voor sessies).
 10. **K9 — geen Fin.** Eén component; het label "met AI" per toelichting en "door AI toegevoegd"
@@ -108,3 +111,47 @@ vrijheidstijd uit — de nummer-guard draaide alleen op het lokale pad (ADR 0080
 - **Open (eigenaar):** /privacy moet de laag noemen (verwerker, gegevens, bewaartermijn) vóór de
   bèta opengaat; de dagcron kan in een week meer dan vijf keer willen draaien (dag 6 en 7 dan zonder
   AI); het quotum telt een race tussen knop en cron hoogstens één te veel.
+
+## Na de security-run en de eindreview (29 sep 2026)
+
+Security-run (schone context) en eindreview gaven twee 🔴 en zeven 🟡; alle verwerkt vóór de
+eerste release.
+
+- **R1 — de migratie kon niet worden toegepast.** `app_settings.value` is in productie `text`,
+  niet jsonb (live: `42883 function jsonb_typeof(text) does not exist`). De omzetting leest de
+  waarde nu uitsluitend als tekst (`s.value::text`), valideert met `pg_input_is_valid(…,'jsonb')`
+  en cast pas daarna; een dubbel gecodeerde waarde wordt op de al geparste waarde uitgepakt.
+  `ai-laag-migratie.test.ts` pint dat er geen jsonb-functie of -operator rechtstreeks op
+  `app_settings.value` staat. Live dry-run met tekstbewuste logica (read-only, security-run): 7
+  caches en 10 edities, 0 ongeldige sleutels, 0 ongeldige JSON, 0 dubbel gecodeerd, 0 zonder lijst.
+- **R2 — geen ongetoetste oude modeltekst in de tijdlijn.** De oude prompt eiste vrijheidstijd en
+  eigen bedragen; die `personalImpact` is nooit door `toetsAiTekst` gegaan. Omgezette berichten
+  krijgen daarom een eigen vorm `ai-oud`, `ai_tekst` NULL, en de oude impactzin gaat nergens mee.
+  Omdat ook kop en samenvatting door het oude model zijn geschreven, draagt zo'n bericht als geheel
+  het label "Uit de eerdere Krant met AI" (niet "Met AI" van de getoetste laag). Een datum komt
+  nooit in de toekomst te staan: `least(generatedAt, now())`, zonder `generatedAt` de
+  `app_settings.updated_at`, zonder beide wordt de cache overgeslagen (de lezer kan zijn eigen
+  cache-JSON schrijven).
+- **Y1 — het quotum is niet te resetten.** `krant_edities` heeft een eigen-rij DELETE-policy.
+  `telAiAanroepen` (nu in `lib/krant/ai-laag-stand.ts`) neemt het maximum van de verversingen met
+  een call en `ai_token_usage` (feature `krant_ai`, alleen een eigen-SELECT-policy).
+- **Y2 — `/api/news` alleen nog voor bron `oud`.** Elke andere bron krijgt 403 vóór de generatie;
+  de peek blijft open.
+- **Y3 — geen AI beloven die niet komt.** `aiLaagStand` bepaalt live waarom de laag stilstaat
+  (bezwaar, lokaal/privé-modus, quotum, tegoed); niets opgeslagen. De regel onder de kop noemt de
+  reden, en kop, deck en bevestiging beloven dan geen AI.
+- **Y4 — geen call op ongewijzigde invoer.** De dagcron geeft de laag alleen mee als er sinds de
+  vorige verversing van die lezer iets nieuws geduid is (`ietsNieuwsSindsVorige`). Een schoon leeg
+  modelantwoord is `met-ai` (geen terugval) en telt wel mee.
+- **Y5 — tijdbudgetten.** Time-out van de call = min(45 s, resterende tijd − 15 s marge), onder
+  10 s geen call; de cron slaat de laag over als er geen volledige call plus marge meer in de functie
+  past; de vernieuwknop heeft `maxDuration` 90.
+- **Y6 — betaald is betaald.** `recordAiUsage` draait in een `finally` rond het schrijven; een
+  toegevoegd artikel dat intussen al in de tijdlijn staat valt vlak vóór het schrijven weg in plaats
+  van de hele verversing te laten vallen.
+- **Y7 — grenzen uit één bron.** `lib/krant/ai-laag-grenzen.ts` (client-veilig); geen "vijf" of
+  "drie" meer uitgeschreven, en "in 7 dagen" in plaats van "deze week" (rollend venster).
+- **G1–G8.** Geboortejaar in de regel → "[je geboortejaar]"; openbare velden zonder naam-sanering;
+  afwijsreden `link`; toevoeging met een matcher-id expliciet geweerd; anon in het verify-script
+  alleen 42501; "kies" en "Doe …" gelijkgetrokken met de prompt; LEZER-banden gronden geen getallen;
+  `wisTijdlijn` (geen aanroeper meer) en `TijdlijnBericht.metAi` (ongebruikt) weg.

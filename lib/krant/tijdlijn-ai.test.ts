@@ -27,7 +27,16 @@ import { ARTIKELEN, PROFIEL_TESSA } from './editie.fixture'
 import type { EditieItem } from './matcher'
 import type { AiKandidaat } from './ai-laag'
 import { maakNepClient, type NepRij } from './nep-client.fixture'
-import { AI_LAAG_TIMEOUT_MS, KRANT_AI_FEATURE, maakAiStap, telAiAanroepen, type AiStapInvoer } from './tijdlijn-ai'
+import {
+  AI_LAAG_MARGE_MS,
+  AI_LAAG_MIN_CALL_MS,
+  AI_LAAG_TIMEOUT_MS,
+  KRANT_AI_FEATURE,
+  aiTimeoutMs,
+  maakAiStap,
+  telAiAanroepen,
+  type AiStapInvoer,
+} from './tijdlijn-ai'
 
 const UID = 'user-a'
 const NU = new Date('2026-09-29T12:00:00Z')
@@ -57,7 +66,7 @@ function item(p: Partial<EditieItem> & { artikelId: string }): EditieItem {
 }
 
 const ITEMS = [item({ artikelId: 'a01-box3-heffingsvrij' })]
-const KANDIDATEN: AiKandidaat[] = [{ ...(ARTIKELEN[2] as AiKandidaat), id: 'k1', title: 'Kandidaat met Jan de Vries' }]
+const KANDIDATEN: AiKandidaat[] = [{ ...(ARTIKELEN[2] as AiKandidaat), id: 'k1', title: 'Minister De Vries over de AOW' }]
 
 const invoer = (p: Partial<AiStapInvoer> = {}): AiStapInvoer => ({
   userId: UID,
@@ -91,11 +100,25 @@ function edities(n: number): NepRij[] {
   ]
 }
 
-function service(opts: { profiel?: NepRij | null; edities?: NepRij[]; fouten?: Record<string, string> } = {}) {
+function service(opts: { profiel?: NepRij | null; edities?: NepRij[]; tokens?: NepRij[]; fouten?: Record<string, string> } = {}) {
   return maakNepClient(
-    { profiles: opts.profiel === null ? [] : [opts.profiel ?? profiel()], krant_edities: opts.edities ?? [] },
+    {
+      profiles: opts.profiel === null ? [] : [opts.profiel ?? profiel()],
+      krant_edities: opts.edities ?? [],
+      ai_token_usage: opts.tokens ?? [],
+    },
     { fouten: opts.fouten },
   )
+}
+
+/** `n` tokenlog-rijen van de laag binnen het venster (+ ruis die niet mag tellen). */
+function tokens(n: number): NepRij[] {
+  return [
+    ...Array.from({ length: n }, (_, i) => ({ id: `t${i}`, user_id: UID, feature: 'krant_ai', created_at: new Date(NU.getTime() - (i + 1) * 3_600_000).toISOString() })),
+    { id: 'chat', user_id: UID, feature: 'chat', created_at: NU.toISOString() },
+    { id: 'oud', user_id: UID, feature: 'krant_ai', created_at: new Date(NU.getTime() - 8 * 86_400_000).toISOString() },
+    { id: 'ander', user_id: 'partner', feature: 'krant_ai', created_at: NU.toISOString() },
+  ]
 }
 
 const TOELICHTING = { toelichtingen: [{ artikelId: 'a01-box3-heffingsvrij', tekst: 'In 2027 gaat de grens naar 60.000 euro; met jouw spaargeld raakt dat je.' }] }
@@ -121,11 +144,13 @@ describe('de poorten — elk blokkeert echt, geen call', () => {
     expect(nep.queries).toHaveLength(0)
   })
 
-  it('alleen kandidaten, geen berichten: de laag draait wél (hij mag toevoegen)', async () => {
+  it('alleen kandidaten, geen berichten: de laag draait wél (hij mag toevoegen); een schoon leeg antwoord is "met-ai" en telt (Y4)', async () => {
     mockGenerate.mockResolvedValue({ object: { toevoegingen: [] } })
     const uit = await stap()(service().client as never, invoer({ items: [] }))
     expect(mockGenerate).toHaveBeenCalledTimes(1)
-    expect(uit.uitkomst).toBe('teruggevallen')
+    expect(uit).toMatchObject({ uitkomst: 'met-ai', reden: null })
+    expect(uit.tellers.terugvalLaag).toBe(0)
+    expect(uit.naSchrijven).not.toBeNull()
   })
 
   it('K6: privacy-poort / kill-switch dicht (cloudToegestaan false) → "geweigerd", niets naar een aanbieder, zelfs geen tier-lezing', async () => {
@@ -178,6 +203,37 @@ describe('de poorten — elk blokkeert echt, geen call', () => {
     expect(mockGetModel).not.toHaveBeenCalled()
   })
 
+  it('Y1: het quotum is niet te resetten door de eigen verversingen te wissen — ai_token_usage telt mee (maximum van beide)', async () => {
+    // Geen enkele verversing meer (gewist via de eigen-rij DELETE-policy), maar 5 calls in de tokenlog.
+    const uit = await stap()(service({ edities: [], tokens: tokens(5) }).client as never, invoer())
+    expect(uit).toMatchObject({ uitkomst: 'quotum', reden: 'quotum' })
+    expect(mockGetModel).not.toHaveBeenCalled()
+    expect(await telAiAanroepen(service({ edities: edities(2), tokens: tokens(4) }).client as never, UID, NU)).toBe(4)
+    expect(await telAiAanroepen(service({ edities: edities(3), tokens: tokens(1) }).client as never, UID, NU)).toBe(3)
+  })
+
+  it('Y1: een onleesbare tokenlog is óók fail-closed (zonder AI)', async () => {
+    const uit = await stap()(service({ fouten: { 'ai_token_usage:select': 'kapot' } }).client as never, invoer())
+    expect(uit).toMatchObject({ uitkomst: 'geweigerd', reden: 'quotum-onleesbaar' })
+  })
+
+  it('Y5: te weinig tijd over voor een call plus marge → geen call ("geweigerd"/tijd, niets betaald)', async () => {
+    const krap = maakAiStap({ cloudToegestaan: true, deadline: Date.now() + AI_LAAG_MARGE_MS + AI_LAAG_MIN_CALL_MS - 1000 })
+    const uit = await krap(service().client as never, invoer())
+    expect(uit).toMatchObject({ uitkomst: 'geweigerd', reden: 'tijd', naSchrijven: null })
+    expect(mockGetModel).not.toHaveBeenCalled()
+  })
+
+  it('Y5: aiTimeoutMs = min(45 s, rest − marge), en null onder het minimum — beide uiteinden', () => {
+    const nu = 1_000_000
+    expect(aiTimeoutMs(undefined, nu)).toBe(AI_LAAG_TIMEOUT_MS)
+    expect(aiTimeoutMs(nu + 10 * 60_000, nu)).toBe(AI_LAAG_TIMEOUT_MS)
+    expect(aiTimeoutMs(nu + AI_LAAG_MARGE_MS + 20_000, nu)).toBe(20_000)
+    expect(aiTimeoutMs(nu + AI_LAAG_MARGE_MS + AI_LAAG_MIN_CALL_MS, nu)).toBe(AI_LAAG_MIN_CALL_MS)
+    expect(aiTimeoutMs(nu + AI_LAAG_MARGE_MS + AI_LAAG_MIN_CALL_MS - 1, nu)).toBeNull()
+    expect(aiTimeoutMs(nu - 1, nu)).toBeNull()
+  })
+
   it('telAiAanroepen: de telling zelf (in de database, niet in het geheugen)', async () => {
     const nep = service({ edities: edities(3) })
     expect(await telAiAanroepen(nep.client as never, UID, NU)).toBe(3)
@@ -226,13 +282,14 @@ describe('de call zelf', () => {
     expect(AI_LAAG_TIMEOUT_MS).toBeGreaterThan(0)
   })
 
-  it('PII gaat er niet in: naam (uit profiles.full_name) en geboortedatum komen niet in de prompt; geen geboortejaar', async () => {
-    await stap()(service().client as never, invoer())
+  it('PII gaat er niet in: de naam (uit profiles.full_name) gaat uit de regel voor jou, geen geboortejaar; een openbare kop blijft heel (G2)', async () => {
+    await stap()(service().client as never, invoer({ items: [item({ artikelId: 'a01-box3-heffingsvrij', tekst: 'Voor Jan de Vries, geboren in 1984, scheelt dit € 120.' })] }))
     const { prompt } = mockGenerate.mock.calls[0][0] as { prompt: string }
     expect(prompt).not.toContain('Jan de Vries')
-    expect(prompt).not.toContain('Vries')
     expect(prompt).not.toContain('1984')
-    expect(prompt).toContain('gebruiker')
+    expect(prompt).toContain('Voor gebruiker, geboren in [je geboortejaar], scheelt dit € 120.')
+    // De openbare kandidaatkop met toevallig dezelfde achternaam blijft staan.
+    expect(prompt).toContain('Minister De Vries over de AOW')
   })
 
   it('het schema dat meegaat kent alleen de aangeleverde id’s (enum)', async () => {

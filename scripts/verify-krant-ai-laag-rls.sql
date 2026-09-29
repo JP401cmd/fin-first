@@ -14,12 +14,15 @@
 --   1-2 eigen rij leesbaar (incl. de AI-kolommen), vreemde rij niet.
 --   3-5 een sessie kan de AI-kolommen niet schrijven — ook niet op de eigen rij
 --       (42501), en kan geen "door AI toegevoegd"-bericht fabriceren.
---   6   anon: 0 rijen én géén fout — óf 42501 (revoke all sinds 20260922120000).
---       Beide tabellen hebben voor anon geen enkel recht; 42501 is hier het
---       VERWACHTE resultaat (zoals in verify-krant-tijdlijn-rls.sql geval 15).
+--   6   anon: 42501. Beide tabellen hebben voor anon geen enkel recht (revoke
+--       all sinds 20260922120000, stap 0c bewijst dat); 42501 is hier het
+--       VERWACHTE resultaat, zoals in verify-krant-tijdlijn-rls.sql geval 15.
+--       Een lege set zonder fout zou betekenen dat anon SELECT terugkreeg: dat
+--       is een afwijking (eindreview G5 — de tak "0 rijen" was dode code).
 --   7   service_role schrijft de AI-kolommen wel; de CHECKs weigeren wat niet
---       kan (toegevoegd zonder tekst, vorm 'ai' buiten de tijdlijn, een
---       met_ai die niet bij ai_uitkomst past).
+--       kan (toegevoegd zonder tekst, vorm 'ai' zonder AI-tekst, vorm 'ai-oud'
+--       mét AI-tekst of artikel, vorm 'ai' buiten de tijdlijn, een met_ai die
+--       niet bij ai_uitkomst past).
 --   8   de omzetting (K7) is herhaalbaar: dezelfde oud_ref een tweede keer = 23505.
 
 BEGIN;
@@ -55,7 +58,8 @@ DO $$ BEGIN
   IF has_table_privilege('anon','public.krant_editie_items','SELECT') OR has_table_privilege('anon','public.krant_edities','SELECT') THEN RAISE EXCEPTION '0c anon heeft SELECT'; END IF;
   IF NOT has_column_privilege('service_role','public.krant_editie_items','ai_tekst','UPDATE') THEN RAISE EXCEPTION '0d service_role mist schrijfrecht op ai_tekst'; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='krant_edities_oud_ref_key' AND indexdef ILIKE 'CREATE UNIQUE%(oud_ref)%WHERE%oud_ref IS NOT NULL%') THEN RAISE EXCEPTION '0e unieke oud_ref-index ontbreekt'; END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='krant_editie_items_vorm_check' AND pg_get_constraintdef(oid) ILIKE '%''ai''%') THEN RAISE EXCEPTION '0f vorm-CHECK kent ''ai'' niet'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='krant_editie_items_vorm_check' AND pg_get_constraintdef(oid) ILIKE '%''ai''%' AND pg_get_constraintdef(oid) ILIKE '%''ai-oud''%') THEN RAISE EXCEPTION '0f vorm-CHECK kent ''ai''/''ai-oud'' niet'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='krant_editie_items_ai_vorm_check') THEN RAISE EXCEPTION '0g CHECK vorm ai/ai-oud ontbreekt'; END IF;
   RAISE NOTICE '0 structuur OK';
 END $$;
 
@@ -86,14 +90,12 @@ END $$;
 RESET ROLE;
 SET LOCAL ROLE anon;
 SELECT set_config('request.jwt.claims', '{"role":"anon"}', true), set_config('request.jwt.claim.sub', '', true);
-DO $$ DECLARE n int; BEGIN
+DO $ DECLARE n int; BEGIN
   BEGIN SELECT count(*) INTO n FROM public.krant_editie_items WHERE ai_tekst IS NOT NULL;
-        IF n <> 0 THEN RAISE EXCEPTION '6a anon leest % AI-teksten', n; END IF;
-        RAISE NOTICE '6a OK 0 rijen zonder fout';
+        RAISE EXCEPTION '6a anon kreeg SELECT op krant_editie_items terug (% rijen)', n;
   EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE '6a OK 42501 (revoke all, bedoeld)'; END;
   BEGIN SELECT count(*) INTO n FROM public.krant_edities WHERE ai_uitkomst IS NOT NULL;
-        IF n <> 0 THEN RAISE EXCEPTION '6b anon leest % verversingen', n; END IF;
-        RAISE NOTICE '6b OK 0 rijen zonder fout';
+        RAISE EXCEPTION '6b anon kreeg SELECT op krant_edities terug (% rijen)', n;
   EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE '6b OK 42501 (revoke all, bedoeld)'; END;
   BEGIN UPDATE public.krant_editie_items SET ai_tekst = 'anon'; RAISE EXCEPTION '6c anon schrijft';
   EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE '6c OK 42501'; END;
@@ -115,6 +117,17 @@ DO $$ DECLARE a uuid := current_setting('leaktest.a')::uuid; ea uuid := current_
           VALUES (es, a, false, 0, 'ai', 1, 'x', 0, '', 'x', '{}');
         RAISE EXCEPTION '7c vorm ai in de schaduw toegelaten';
   EXCEPTION WHEN check_violation THEN RAISE NOTICE '7c OK 23514'; END;
+  BEGIN INSERT INTO public.krant_editie_items (editie_id, user_id, tijdlijn, positie, vorm, score, sjabloon_id, variant, tekst, snapshot)
+          VALUES (ea, a, true, 6, 'ai', 1, 'ai-toegevoegd', 0, '', '{}');
+        RAISE EXCEPTION '7f vorm ai zonder AI-tekst toegelaten';
+  EXCEPTION WHEN check_violation THEN RAISE NOTICE '7f OK 23514'; END;
+  BEGIN INSERT INTO public.krant_editie_items (editie_id, user_id, tijdlijn, positie, vorm, score, sjabloon_id, variant, tekst, ai_tekst, snapshot)
+          VALUES (ea, a, true, 7, 'ai-oud', 1, 'ai-oud', 0, '', 'oude modeltekst', '{}');
+        RAISE EXCEPTION '7g vorm ai-oud mét AI-tekst toegelaten (R2)';
+  EXCEPTION WHEN check_violation THEN RAISE NOTICE '7g OK 23514'; END;
+  INSERT INTO public.krant_editie_items (editie_id, user_id, tijdlijn, positie, vorm, score, sjabloon_id, variant, tekst, snapshot)
+    VALUES (ea, a, true, 8, 'ai-oud', 1, 'ai-oud', 0, '', '{"titel":"oud"}');
+  RAISE NOTICE '7h OK vorm ai-oud zonder AI-tekst en zonder artikel mag';
   BEGIN UPDATE public.krant_edities SET met_ai = false WHERE id = ea; RAISE EXCEPTION '7d met_ai los van ai_uitkomst toegelaten';
   EXCEPTION WHEN check_violation THEN RAISE NOTICE '7d OK 23514'; END;
   BEGIN UPDATE public.krant_edities SET ai_uitkomst = 'onzin' WHERE id = ea; RAISE EXCEPTION '7e onbekende ai_uitkomst toegelaten';

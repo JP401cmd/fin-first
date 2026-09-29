@@ -44,10 +44,15 @@ export const KATERN_ONDER = 5
 
 /** Kolommen van `krant_editie_items` die de lezer ziet — de eigen rij, meta + momentopname. */
 export const TIJDLIJN_ITEM_KOLOMMEN =
-  'id, editie_id, created_at, positie, vorm, tekst, ai_tekst, ai_toegevoegd, waarom, wat_mist, deadline, snapshot, krant_edities!inner(week_key, met_ai)'
+  'id, editie_id, created_at, positie, vorm, tekst, ai_tekst, ai_toegevoegd, waarom, wat_mist, deadline, snapshot, krant_edities!inner(week_key)'
 
-/** Het vormtype van een tijdlijnbericht: de matchervormen plus 'ai' (Krant 1E — toegevoegd door het model, of een omgezet bericht uit de oude AI-Krant). */
-export type TijdlijnVorm = EditieVorm | 'ai'
+/**
+ * Het vormtype van een tijdlijnbericht: de matchervormen plus (Krant 1E) 'ai' —
+ * door de AI-laag toegevoegd, met een getoetste AI-tekst — en 'ai-oud' — omgezet
+ * uit de oude AI-Krant (K7): kop en samenvatting door het oude model, zonder
+ * AI-tekst, als geheel gelabeld "Uit de eerdere Krant met AI".
+ */
+export type TijdlijnVorm = EditieVorm | 'ai' | 'ai-oud'
 
 export interface TijdlijnBericht {
   id: string
@@ -65,8 +70,6 @@ export interface TijdlijnBericht {
   aiTekst: string | null
   /** Krant 1E: het model koos dit bericht (label "door AI toegevoegd"). */
   aiToegevoegd: boolean
-  /** Krant 1E: de verversing van dit bericht had de AI-laag (met_ai). */
-  metAi: boolean
   /** "Waarom zie ik dit?" — grep-bare regels van de matcher. */
   waarom: string[]
   /** Profielvelden die ontbraken voor een bedrag. */
@@ -170,7 +173,7 @@ interface ItemRij {
   wat_mist: string[] | null
   deadline: unknown
   snapshot: Record<string, unknown> | null
-  krant_edities: { week_key: string; met_ai?: boolean | null } | Array<{ week_key: string; met_ai?: boolean | null }> | null
+  krant_edities: { week_key: string } | Array<{ week_key: string }> | null
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null)
@@ -189,7 +192,6 @@ export function rijNaarBericht(r: ItemRij): TijdlijnBericht {
     tekst: r.tekst,
     aiTekst: str(r.ai_tekst),
     aiToegevoegd: r.ai_toegevoegd === true,
-    metAi: editie?.met_ai === true,
     waarom: r.waarom ?? [],
     watMist: r.wat_mist ?? [],
     deadline: r.deadline ?? null,

@@ -9,6 +9,7 @@ import { getCachedUser } from '@/lib/supabase/cached-user'
 import { magTesteditieZien } from '@/lib/krant/testeditie-toegang'
 import { krantBronVoor, leestTijdlijn } from '@/lib/krant/tijdlijn-bron'
 import { laadTijdlijn } from '@/lib/krant/tijdlijn-lezen'
+import { aiLaagStand } from '@/lib/krant/ai-laag-stand'
 
 export default async function NieuwsOnlyPage() {
   // De user_id gaat als prop mee omdat de browsercache van de krant erop wordt
@@ -35,6 +36,12 @@ export default async function NieuwsOnlyPage() {
       laadTijdlijn(supabase, user.id),
       supabase.from('profiles').select('krant_schaduw_bezwaar_at').eq('id', user.id).maybeSingle(),
     ])
+    const bezwaar = Boolean(bezwaarRes.data?.krant_schaduw_bezwaar_at)
+    // Krant 1E (eindreview Y3): staat de AI-laag nu stil, en waarom? Alleen voor
+    // wie hem heeft of kan kiezen — de kop, de regel onder de kop en de
+    // bevestiging beloven anders AI die niet komt. Niets opgeslagen: bezwaar,
+    // privacy-poort, quotum en tegoed worden hier live getoetst.
+    const aiStilstand = bron === 'ai' || kanAiKiezen ? await aiLaagStand(supabase, user.id, { bezwaar }) : null
     return (
       <>
         <NavStackMeta title="Krant" topBar={{ kind: 'rich' }} />
@@ -42,7 +49,8 @@ export default async function NieuwsOnlyPage() {
           overzicht={overzicht}
           bron={bron}
           kanAiKiezen={kanAiKiezen}
-          bezwaar={Boolean(bezwaarRes.data?.krant_schaduw_bezwaar_at)}
+          bezwaar={bezwaar}
+          aiStilstand={aiStilstand}
         />
       </>
     )

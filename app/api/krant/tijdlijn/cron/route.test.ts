@@ -27,14 +27,20 @@ vi.mock('@/lib/krant/editie-loader', () => ({ laadKandidaten: vi.fn(async () => 
 vi.mock('@/lib/reference-cache', () => ({ getAowLeeftijden: vi.fn(async () => []) }))
 const mockVervers = vi.fn()
 const mockRuim = vi.fn()
+const mockIetsNieuws = vi.fn()
 vi.mock('@/lib/krant/tijdlijn-run', () => ({
   ververs: (...a: unknown[]) => mockVervers(...a),
   ruimAlleTijdlijnenOp: (...a: unknown[]) => mockRuim(...a),
+  ietsNieuwsSindsVorige: (...a: unknown[]) => mockIetsNieuws(...a),
 }))
 const mockIsCloudAllowed = vi.fn()
 vi.mock('@/lib/ai/privacy-gate', () => ({ isCloudAllowed: (...a: unknown[]) => mockIsCloudAllowed(...a) }))
-const mockMaakAiStap = vi.fn((opties: { cloudToegestaan: boolean }) => ({ stap: 'ai', ...opties }))
-vi.mock('@/lib/krant/tijdlijn-ai', () => ({ maakAiStap: (o: { cloudToegestaan: boolean }) => mockMaakAiStap(o) }))
+const mockMaakAiStap = vi.fn((opties: { cloudToegestaan: boolean; deadline?: number }) => ({ stap: 'ai', cloudToegestaan: opties.cloudToegestaan }))
+vi.mock('@/lib/krant/tijdlijn-ai', () => ({
+  AI_LAAG_TIMEOUT_MS: 45_000,
+  AI_LAAG_MARGE_MS: 15_000,
+  maakAiStap: (o: { cloudToegestaan: boolean; deadline?: number }) => mockMaakAiStap(o),
+}))
 const beta = { open: false }
 vi.mock('@/lib/krant/tijdlijn-beta', () => ({
   inTijdlijnBeta: (rol: string | null) => beta.open || rol === 'superadmin',
@@ -127,6 +133,7 @@ beforeEach(() => {
   mockVervers.mockImplementation(async (_s: unknown, i: { userId: string }) => ({ editieId: `e-${i.userId}`, profielType: 'x', leeg: false, items: 2 }))
   mockRuim.mockResolvedValue(1)
   mockIsCloudAllowed.mockResolvedValue(true)
+  mockIetsNieuws.mockResolvedValue(true)
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://db.test'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
   delete process.env.VERCEL_ENV
@@ -216,6 +223,7 @@ describe('wie er ververst wordt', () => {
     expect(gedraaid().sort()).toEqual(['u-admin', 'u-geheel', 'u-lezer'])
     const perLezer = new Map(mockVervers.mock.calls.map(([, i]) => [(i as { userId: string }).userId, i as { aiStap: unknown }]))
     expect(perLezer.get('u-geheel')!.aiStap).toEqual({ stap: 'ai', cloudToegestaan: true })
+    expect(mockIetsNieuws).toHaveBeenCalledWith(expect.anything(), 'u-geheel')
     expect(perLezer.get('u-admin')!.aiStap).toBeNull()
     // Het Krant-account (u-lezer) heeft variant ai in de rij, maar krijgt nooit de laag.
     expect(perLezer.get('u-lezer')!.aiStap).toBeNull()
@@ -231,11 +239,38 @@ describe('wie er ververst wordt', () => {
     aiVarianten = [{ user_id: 'u-geheel' }]
     mockIsCloudAllowed.mockResolvedValueOnce(false)
     await GET(req('cron-secret'))
-    expect(mockMaakAiStap).toHaveBeenCalledWith({ cloudToegestaan: false })
+    expect(mockMaakAiStap).toHaveBeenCalledWith(expect.objectContaining({ cloudToegestaan: false }))
     mockMaakAiStap.mockClear()
     mockIsCloudAllowed.mockRejectedValueOnce(new Error('db weg'))
     await GET(req('cron-secret'))
-    expect(mockMaakAiStap).toHaveBeenCalledWith({ cloudToegestaan: false })
+    expect(mockMaakAiStap).toHaveBeenCalledWith(expect.objectContaining({ cloudToegestaan: false }))
+  })
+
+  it('Y4: niets nieuws geduid sinds de vorige verversing van deze AI-lezer → geen AI-stap (en geen call); leesfout telt als nee', async () => {
+    beta.open = true
+    aiVarianten = [{ user_id: 'u-geheel' }]
+    mockIetsNieuws.mockResolvedValueOnce(false)
+    const res = await GET(req('cron-secret'))
+    const perLezer = new Map(mockVervers.mock.calls.map(([, i]) => [(i as { userId: string }).userId, i as { aiStap: unknown }]))
+    expect(perLezer.get('u-geheel')!.aiStap).toBeNull()
+    expect(mockMaakAiStap).not.toHaveBeenCalled()
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(summary).toMatchObject({ aiLezers: 1, aiOvergeslagen: 1 })
+    mockIetsNieuws.mockRejectedValueOnce(new Error('kapot'))
+    mockVervers.mockClear()
+    await GET(req('cron-secret'))
+    const opnieuw = new Map(mockVervers.mock.calls.map(([, i]) => [(i as { userId: string }).userId, i as { aiStap: unknown }]))
+    expect(opnieuw.get('u-geheel')!.aiStap).toBeNull()
+  })
+
+  it('Y5: de AI-stap krijgt een deadline binnen maxDuration (300 s)', async () => {
+    beta.open = true
+    aiVarianten = [{ user_id: 'u-geheel' }]
+    const voor = Date.now()
+    await GET(req('cron-secret'))
+    const { deadline } = mockMaakAiStap.mock.calls[0][0]
+    expect(deadline).toBeGreaterThanOrEqual(voor + 300_000 - 5_000)
+    expect(deadline).toBeLessThanOrEqual(Date.now() + 300_000)
   })
 
   it('1E: de summary telt de AI-laag mee — alleen aantallen', async () => {

@@ -415,9 +415,24 @@ mailbox.
 - **Verbruik.** Feature `krant_ai` in `ai_token_usage` (`/beheer/ai-verbruik`, label "Krant met AI").
   Eigen model kan via `app_settings` `ai_model_anthropic:krant_ai` (ADR 0186); zonder die rij het
   globale model. Elke call kost 1 credit uit de maandbucket (`recordAiUsage` 'news').
-- **Grenzen.** Hoogstens 5 modelcalls per lezer per 7 dagen, geteld in `krant_edities.ai_uitkomst`
-  (`met-ai` + `teruggevallen`). Daarboven: een gewone verversing met "Deze keer zonder AI" op het
-  scherm. `news_max_refreshes_per_week` geldt hier níét meer (alleen nog voor de oude Krant).
+- **Grenzen.** Hoogstens 5 modelcalls per lezer per 7 dagen (rollend; getallen in
+  `lib/krant/ai-laag-grenzen.ts`). Geteld als het MAXIMUM van `krant_edities.ai_uitkomst`
+  (`met-ai` + `teruggevallen`) en `ai_token_usage` (feature `krant_ai`) — die laatste kan de lezer
+  niet wissen, dus zijn eigen verversingen wissen reset het quotum niet. Daarboven: een gewone
+  verversing; het scherm noemt de reden. `news_max_refreshes_per_week` geldt hier níét meer (alleen
+  nog voor de oude Krant). De dagcron roept het model alleen aan als er sinds de vorige verversing
+  van die lezer iets nieuws geduid is (anders telt `aiOvergeslagen`).
+- **"Waarom zegt de Krant zonder AI?"** Het scherm toetst live: bezwaar → "staat stil zolang je
+  bezwaar staat"; nieuws op lokaal of privé-modus → "zolang nieuws bij jou op lokaal staat"; quotum;
+  maandtegoed op. Niets hiervan staat in de database; alleen "de vorige verversing was zonder AI"
+  komt uit `krant_edities.ai_uitkomst`.
+- **Omgezette oude edities.** Berichten uit de oude AI-Krant (`vorm = 'ai-oud'`) dragen het label
+  "Uit de eerdere Krant met AI" en hebben géén AI-tekst: de oude impactzin (met vrijheidstijd en
+  eigen rekenwerk) is bewust niet overgenomen.
+- **Tijd.** De vernieuwknop heeft `maxDuration` 90 s; de modelcall wacht hoogstens min(45 s,
+  resterende tijd − 15 s). In de dagcron wordt de laag overgeslagen als er geen volledige call plus
+  marge meer in de functie past.
+- **`/api/news`** (de oude Krant) geeft sinds 1E een 403 aan elke lezer wiens bron niet `oud` is.
 - **Uitzetten.** Platformbreed: de AI-kill-switch (`/beheer/platform`) — de laag valt dan terug op
   zonder AI, de tijdlijn blijft werken. Per lezer: zijn keuze terugzetten (`PUT /api/krant/variant`
   `{variant:'tijdlijn'}` namens hem, of `update nieuwsprofiel set krant_variant = null where user_id = …`
@@ -432,7 +447,11 @@ mailbox.
   `scripts/verify-krant-tijdlijn-rls.sql` en `scripts/verify-krant-ai-laag-rls.sql` groen. De tweede
   zet de oude AI-edities om (NOTICE met de aantallen; een tweede run maakt geen dubbelen) en stopt
   met een EXCEPTION als een oude cache geen geldige JSON is — dan eerst die rij beoordelen, niet de
-  migratie aanpassen. Pas daarna de code.
+  migratie aanpassen. `app_settings.value` is in productie TEKST; de migratie leest hem daarom als
+  tekst (een jsonb-functie erop faalt met 42883). Verwacht op basis van de read-only dry-run van
+  29-09: 7 caches + 10 edities in `news_editions` als bronnen; de NOTICE telt hoeveel daarvan binnen
+  120 dagen vallen, van een bestaand account zijn en ≥ 1 bericht hebben (dubbele inhoud tussen een
+  cache en een archiefeditie telt één keer). Pas daarna de code.
 
 ### Wie wijzigde wat?
 - **Ter info → Audit-trail** (`/beheer/audit`): logboek van abonnement-, rol-, blokkade- en

@@ -51,8 +51,13 @@ describe('migratie krant_ai_laag — herhaalbaar', () => {
 })
 
 describe('migratie krant_ai_laag — de inhoud van K7/K8', () => {
-  it("de vorm-CHECK kent 'ai' naast de bestaande vormen", () => {
-    expect(code).toContain("check (vorm in ('direct', 'gevoeligheid', 'relevant', 'raakt', 'ai'))")
+  it("de vorm-CHECK kent 'ai' en 'ai-oud' naast de bestaande vormen", () => {
+    expect(code).toContain("check (vorm in ('direct', 'gevoeligheid', 'relevant', 'raakt', 'ai', 'ai-oud'))")
+  })
+
+  it("R2: vorm 'ai' heeft altijd een AI-tekst; vorm 'ai-oud' nooit (en geen artikel)", () => {
+    expect(code).toContain("(vorm <> 'ai' or ai_tekst is not null)")
+    expect(code).toContain("(vorm <> 'ai-oud' or (ai_tekst is null and article_id is null and not ai_toegevoegd))")
   })
 
   it('ai_tekst (nullable) en ai_toegevoegd (not null default false)', () => {
@@ -67,11 +72,26 @@ describe('migratie krant_ai_laag — de inhoud van K7/K8', () => {
     expect(inSql).toEqual([...AI_UITKOMSTEN])
   })
 
-  it('de omgezette items: vorm ai, article_id leeg, tijdlijn true, met_ai true op de editie', () => {
+  it('de omgezette items: vorm ai-oud, article_id leeg, tijdlijn true, tekst leeg, ai_tekst NULL; met_ai true op de editie', () => {
     const insert = code.slice(code.indexOf('insert into public.krant_editie_items'))
-    expect(insert).toMatch(/select\s+e_id,\s+r\.user_id,\s+null,\s+true,/)
-    expect(insert).toContain("'ai',")
+    expect(insert).toMatch(/select\s+e_id,\s+r\.user_id,\s+null,\s+true,\s+\(x\.nr - 1\)::smallint,\s+'ai-oud',/)
+    // tekst '' en daarna ai_tekst NULL, ai_toegevoegd false
+    expect(insert).toMatch(/'{}'::jsonb,\s+'',\s+null,\s+false,/)
     expect(code).toMatch(/'tijdlijn', true, null, ref,/)
+  })
+
+  it('R2: de oude personalImpact gaat NERGENS mee — niet als AI-tekst, niet in de momentopname', () => {
+    expect(code).not.toContain('personalimpact')
+    const snapshot = code.slice(code.indexOf('jsonb_build_object('), code.indexOf('r.gemaakt\n    from jsonb_array_elements'))
+    expect(snapshot).not.toMatch(/impact/)
+  })
+
+  it('R2: een datum nooit in de toekomst — least(…, now()); zonder generatedAt de updated_at; zonder beide overgeslagen', () => {
+    expect(code).toMatch(/least\(\s*coalesce\(/)
+    expect(code).toContain('c.bijgewerkt')
+    expect(code).toContain('least(e.created_at, now())')
+    expect(code).toContain('where b.gemaakt is not null')
+    expect(code).not.toMatch(/else now\(\)/)
   })
 
   it('de oude bronnen BLIJVEN staan: geen delete, update, drop of truncate op news_editions of app_settings', () => {
@@ -82,7 +102,20 @@ describe('migratie krant_ai_laag — de inhoud van K7/K8', () => {
 
   it('fail-closed: onbekende sleutels, ongeldige JSON, geen lijst of een niet-object bericht → raise exception (hele transactie terug)', () => {
     expect(code.match(/raise exception/g)?.length).toBeGreaterThanOrEqual(6)
-    expect(code).toContain("pg_input_is_valid(s.value #>> '{}', 'jsonb')")
+    expect(code).toContain("pg_input_is_valid(s.value::text, 'jsonb')")
+  })
+
+  it('R1: app_settings.value is TEXT in productie — geen jsonb-functie of -operator rechtstreeks op s.value', () => {
+    // 42883 live gemeten: jsonb_typeof(text) bestaat niet. Alleen via s.value::text(::jsonb).
+    expect(code).not.toMatch(/jsonb_typeof\(s\.value\)/)
+    expect(code).not.toMatch(/s\.value\s*(#>>|#>|->>|->)/)
+    expect(code).not.toMatch(/s\.value\s*::jsonb/)
+    for (const m of code.matchAll(/s\.value(?!::text)/g)) {
+      // elk ander gebruik van s.value is een null-toets
+      expect(code.slice(m.index!, m.index! + 16)).toBe('s.value is null ')
+    }
+    // de dubbel gecodeerde tak werkt op de AL GEPARSTE waarde
+    expect(code).toContain("jsonb_typeof(c.p) = 'string' and pg_input_is_valid(c.p #>> '{}', 'jsonb')")
   })
 
   it('alleen edities van de afgelopen 120 dagen (de bewaartermijn van de tijdlijn), van een bestaand account', () => {

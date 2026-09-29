@@ -14,7 +14,8 @@ import { buildSharedContext } from '@/lib/ai/context/shared-context'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { NextResponse } from 'next/server'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { forbidden, unauthorized, serverError } from '@/lib/api/respond'
+import { krantBronVoor } from '@/lib/krant/tijdlijn-bron'
 import { checkTierGate } from '@/lib/require-tier'
 import { aiSubscriptionRequired, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { NEWS_SYSTEM_PROMPT } from '@/lib/news-system-prompt'
@@ -207,6 +208,15 @@ export async function GET(request: Request) {
       peek: true,
     })
   }
+
+  // UITGEFASEERD SINDS 1E — alleen nog bron 'oud' (security-run Y2, 29-09). Een
+  // lezer wiens /nieuws de tijdlijn is (met of zonder AI-laag) of het
+  // wachtscherm, krijgt hier geen generatie meer: anders kon hij via deze route
+  // een tweede AI-Krant naast zijn tijdlijn starten, buiten het quotum en de
+  // guards van de laag om. De peek hierboven blijft open (alleen leeswerk; de
+  // nieuwsstip valt er alleen op terug voor bron 'oud').
+  const { bron: krantBron } = await krantBronVoor(supabase, user.id)
+  if (krantBron !== 'oud') return forbidden('De Krant loopt via je tijdlijn')
 
   const editionNr = await getNextEditionNr(supabase, user.id)
   const jaargang = currentJaargang()

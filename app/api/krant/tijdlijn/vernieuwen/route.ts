@@ -29,9 +29,13 @@ import { maakAiStap } from '@/lib/krant/tijdlijn-ai'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 60
+// 90 s (eindreview Y5): de modelcall is begrensd op de resterende tijd min een
+// marge voor guards en schrijven, zodat een gekilde functie nooit eindigt met
+// een geclaimde rem, een betaalde call en niets geschreven.
+export const maxDuration = 90
 
 export async function POST() {
+  const startMs = Date.now()
   const supabase = await createClient()
   const {
     data: { user },
@@ -40,7 +44,7 @@ export async function POST() {
 
   try {
     const cloudToegestaan = await isCloudAllowed(supabase, user.id, 'nieuws').catch(() => false)
-    const aiStap = maakAiStap({ cloudToegestaan })
+    const aiStap = maakAiStap({ cloudToegestaan, deadline: startMs + maxDuration * 1000 })
     const uitkomst = await verversEigenTijdlijn(getServiceClient(), user.id, { aiStap })
     if (uitkomst.status === 'geen-tijdlijn') return forbidden()
     if (uitkomst.status === 'te-snel') {

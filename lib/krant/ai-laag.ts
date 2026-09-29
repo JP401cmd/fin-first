@@ -43,19 +43,23 @@ import { DOELGROEP_SLEUTEL_LIJST } from './profiel-velden'
 import { vindWftOvertreding } from './wft-woordenlijst'
 
 // ── Grenzen (K3, K5) ─────────────────────────────────────────────────────────
+// Eén bron voor server en scherm: lib/krant/ai-laag-grenzen.ts (eindreview Y7).
 
-/** Hoogstens zoveel kandidaten die de matcher níet koos gaan naar het model (K3). */
-export const AI_LAAG_MAX_KANDIDATEN = 12
-/** Hoogstens zoveel berichten mag het model toevoegen (K3). */
-export const AI_LAAG_MAX_TOEVOEGINGEN = 3
-/** Hoogstens zoveel modelcalls per lezer per venster (K5) — telt in de database. */
-export const AI_LAAG_MAX_PER_WEEK = 5
-/** Het venster van het quotum: rollend, zoals de oude weekteller. */
-export const AI_LAAG_QUOTUM_DAGEN = 7
-/** Een toelichting is kort: hoogstens drie zinnen … */
-export const AI_TEKST_MAX_ZINNEN = 3
-/** … en hoogstens zoveel tekens. */
-export const AI_TEKST_MAX_TEKENS = 480
+import {
+  AI_LAAG_MAX_KANDIDATEN,
+  AI_LAAG_MAX_PER_WEEK,
+  AI_LAAG_MAX_TOEVOEGINGEN,
+  AI_TEKST_MAX_TEKENS,
+  AI_TEKST_MAX_ZINNEN,
+} from './ai-laag-grenzen'
+export {
+  AI_LAAG_MAX_KANDIDATEN,
+  AI_LAAG_MAX_PER_WEEK,
+  AI_LAAG_MAX_TOEVOEGINGEN,
+  AI_LAAG_QUOTUM_DAGEN,
+  AI_TEKST_MAX_TEKENS,
+  AI_TEKST_MAX_ZINNEN,
+} from './ai-laag-grenzen'
 
 /**
  * Het model voegt alleen berichten toe van een soort die de matcher ook als
@@ -67,7 +71,13 @@ export const AI_KANDIDAAT_SOORTEN: ReadonlySet<DuidingSoort> = new Set<DuidingSo
 
 // ── Uitkomst en tellers ──────────────────────────────────────────────────────
 
-/** Wat de AI-laag bij één verversing deed — kolom krant_edities.ai_uitkomst. */
+/**
+ * Wat de AI-laag bij één verversing deed — kolom krant_edities.ai_uitkomst.
+ * 'met-ai' = het model antwoordde bruikbaar: ≥ 1 AI-tekst bleef staan, óf een
+ * schoon leeg antwoord ("niets toe te voegen" is een goed antwoord, eindreview
+ * Y4). 'teruggevallen' = aangeroepen, maar een fout, een onbruikbaar antwoord of
+ * alle teksten afgewezen.
+ */
 export const AI_UITKOMSTEN = ['met-ai', 'teruggevallen', 'quotum', 'geweigerd', 'leeg'] as const
 export type AiUitkomst = (typeof AI_UITKOMSTEN)[number]
 
@@ -211,11 +221,20 @@ function eenRegel(tekst: string | null | undefined, max = 600): string | null {
 }
 
 /**
- * De invoer voor het model. ELK tekstveld gaat door `sanitizeForAI` (met de
- * naam en geboortedatum van de lezer, als die bekend zijn): de bronkoppen en
- * samenvattingen zijn openbaar, maar de regel voor jou en een samenvatting
- * kunnen per ongeluk iets herleidbaars dragen. Dezelfde gesaneerde tekst is
- * daarna de grondslag van de nummer-guard.
+ * De invoer voor het model. ELK tekstveld gaat door `sanitizeForAI`, maar niet
+ * met dezelfde opties (eindreview G2):
+ *   · OPENBARE velden van derden (bronkop, samenvatting) zonder de naam en de
+ *     geboortedatum van de lezer. Anders verminkt een kop die toevallig een
+ *     naamdeel van de lezer bevat, en is de naam af te lezen door de prompt
+ *     naast de openbare kop te leggen. IBAN, e-mail, telefoon en adres gaan er
+ *     wel uit.
+ *   · De REGEL voor jou en de LEZER-regels mét naam en geboortedatum.
+ * In de regel wordt het exacte geboortejaar (bv. sjabloon direct-aow "Voor wie
+ * in {geboortejaar} is geboren…") vervangen door "[je geboortejaar]" (G1): de
+ * leeftijdsklasse staat al in de LEZER-regels, en een jaartal of bandgrens in
+ * de regel zou anders als grond voor getallen gaan tellen. De catalogus zelf
+ * blijft ongemoeid. Dezelfde gesaneerde tekst is daarna de
+ * grondslag van de nummer-guard.
  */
 export function bouwAiLaagInvoer(
   items: readonly EditieItem[],
@@ -225,24 +244,29 @@ export function bouwAiLaagInvoer(
   sanitize: SanitizeOptions,
   soortVan: (artikelId: string) => DuidingSoort | null,
 ): AiLaagInvoer {
-  const s = (t: string | null) => (t == null ? null : sanitizeForAI(t, sanitize))
+  const openbaar = (t: string | null) => (t == null ? null : sanitizeForAI(t))
+  const persoonlijk = (t: string | null) => (t == null ? null : sanitizeForAI(t, sanitize))
+  const zonderGeboortejaar = (t: string | null) =>
+    t == null || profiel.geboortejaar == null
+      ? t
+      : t.replace(new RegExp(`\\b${profiel.geboortejaar}\\b`, 'g'), '[je geboortejaar]')
   return {
     berichten: items.map((i) => ({
       artikelId: i.artikelId,
-      titel: s(eenRegel(i.titel, 300)) ?? '',
+      titel: openbaar(eenRegel(i.titel, 300)) ?? '',
       rubriek: i.rubriek,
       soort: soortVan(i.artikelId),
-      samenvatting: s(eenRegel(i.samenvatting)),
-      regel: s(eenRegel(i.tekst, 800)) ?? '',
+      samenvatting: openbaar(eenRegel(i.samenvatting)),
+      regel: persoonlijk(zonderGeboortejaar(eenRegel(i.tekst, 800))) ?? '',
     })),
     kandidaten: kandidaten.map((k) => ({
       artikelId: k.id,
-      titel: s(eenRegel(k.title, 300)) ?? '',
+      titel: openbaar(eenRegel(k.title, 300)) ?? '',
       rubriek: k.category,
       soort: k.duiding.soort,
-      samenvatting: s(eenRegel(schoneSamenvatting(k.duiding.samenvatting))),
+      samenvatting: openbaar(eenRegel(schoneSamenvatting(k.duiding.samenvatting))),
     })),
-    lezer: lezerRegels(profiel, peiljaar).map((r) => sanitizeForAI(r, sanitize)),
+    lezer: lezerRegels(profiel, peiljaar).map((r) => persoonlijk(r) ?? ''),
   }
 }
 
@@ -255,9 +279,11 @@ export function schoneSamenvatting(samenvatting: string | null): string | null {
 /**
  * De grondslag van de nummer-guard voor één bericht (K4): de duiding van dat
  * artikel (heel, als JSON — incl. parameters, grond-citaten, ingangsdatum en
- * deadline), de aangeleverde (gesaneerde) regel en samenvatting, en de
- * gesaneerde lezerscontext. Bewust per BERICHT: een getal uit een ánder bericht
- * gront deze tekst niet.
+ * deadline) en de aangeleverde (gesaneerde) regel en samenvatting. Bewust per
+ * BERICHT: een getal uit een ánder bericht gront deze tekst niet. De
+ * LEZER-banden gronden bewust NIETS (eindreview G7): een bandgrens ("35 tot
+ * 50", "50k-100k") is geen uitspraak die het model mag herhalen als getal, en
+ * zou anders in élk bericht als gegrond tellen.
  */
 export function grondVoor(artikelId: string, invoer: AiLaagInvoer, duiding: DuidingV1 | null): string {
   const b = invoer.berichten.find((x) => x.artikelId === artikelId)
@@ -270,14 +296,12 @@ export function grondVoor(artikelId: string, invoer: AiLaagInvoer, duiding: Duid
     if (duiding.ingangsdatum) delen.push(duiding.ingangsdatum)
     if (duiding.deadline) delen.push(duiding.deadline.datum)
   }
-  delen.push(...invoer.lezer)
   return delen.filter((d) => d.length > 0).join('\n')
 }
 
 // ── K3: het schema, met een enum per aanroep ─────────────────────────────────
 
-const TEKST_BESCHRIJVING =
-  'Hoogstens drie zinnen in het Nederlands: wat dit bericht voor deze lezer betekent. Alleen bedragen in euro die in de invoer staan; niets uitrekenen.'
+const TEKST_BESCHRIJVING = `Hoogstens ${AI_TEKST_MAX_ZINNEN} zinnen in het Nederlands: wat dit bericht voor deze lezer betekent. Alleen bedragen in euro die in de invoer staan; niets uitrekenen.`
 
 function enumVan(ids: readonly string[]) {
   return z.enum(ids as unknown as [string, ...string[]])
@@ -358,6 +382,8 @@ export function valideerAiUitvoer(
     return true
   })
   lees(ruw.toevoegingen, set.kandidaten, (id, tekst) => {
+    // G4: een id dat óók een matcherbericht is, is nooit een toevoeging.
+    if (set.berichten.has(id)) return false
     if (gezienToevoeging.has(id)) return false
     gezienToevoeging.add(id)
     uit.toevoegingen.push({ artikelId: id, tekst })
@@ -368,7 +394,22 @@ export function valideerAiUitvoer(
 
 // ── K4/K9: de guards per tekst ───────────────────────────────────────────────
 
-export type AfwijsReden = 'lengte' | 'getal' | 'datum' | 'wft' | 'metafoor' | 'naam'
+export type AfwijsReden = 'lengte' | 'getal' | 'datum' | 'wft' | 'metafoor' | 'naam' | 'link'
+
+/**
+ * G3: geen link, domeinnaam of e-mailadres in een AI-tekst. Een bronkop of
+ * samenvatting van derden kan een instructie of URL dragen; het model mag die
+ * nooit doorgeven — de link naar de bron zet de server zelf uit de bronrij.
+ */
+export const LINK: readonly RegExp[] = [/https?:/i, /\bwww\./i, /\b[\w-]+\.(nl|com|eu|org|net)\b/i, /@/]
+
+/**
+ * G6: de prompt verbiedt "kies" en "doe"; de Wft-lijst vangt "kies" alleen als
+ * "kies voor/een" en "doe" alleen als "doe er goed aan". Voor AI-tekst geldt de
+ * strengere vorm — de Wft-lijst zelf blijft ongewijzigd (zij toetst ook de
+ * geattesteerde catalogus).
+ */
+export const AI_EXTRA_AANSPORING: readonly RegExp[] = [/\bkies\b/i, /(^|[.!?:;]\s+)doe\b/i, /\boverweeg\b/i]
 
 /**
  * De koop-/verkoopmetafoor (ADR 0165): nooit "vrijkopen", "terugkopen",
@@ -400,7 +441,8 @@ export function telZinnen(tekst: string): number {
 export function toetsAiTekst(tekst: string, grond: string): { ok: true; tekst: string } | { ok: false; reden: AfwijsReden } {
   const schoon = tekst.replace(/\s+/g, ' ').trim()
   if (schoon.length === 0 || schoon.length > AI_TEKST_MAX_TEKENS || telZinnen(schoon) > AI_TEKST_MAX_ZINNEN) return { ok: false, reden: 'lengte' }
-  if (vindWftOvertreding(schoon)) return { ok: false, reden: 'wft' }
+  if (vindWftOvertreding(schoon) || AI_EXTRA_AANSPORING.some((re) => re.test(schoon))) return { ok: false, reden: 'wft' }
+  if (LINK.some((re) => re.test(schoon))) return { ok: false, reden: 'link' }
   if (KOOPMETAFOOR.some((re) => re.test(schoon))) return { ok: false, reden: 'metafoor' }
   if (ASSISTENTNAAM.test(schoon)) return { ok: false, reden: 'naam' }
 
@@ -447,11 +489,17 @@ export interface VerwerkteAiLaag {
   tellers: AiLaagTellers
   /** true als er minstens één AI-tekst bleef staan. */
   metAi: boolean
+  /**
+   * true als het model schoon "niets toe te voegen" antwoordde: een geldig
+   * object, geen enkele toelichting of toevoeging aangeboden, niets geweigerd.
+   * Dat is geen terugval (eindreview Y4) — de call telt wel.
+   */
+  schoonLeeg: boolean
 }
 
 function telAfwijzing(t: AiLaagTellers, reden: AfwijsReden): void {
   if (reden === 'getal' || reden === 'datum') t.getallenTegengehouden++
-  else if (reden === 'lengte') t.schemaTegengehouden++
+  else if (reden === 'lengte' || reden === 'link') t.schemaTegengehouden++
   else t.wftTegengehouden++
 }
 
@@ -478,8 +526,9 @@ export function verwerkAiUitvoer(args: {
   if (!gevalideerd) {
     tellers.terugvalLaag = 1
     tellers.terugvalBericht = items.length
-    return { items: [...items], tellers, metAi: false }
+    return { items: [...items], tellers, metAi: false, schoonLeeg: false }
   }
+  const aangeboden = gevalideerd.toelichtingen.size + gevalideerd.toevoegingen.length + gevalideerd.geweigerd
   tellers.schemaTegengehouden += gevalideerd.geweigerd
 
   const toets = (artikelId: string, tekst: string): string | null => {
@@ -513,6 +562,7 @@ export function verwerkAiUitvoer(args: {
   tellers.toevoegingen = toegevoegd.length
 
   const metAi = tellers.toelichtingen + tellers.toevoegingen > 0
-  if (!metAi) tellers.terugvalLaag = 1
-  return { items: [...berichten, ...toegevoegd], tellers, metAi }
+  const schoonLeeg = !metAi && aangeboden === 0
+  if (!metAi && !schoonLeeg) tellers.terugvalLaag = 1
+  return { items: [...berichten, ...toegevoegd], tellers, metAi, schoonLeeg }
 }

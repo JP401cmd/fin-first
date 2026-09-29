@@ -17,7 +17,7 @@ import { afleidNieuwsprofiel } from './profiel-afleiding'
 import { AOW_RIJEN, ARTIKELEN, NU, PROFIEL_TESSA } from './editie.fixture'
 import { EDITIE_MAX } from './matcher'
 import { maakNepClient } from './nep-client.fixture'
-import { GEZIEN_PORTIE, TIJDLIJN_BEWAAR_DAGEN, hertoetsLezer, nogTijdlijnlezer, ruimAlleTijdlijnenOp, ruimTijdlijnOp, tijdlijnArtikelIds, ververs, wisTijdlijn } from './tijdlijn-run'
+import { GEZIEN_PORTIE, TIJDLIJN_BEWAAR_DAGEN, hertoetsLezer, nogTijdlijnlezer, ruimAlleTijdlijnenOp, ruimTijdlijnOp, tijdlijnArtikelIds, ververs, ietsNieuwsSindsVorige } from './tijdlijn-run'
 import { AI_LAAG_MAX_KANDIDATEN, legeTellers } from './ai-laag'
 import type { AiStap, AiStapInvoer } from './tijdlijn-ai'
 
@@ -142,19 +142,6 @@ describe('tijdlijn-run (Krant 1C, B31)', () => {
     expect(nep.rijen('krant_edities').map((e) => e.id).sort()).toEqual(['s-oud', 't-vers'])
   })
 
-  it('wisTijdlijn (de bèta uit): de hele eigen tijdlijn weg, schaduw en partner blijven', async () => {
-    const nep = maakNepClient({
-      krant_edities: [
-        { id: 't1', user_id: UID, bron: 'tijdlijn' },
-        { id: 't2', user_id: UID, bron: 'tijdlijn' },
-        { id: 's1', user_id: UID, bron: 'schaduw' },
-        { id: 'p1', user_id: 'partner', bron: 'tijdlijn' },
-      ],
-    })
-    expect(await wisTijdlijn(nep.client as never, UID)).toBe(2)
-    expect(nep.rijen('krant_edities').map((e) => e.id).sort()).toEqual(['p1', 's1'])
-  })
-
   it('de bewaartermijn is gelijk aan die van de artikelen (ARTICLE_RETENTION_DAYS, ADR 0171)', () => {
     const m = readSourceLF('lib/news-ingest.ts').match(/export const ARTICLE_RETENTION_DAYS = (\d+)/)
     expect(m, 'ARTICLE_RETENTION_DAYS niet gevonden in lib/news-ingest.ts').not.toBeNull()
@@ -247,6 +234,27 @@ describe('tijdlijn-run (Krant 1C, B31)', () => {
   })
 
   describe('de AI-laag in de verversing (Krant 1E, ADR 0190)', () => {
+    /**
+     * Extra artikelen die de matcher níet kiest (doelgroep past niet bij Tessa,
+     * geen mechanisme): zonder deze had de fixture 0 AI-kandidaten en waren de
+     * toevoegingstests leeg.
+     */
+    const basisAchtergrond = ARTIKELEN.find((a) => a.duiding?.soort === 'achtergrond')!
+    const EXTRA = Array.from({ length: 4 }, (_, i) => ({
+      ...basisAchtergrond,
+      id: `x-extra-${i}`,
+      title: `Extra achtergrond ${i}`,
+      category: 'macro',
+      duiding: {
+        ...basisAchtergrond.duiding!,
+        doelgroep: [{ veld: 'kinderen' as const, op: 'is' as const, waarden: ['jongste-0-3'] }],
+        mechanisme: null,
+        themas: [],
+      },
+    }))
+    const invoerAi = () => ({ ...invoer(), kandidaten: [...ARTIKELEN, ...EXTRA] })
+    const rijenAi = () => [...artikelRijen(), ...EXTRA.map((a) => ({ id: a.id, duiding_status: 'geduid' }))]
+
     /** Een nep-stap: legt de invoer vast en geeft een toelichting op het eerste bericht + één toevoeging. */
     function nepStap(gedrag: 'toelichten' | 'gooien' | 'niets' = 'toelichten') {
       const invoeren: AiStapInvoer[] = []
@@ -273,9 +281,9 @@ describe('tijdlijn-run (Krant 1C, B31)', () => {
     }
 
     it('de stap krijgt de matcherberichten en hoogstens 12 kandidaten die de matcher NIET koos; met_ai + ai_uitkomst + ai_tekst worden geschreven', async () => {
-      const nep = maakNepClient({ news_articles: artikelRijen() })
+      const nep = maakNepClient({ news_articles: rijenAi() })
       const { stap, invoeren, naSchrijven } = nepStap()
-      const uit = await ververs(nep.client as never, { ...invoer(), aiStap: stap })
+      const uit = await ververs(nep.client as never, { ...invoerAi(), aiStap: stap })
       expect(invoeren).toHaveLength(1)
       const inv = invoeren[0]
       const gekozen = new Set(inv.items.map((i) => i.artikelId))
@@ -289,19 +297,18 @@ describe('tijdlijn-run (Krant 1C, B31)', () => {
       const toegelicht = items.find((i) => i.ai_tekst === 'Toelichting van het model.')!
       expect(typeof toegelicht.tekst).toBe('string')
       expect((toegelicht.tekst as string).length).toBeGreaterThan(0)
-      if (inv.kandidaten.length > 0) {
-        const toegevoegd = items.find((i) => i.ai_toegevoegd === true)!
-        expect(toegevoegd).toMatchObject({ vorm: 'ai', tekst: '', tijdlijn: true, article_id: inv.kandidaten[0].id })
-      }
+      expect(inv.kandidaten.length).toBeGreaterThan(0)
+      const toegevoegd = items.find((i) => i.ai_toegevoegd === true)!
+      expect(toegevoegd).toMatchObject({ vorm: 'ai', tekst: '', tijdlijn: true, article_id: inv.kandidaten[0].id })
       expect(uit.ai?.uitkomst).toBe('met-ai')
       expect(naSchrijven).toHaveBeenCalledTimes(1)
     })
 
     it('een stap die GOOIT: dezelfde verversing zonder AI — matcherberichten intact, nooit leeg door de fout', async () => {
-      const zonder = maakNepClient({ news_articles: artikelRijen() })
-      const basis = await ververs(zonder.client as never, invoer())
-      const nep = maakNepClient({ news_articles: artikelRijen() })
-      const uit = await ververs(nep.client as never, { ...invoer(), aiStap: nepStap('gooien').stap })
+      const zonder = maakNepClient({ news_articles: rijenAi() })
+      const basis = await ververs(zonder.client as never, invoerAi())
+      const nep = maakNepClient({ news_articles: rijenAi() })
+      const uit = await ververs(nep.client as never, { ...invoerAi(), aiStap: nepStap('gooien').stap })
       expect(uit.items).toBe(basis.items)
       expect(uit.leeg).toBe(false)
       const [editie] = nep.rijen('krant_edities')
@@ -310,20 +317,20 @@ describe('tijdlijn-run (Krant 1C, B31)', () => {
     })
 
     it('quotum/weigering: ai_uitkomst gezet, met_ai false', async () => {
-      const nep = maakNepClient({ news_articles: artikelRijen() })
-      const uit = await ververs(nep.client as never, { ...invoer(), aiStap: nepStap('niets').stap })
+      const nep = maakNepClient({ news_articles: rijenAi() })
+      const uit = await ververs(nep.client as never, { ...invoerAi(), aiStap: nepStap('niets').stap })
       expect(uit.ai?.uitkomst).toBe('quotum')
       expect(nep.rijen('krant_edities')[0]).toMatchObject({ met_ai: false, ai_uitkomst: 'quotum' })
     })
 
     it('cron-hertoets: koos de lezer intussen weer zonder AI, dan draait de laag niet (en schrijft geen ai_uitkomst)', async () => {
       const nep = maakNepClient({
-        news_articles: artikelRijen(),
+        news_articles: rijenAi(),
         nieuwsprofiel: [{ user_id: UID, krant_variant: null }],
         profiles: [{ id: UID, krant_schaduw_bezwaar_at: null }],
       })
       const { stap, invoeren } = nepStap()
-      const uit = await ververs(nep.client as never, { ...invoer(), hertoetsVoorSchrijven: true, aiStap: stap })
+      const uit = await ververs(nep.client as never, { ...invoerAi(), hertoetsVoorSchrijven: true, aiStap: stap })
       expect(invoeren).toHaveLength(0)
       expect(uit.ai).toBeUndefined()
       expect(nep.rijen('krant_edities')[0]).toMatchObject({ met_ai: false })
@@ -331,17 +338,62 @@ describe('tijdlijn-run (Krant 1C, B31)', () => {
     })
 
     it('zonder aiStap: de rij is exact die van vóór 1E (geen ai_uitkomst, geen ai_tekst-kolom)', async () => {
-      const nep = maakNepClient({ news_articles: artikelRijen() })
+      const nep = maakNepClient({ news_articles: rijenAi() })
       await ververs(nep.client as never, invoer())
       expect('ai_uitkomst' in nep.rijen('krant_edities')[0]).toBe(false)
       expect(nep.rijen('krant_editie_items').every((i) => !('ai_tekst' in i) && !('ai_toegevoegd' in i))).toBe(true)
     })
 
-    it('een schrijffout na de stap: naSchrijven (credit-metering) wordt NIET aangeroepen', async () => {
-      const nep = maakNepClient({ news_articles: artikelRijen() }, { fouten: { 'krant_editie_items:insert': 'duplicate key 23505' } })
+    it('Y6: een schrijffout na een BETAALDE call: de fout gaat door, maar naSchrijven (credit-metering) draait toch', async () => {
+      const nep = maakNepClient({ news_articles: rijenAi() }, { fouten: { 'krant_editie_items:insert': 'duplicate key 23505' } })
       const { stap, naSchrijven } = nepStap()
-      await expect(ververs(nep.client as never, { ...invoer(), aiStap: stap })).rejects.toThrow(/items schrijven mislukt/)
-      expect(naSchrijven).not.toHaveBeenCalled()
+      await expect(ververs(nep.client as never, { ...invoerAi(), aiStap: stap })).rejects.toThrow(/items schrijven mislukt/)
+      expect(naSchrijven).toHaveBeenCalledTimes(1)
+    })
+
+    it('Y6: een toegevoegd artikel dat intussen al in de tijdlijn staat, valt eruit — de rest van de verversing wordt gewoon geschreven', async () => {
+      const nep = maakNepClient({ news_articles: rijenAi() })
+      const { stap, invoeren } = nepStap()
+      // Eerst de stap laten kiezen, dan het gekozen artikel "door de cron" in de tijdlijn zetten.
+      const verpakt: AiStap = async (service, inv) => {
+        const uit = await stap(service, inv)
+        const extra = uit.items.find((i) => i.aiToegevoegd)
+        if (extra) nep.rijen('krant_editie_items').push({ id: 'race', user_id: UID, article_id: extra.artikelId, tijdlijn: true })
+        return uit
+      }
+      const uit = await ververs(nep.client as never, { ...invoerAi(), aiStap: verpakt })
+      expect(invoeren[0].kandidaten.length, 'de fixture moet kandidaten hebben, anders is deze test leeg').toBeGreaterThan(0)
+      const geschreven = nep.rijen('krant_editie_items').filter((i) => i.id !== 'race')
+      expect(geschreven.some((i) => i.ai_toegevoegd === true)).toBe(false)
+      expect(uit.items).toBe(invoeren[0].items.length)
+      expect(uit.ai?.tellers.toevoegingen).toBe(0)
+    })
+  })
+
+  describe('ietsNieuwsSindsVorige (eindreview Y4 — de dagcron verbruikt geen call op ongewijzigde invoer)', () => {
+    const VORIGE = '2026-09-20T06:30:00Z'
+    it('geen vorige verversing: ja', async () => {
+      const nep = maakNepClient({ krant_edities: [], news_articles: [] })
+      expect(await ietsNieuwsSindsVorige(nep.client as never, UID)).toBe(true)
+    })
+    it('wel een vorige, niets geduid sinds: nee; één artikel geduid ná de vorige: ja — alleen de eigen tijdlijn telt', async () => {
+      const basis = {
+        krant_edities: [
+          { id: 'e1', user_id: UID, bron: 'tijdlijn', created_at: VORIGE },
+          { id: 'p1', user_id: 'partner', bron: 'tijdlijn', created_at: '2026-09-21T06:30:00Z' },
+          { id: 's1', user_id: UID, bron: 'schaduw', created_at: '2026-09-21T06:30:00Z' },
+        ],
+      }
+      const niets = maakNepClient({ ...basis, news_articles: [{ id: 'a', duiding_status: 'geduid', geduid_at: '2026-09-20T05:00:00Z' }] })
+      expect(await ietsNieuwsSindsVorige(niets.client as never, UID)).toBe(false)
+      const wel = maakNepClient({ ...basis, news_articles: [{ id: 'a', duiding_status: 'geduid', geduid_at: '2026-09-20T06:30:01Z' }] })
+      expect(await ietsNieuwsSindsVorige(wel.client as never, UID)).toBe(true)
+      const nietGeduid = maakNepClient({ ...basis, news_articles: [{ id: 'a', duiding_status: 'wacht', geduid_at: '2026-09-21T00:00:00Z' }] })
+      expect(await ietsNieuwsSindsVorige(nietGeduid.client as never, UID)).toBe(false)
+    })
+    it('een leesfout gooit (de cron behandelt dat als "nee": geen call)', async () => {
+      const nep = maakNepClient({ krant_edities: [] }, { fouten: { 'krant_edities:select': 'kapot' } })
+      await expect(ietsNieuwsSindsVorige(nep.client as never, UID)).rejects.toThrow(/laatste verversing lezen mislukt/)
     })
   })
 })

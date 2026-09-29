@@ -13,14 +13,18 @@
 //   3. geen Krant-account                → 'geweigerd'  (K2; checkTierGate weigert
 //      hem ook, dit is de tweede, expliciete toets)
 //   4. geen bezwaar                      → 'geweigerd'  (een bezwaar stopt óók de laag)
-//   5. quotum: ≤ 5 calls per 7 dagen     → 'quotum'     (geteld in krant_edities, K5)
+//   5. quotum: ≤ 5 calls per 7 dagen     → 'quotum'     (K5: het maximum van krant_edities
+//      en ai_token_usage — die laatste kan de lezer niet wissen, security Y1)
 //   6. het maandtegoed (credit-gate)     → 'geweigerd'
 //   7. sanitizeForAI op elk invoerveld   → 'geweigerd'  bij een fout (fail-safe)
+//  7b. genoeg tijd voor call + schrijven  → 'geweigerd'  (reden 'tijd', Y5)
 //   8. getModel(service, 'krant_ai')     → 'geweigerd'  bij AIConfigError (platform-
 //      kill-switch, geen sleutel) — er is dan geen call gedaan
-//   9. generateObject met enum-schema    → 'teruggevallen' bij een modelfout
+//   9. generateObject met enum-schema    → 'teruggevallen' bij een modelfout;
+//      time-out = min(45 s, resterende tijd − marge)
 //  10. guards per tekst + maskPIIInOutput (lib/krant/ai-laag.ts)
-//  11. schrijven met met_ai = true (door de aanroeper) → daarna recordAiUsage
+//  11. schrijven met met_ai = true (door de aanroeper) → recordAiUsage in een
+//      finally: ook als het schrijven faalt, is de call betaald (Y6)
 //
 // ELKE fout of weigering = dezelfde verversing ZONDER AI: deze functie gooit
 // nooit, en de matcherberichten komen altijd ongewijzigd terug. Een fout in de
@@ -42,8 +46,6 @@ import type { SanitizeOptions } from '@/lib/ai/sanitize'
 import { isNewsOnly, resolveActiveModules } from '@/lib/modules/resolve'
 import { checkTierGate } from '@/lib/require-tier'
 import {
-  AI_AANROEP_UITKOMSTEN,
-  AI_LAAG_QUOTUM_DAGEN,
   aiLaagSchema,
   bouwAiLaagInvoer,
   legeTellers,
@@ -54,18 +56,39 @@ import {
   type AiUitkomst,
 } from './ai-laag'
 import { AI_LAAG_SYSTEM_PROMPT, buildAiLaagPrompt } from './ai-laag-prompt'
+import { KRANT_AI_TOKEN_FEATURE, telAiAanroepen } from './ai-laag-stand'
 import type { DuidingV1 } from './duiding-schema'
 import type { SchrijfItem } from './editie-schrijver'
 import type { EditieItem } from './matcher'
 import type { NieuwsprofielV1 } from './profiel'
 
 /** De feature-string voor getModel + token-logging (ai_token_usage, /beheer/ai-verbruik). */
-export const KRANT_AI_FEATURE = 'krant_ai' as const
+// Eén string: dezelfde telt in ai_token_usage mee voor het quotum (ai-laag-stand.ts).
+export const KRANT_AI_FEATURE = KRANT_AI_TOKEN_FEATURE
+
+// Het quotum telt in de database (ai-laag-stand.ts); hier her-exporteerd voor de tests.
+export { telAiAanroepen }
 
 /** Een verversing wacht hoogstens zo lang op het model; daarna zonder AI. */
 export const AI_LAAG_TIMEOUT_MS = 45_000
+/**
+ * Marge na de modelcall voor de guards en het schrijven (eindreview Y5): een
+ * functie die door Vercel wordt afgebroken, mag nooit eindigen met een betaalde
+ * call en niets geschreven.
+ */
+export const AI_LAAG_MARGE_MS = 15_000
+/** Korter dan dit is een call zinloos: dan slaat de stap de laag over (geen call). */
+export const AI_LAAG_MIN_CALL_MS = 10_000
 
-const DAG_MS = 24 * 60 * 60 * 1000
+/**
+ * De time-out van de modelcall: min(AI_LAAG_TIMEOUT_MS, resterende tijd − marge).
+ * null = te weinig tijd over voor een zinvolle call.
+ */
+export function aiTimeoutMs(deadline: number | undefined, nuMs: number = Date.now()): number | null {
+  const rest = deadline == null ? Number.POSITIVE_INFINITY : deadline - nuMs - AI_LAAG_MARGE_MS
+  const t = Math.min(AI_LAAG_TIMEOUT_MS, rest)
+  return t >= AI_LAAG_MIN_CALL_MS ? t : null
+}
 
 /** Grep-bare reden bij een uitkomst anders dan 'met-ai' — alleen voor tellingen en logs. */
 export type AiStapReden =
@@ -84,6 +107,7 @@ export type AiStapReden =
   | 'onbruikbaar'
   | 'guards'
   | 'fout'
+  | 'tijd'
 
 export interface AiStapInvoer {
   userId: string
@@ -102,7 +126,11 @@ export interface AiStapUitkomst {
   uitkomst: AiUitkomst
   reden: AiStapReden | null
   tellers: AiLaagTellers
-  /** Na een GESLAAGD schrijven aanroepen: de credit-metering (recordAiUsage). Alleen als er een modelcall was. */
+  /**
+   * De credit-metering (recordAiUsage), alleen als er een modelcall was. De
+   * aanroeper roept hem aan ná het schrijven — óók als dat schrijven faalt
+   * (try/finally, eindreview Y6): de call is betaald.
+   */
   naSchrijven: (() => Promise<void>) | null
 }
 
@@ -116,6 +144,12 @@ export interface AiStapOpties {
    * de stap stuurt dan niets naar een aanbieder.
    */
   cloudToegestaan: boolean
+  /**
+   * Epoch-ms waarop de functie uiterlijk klaar moet zijn (maxDuration van de
+   * route/cron min een eigen marge). De time-out van de call wordt daar naar
+   * begrensd; is er te weinig tijd, dan geen call (eindreview Y5).
+   */
+  deadline?: number
 }
 
 /** Tellers en items bij een terugval zonder modelcall of met een onbruikbaar antwoord. */
@@ -126,20 +160,6 @@ function zonderAi(items: readonly EditieItem[], uitkomst: AiUitkomst, reden: AiS
     tellers.terugvalBericht = items.length
   }
   return { items: [...items], uitkomst, reden, tellers, naSchrijven }
-}
-
-/** Hoeveel modelcalls deze lezer in het venster al deed (met-ai + teruggevallen). */
-export async function telAiAanroepen(service: SupabaseClient, userId: string, now: Date): Promise<number> {
-  const sinds = new Date(now.getTime() - AI_LAAG_QUOTUM_DAGEN * DAG_MS).toISOString()
-  const { count, error } = await service
-    .from('krant_edities')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('bron', 'tijdlijn')
-    .in('ai_uitkomst', [...AI_AANROEP_UITKOMSTEN])
-    .gte('created_at', sinds)
-  if (error) throw new Error(`[krant/tijdlijn-ai] quotum lezen mislukt: ${error.message}`)
-  return count ?? 0
 }
 
 /**
@@ -197,6 +217,10 @@ export function maakAiStap(opties: AiStapOpties): AiStap {
         return zonderAi(items, 'geweigerd', 'sanitize')
       }
 
+      // 7b. Genoeg tijd over voor een call plus het schrijven? (Y5)
+      const timeoutMs = aiTimeoutMs(opties.deadline)
+      if (timeoutMs == null) return zonderAi(items, 'geweigerd', 'tijd')
+
       // 8. Het model — altijd via getModel (kill-switch, model per feature, token-logging).
       let model: Awaited<ReturnType<typeof getModel>>
       try {
@@ -226,7 +250,7 @@ export function maakAiStap(opties: AiStapOpties): AiStap {
           // output_format kent geen enum-rijke schema's zonder grenzen.
           providerOptions: { anthropic: { structuredOutputMode: 'jsonTool' } },
           maxOutputTokens: 2000,
-          abortSignal: AbortSignal.timeout(AI_LAAG_TIMEOUT_MS),
+          abortSignal: AbortSignal.timeout(timeoutMs),
         })
         ruw = object
       } catch (err) {
@@ -244,10 +268,12 @@ export function maakAiStap(opties: AiStapOpties): AiStap {
 
       // 10. Grondingstoets, guards per tekst, cap op toevoegingen, PII-masker.
       const verwerkt = verwerkAiUitvoer({ ruw, items, kandidaten, invoer: laagInvoer, duidingVan: invoer.duidingVan })
+      // Een schoon leeg antwoord ("niets toe te voegen") is geen terugval (Y4).
+      const bruikbaar = verwerkt.metAi || verwerkt.schoonLeeg
       return {
         items: verwerkt.items,
-        uitkomst: verwerkt.metAi ? 'met-ai' : 'teruggevallen',
-        reden: verwerkt.metAi ? null : verwerkt.tellers.schemaTegengehouden > 0 && verwerkt.tellers.toelichtingen === 0 ? 'onbruikbaar' : 'guards',
+        uitkomst: bruikbaar ? 'met-ai' : 'teruggevallen',
+        reden: bruikbaar ? null : verwerkt.tellers.schemaTegengehouden > 0 && verwerkt.tellers.toelichtingen === 0 ? 'onbruikbaar' : 'guards',
         tellers: verwerkt.tellers,
         naSchrijven,
       }
