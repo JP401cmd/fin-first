@@ -97,6 +97,29 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.21',
+    date: '2026-09-29',
+    title: 'De Krant als los product',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De Krant kan nu ook los gebruikt worden',
+            description:
+              'Een account met alleen de Krant ziet de Krant en het eigen account. Gebruik je het volledige TriFinity, dan verandert er niets.',
+          },
+          {
+            title: 'Van de Krant naar het volledige TriFinity',
+            description:
+              'Wie alleen de Krant heeft, neemt met één knop het volledige TriFinity erbij. Er wordt niets gewist.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.20',
     date: '2026-09-29',
     title: 'De Krant als tijdlijn staat klaar',

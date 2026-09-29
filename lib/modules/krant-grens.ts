@@ -46,8 +46,8 @@ export const PATHNAME_HEADER = 'x-tf-pathname'
  * alles eronder (`/nieuws`, `/nieuws/…`), nooit een woord dat er toevallig mee
  * begint (`/nieuwsbrief`, `/nieuwsX`).
  *
- * `/mijn/nieuwsprofiel` (2C) en `/krant/meer` (2D) bestaan nog niet; ze staan
- * hier zodat die kaarten niets aan de grens hoeven te veranderen.
+ * `/krant/meer` (2D) bestaat sinds R2. `/mijn/nieuwsprofiel` (2C) bestaat nog
+ * niet; het staat hier zodat die kaart niets aan de grens hoeft te veranderen.
  * `/mijn/notificaties` in plaats van het `/mijn/meldingen` van de kaart: die
  * route bestaat niet, de meldingsvoorkeuren staan op /mijn/notificaties.
  */

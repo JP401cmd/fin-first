@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T16:39:55.825Z",
+  "generatedAt": "2026-09-29T16:58:54.013Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.20"
+    "version": "0.92.21"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -19345,7 +19345,7 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3987,
+        "loc": 4010,
         "commits": 26
       },
       {
@@ -20639,31 +20639,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-29",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Schermen",
-        "added": [
-          "/krant/meer"
-        ],
-        "removed": []
-      },
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/admin/users/product",
-          "/api/modules"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+13"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

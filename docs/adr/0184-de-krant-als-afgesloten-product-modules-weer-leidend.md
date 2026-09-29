@@ -43,7 +43,7 @@ Gemeten op productie (read-only SELECT, 28-09-2026): 29 profielen. `active_modul
 - **Toegang.** Er komt geen nieuw escalatiepad bij. `active_modules` en `home_screen` vallen onder dezelfde own-row-policy als de rest van de profielrij en buiten de guard-trigger. Dat is terecht, want modules zijn geen betaalrecht: betaalde functies lopen via abonnementen, los van de moduleset. Wie via een eigen PUT de Krant kiest, ziet minder en krijgt niets extra's.
 - **Uitrol: eerst de migratie.** De migratie moet live staan vóór de deploy van `PUT /api/modules`. Tegen de oude CHECK faalt de Krant-update met 23514 en krijgt de client een 500. Omgekeerd is het veilig: de huidige code schrijft alleen `overzicht`/`budget`. Handmatig uitrollen gaat met `execute_sql` binnen één `begin; … commit;`, met de expliciete versie-INSERT `('20261006120000','profiles_home_screen_nieuws')` in `supabase_migrations.schema_migrations`.
 - **Terugweg.** Draai eerst de code terug. Zet daarna in één transactie `home_screen = 'overzicht' where home_screen = 'nieuws'` en herstel de oude CHECK. Voor een Krant-account verandert dat niets zichtbaars, omdat de home uit `active_modules` volgt.
-- **De productgrens komt in dezelfde release (2B, hieronder).** Er is nog geen UI die `PUT /api/modules` aanroept (dat doet 2D, "de weg omhoog naar het Geheel").
+- **De productgrens komt in dezelfde release (2B, hieronder).** De enige UI die `PUT /api/modules` aanroept is de knop op /krant/meer (2D, "de weg omhoog naar het Geheel", ADR 0188); die is in dezelfde release meegekomen.
 - **Architectuurplaat.** Er komt geen nieuw element bij: de helper is geen dienst. De ERD blijft gelijk, want een CHECK wordt niet gescand.
 
 ## Vervolg: Krant 2B bouwt hierop

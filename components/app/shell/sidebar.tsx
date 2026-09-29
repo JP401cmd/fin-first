@@ -953,7 +953,10 @@ function OverigeSection({
   // Staat de tijdlijn voor deze lezer nog dicht, dan slaan we de tijdlijn-peek
   // over: anders geeft elke paginalading een 403. Een besparing, geen poort —
   // de route toetst dezelfde vlag zelf.
-  const newsUnread = useNewsUnread(hasAi, inTijdlijnBeta(role))
+  // Een Krant-account raakt de AI-Krant nooit (B11): ook met een AI-abonnement
+  // zou `/api/news?peek=1` daar een 403 van de Krant-poort geven.
+  const { isKrant } = useNavSurface()
+  const newsUnread = useNewsUnread(hasAi && !isKrant, inTijdlijnBeta(role))
 
   return (
     <div className="flex flex-col px-2 py-3">
