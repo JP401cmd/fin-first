@@ -485,7 +485,17 @@ async function duidEen(
     const { object } = await generateObject({
       model,
       schema: duidingModelSchema,
-      system: buildDuidingSystemPrompt(),
+      // Prompt-caching: de systeemprompt (met de catalogi) en de schema-tool
+      // die ervóór rendert zijn per artikel identiek — ~90 % van de input. Met
+      // dit breekpunt kosten ze na de eerste call van een run 0,1× in plaats
+      // van 1×. Het model verandert niet, dus de uitkomst ook niet. Houd de
+      // prompt deterministisch (geen datum, geen id): elke variatie maakt de
+      // cache stil ongeldig — zichtbaar als cache_read_tokens = 0.
+      system: {
+        role: 'system',
+        content: buildDuidingSystemPrompt(),
+        providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+      },
       prompt: buildDuidingPrompt(artikel, tekst),
       // De json-tool, niet de strikte `output_format`: die weigert schema's met
       // meer dan 16 union-parameters, en de gediscrimineerde mechanisme-union

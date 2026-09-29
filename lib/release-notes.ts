@@ -97,6 +97,35 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.18',
+    date: '2026-09-29',
+    title: 'Fin op een nieuwer model',
+    sections: [
+      {
+        module: 'Fin',
+        color: 'blue',
+        items: [
+          {
+            title: 'Fin draait op een nieuwer taalmodel',
+            description:
+              'De gesprekken met Fin en de andere hulp van Fin lopen nu via een nieuwere versie van het taalmodel.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Het nieuws verwerken kost minder',
+            description:
+              'Het ophalen en duiden van het nieuws gebeurt zuiniger, met dezelfde controles als altijd. Voor jou geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.17',
     date: '2026-09-29',
     title: 'Achterstand in het nieuws inhalen',

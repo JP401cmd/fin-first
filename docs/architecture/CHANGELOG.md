@@ -1255,7 +1255,7 @@
 
 ## 2026-09-29
 
-- Geen wijzigingen.
+- **Integraties** verwijderd: OpenRouter
 
 ## 2026-09-29
 
