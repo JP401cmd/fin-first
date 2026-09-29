@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T07:37:05.395Z",
+  "generatedAt": "2026-09-29T09:42:25.216Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.16"
+    "version": "0.92.18"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -193,8 +193,8 @@
     "routesProduction": 90,
     "api": 336,
     "tables": 105,
-    "migrations": 268,
-    "integrations": 25,
+    "migrations": 269,
+    "integrations": 24,
     "components": 1245,
     "providers": 19,
     "contextBuilders": 9,
@@ -8783,7 +8783,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 268
+    "migrationCount": 269
   },
   "tablesByDomain": [
     {
@@ -10745,10 +10745,6 @@
     },
     {
       "name": "OpenAI",
-      "category": "AI"
-    },
-    {
-      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -19013,6 +19009,18 @@
       ],
       "summary": "Na een week meten had geen enkele geduide Krant-duiding een rekenend mechanisme. Tarieven, grenzen en percentages staan zelden in een nieuwsbericht; ze staan in wetteksten, pdf's en sleuteltabellen. Besluit B34 (27 sep): rekenende berichten komen uit een gecureerde kalender van r",
       "file": "docs/adr/0185-de-regelkalender-als-tweeling-van-de-fiscale-wijzigingslog.md"
+    },
+    {
+      "id": "0186-model-per-ai-feature",
+      "title": "Model per AI-feature, effort standaard laag, prompt-caching op de duiding",
+      "status": "aanvaard",
+      "date": "2026-09-29",
+      "elements": [
+        "t-aigateway",
+        "as-nieuws"
+      ],
+      "summary": "Tot nu toe kende de app één globaal Anthropic-model (`ai_model_anthropic` = Sonnet 4.5) voor élke feature. De meting over 14 dagen (tot 29 sep 2026): de nieuws-cron (`nieuws_duiding` + `nieuws_ingest`) droeg ≈ $15 van de ≈ $16. Twee derde daarvan was input van de duiding: ≈ 10.00",
+      "file": "docs/adr/0186-model-per-ai-feature.md"
     }
   ],
   "churn": {
@@ -19024,7 +19032,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 66
+        "commits": 67
       },
       {
         "path": "app/(app)/toekomst",
@@ -19072,8 +19080,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3894,
-        "commits": 22
+        "loc": 3941,
+        "commits": 23
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -20306,24 +20314,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-27",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/admin/krant-weekmeting"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+2"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-09-29",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
