@@ -24,6 +24,7 @@ function week(over: Partial<WeekMeting> = {}): WeekMeting {
     kopNietVanBron: 0,
     metModeltekst: 0,
     metThema: 5,
+    handmatig: 0,
     teruggetrokken: { 'fout-getal': 0, 'verkeerde-doelgroep': 0, 'verkeerd-mechanisme': 0, anders: 0 },
     teruggetrokkenTotaal: 0,
     foutGetalRekenend: 0,

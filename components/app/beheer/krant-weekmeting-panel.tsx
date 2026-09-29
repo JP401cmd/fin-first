@@ -230,6 +230,12 @@ function WeekDetail({ regel }: { regel: WeekmetingReeksRegel }) {
         Tekstpoort: G1 {r.poort.g1} · G2 {r.poort.g2} · G3 {r.poort.g3} · G4 {r.poort.g4} · G5 {r.poort.g5} · G6{' '}
         {r.poort.g6} ({r.poort.groen} groen, {r.poort.gedegradeerd} gedegradeerd)
       </p>
+      {(r.artikelen.handmatig ?? 0) > 0 && (
+        <p>
+          Handmatig geduid (inhaalslag): {r.artikelen.handmatig} van {r.artikelen.geduid} — telt mee in de dekking,
+          maar is geen meting van het productiemodel.
+        </p>
+      )}
       <div>
         <h4 className="mb-1 font-semibold text-[var(--ink-2)]">
           Lege edities {r.editieWeek}: {r.verversingen.leeg} van {r.verversingen.edities}

@@ -245,3 +245,42 @@ weekcron. De security-run wees op het restrisico: dezelfde verdeling staat ook i
 en twee correct onderdrukte tabellen over een net iets andere populatie (een herhaalde run in dezelfde
 week) kunnen samen de cel van het verschil prijsgeven. De eigenaar heeft dat risico aanvaard; bij een
 groeiende lezerspopulatie opnieuw wegen.
+
+## Aanvulling 29 sep 2026 — handmatige inhaalslag vanuit een Claude-sessie
+
+Na een `DUIDING_VERSIE`-bump staat een hele week weer op `wacht`, en de cron duidt nieuwste eerst, hoogstens
+60 per run. Een afgesloten week komt dan dagen later aan de beurt (29 sep: 106 van 107 W39-artikelen).
+
+**Besluit.** Een Claude-sessie mag de achterstand inhalen, met `scripts/krant/duiding-inhaalslag.ts` en de
+skill `duiding-inhaalslag`. Er komt geen tweede duidingspad: de cron (`duidEen`) en het script delen
+`bereidDuidingVoor` (grondslag, meta, controlebron) en `schrijfDuidingUitkomst` (update geconditioneerd op
+een wachtende status). De sessie krijgt exact de prompt van de cron. Haar uitvoer gaat door dezelfde
+zod-parse en dezelfde `controleerDuiding`, tegen de actuele rij en alleen als de grondslag-hash nog klopt.
+
+- **Alleen geduid wordt geschreven.** Een afwijzing laat de rij op `wacht`: een handmatige vergissing mag
+  een artikel niet definitief afwijzen.
+- **Herkenbaar.** `meta.model = claude-code-handmatig`.
+- **Standaard alleen lezen.** Schrijven vraagt `--schrijf --ja` en het akkoord van de eigenaar. De
+  service-sleutel komt uit `.env.local` en wordt niet gelogd. Uitvoerbestanden staan standaard buiten de
+  repo (`os.tmpdir()`), want ze bevatten brontekst van derden.
+- **Dezelfde poort als productie.** Schrijven weigert tenzij `lib/krant` schoon is en HEAD in
+  `origin/master` zit, en tenzij de `DUIDING_VERSIE` van de batch gelijk is aan die van de code. Anders
+  zou een lokaal versoepelde controle of een hogere versie ongemerkt naar productie gaan. De commit staat
+  in het rapport.
+- **Noodstop.** Staat de AI-noodstop van het platform uit, dan weigert het schrijven.
+- **Onbetrouwbare brontekst.** De fragmenten zijn tekst van derden en kunnen instructies bevatten. Anders
+  dan de cron (een `generateObject` zonder tools) leest hier een sessie mét tools. Daarom schrijft
+  alleen de agent `duiding-schrijver` de duidingen: die heeft uitsluitend Read en Write, geen Bash, geen
+  MCP en geen web.
+- **Meting.** Een handmatige duiding is geen modelmeting. De weekmeting telt ze apart (`handmatig`) en
+  zet een waarschuwing `handmatig-geduid`. Een ingehaalde week meet dus de sessie plus de poort, niet het
+  productiemodel, en is voor de K1-poort geen bewijs van modelkwaliteit.
+- **Waarom alleen de duiding.** Inventaris van 29 sep: van de negen crons gebruikt alleen
+  `/api/news-ingest/cron` AI, op drie plekken. De linkkeuze op lijstpagina's gebeurt tijdens het ophalen,
+  met een vaste terugval, en houdt niets vast. Bij de categorisatie wordt een uitgesteld item niet
+  opgeslagen, maar een mislukte categorisatie wél: de rij komt met `category = null` in de tabel, zonder
+  herkansing (29 sep: 2 van 242 rijen). Die rijen zijn bewust niet in deze inhaalslag opgenomen. Het gaat
+  om weinig rijen, en de rubriek is alleen een hint in de duidingsprompt ("Rubriek: onbekend"). Groeit het
+  aantal, dan krijgt het een eigen verbeterkaart.
+- **Grens.** Structureel duiden blijft de cron, met token-logging, noodstop en meldlaag. De inhaalslag is
+  een uitzondering bij een achterstand, geen vervanging.

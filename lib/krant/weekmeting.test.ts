@@ -30,6 +30,7 @@ function week(overrides: Partial<WeekMeting> = {}): WeekMeting {
     kopNietVanBron: 0,
     metModeltekst: 0,
     metThema: 4,
+    handmatig: 0,
     teruggetrokken: { 'fout-getal': 0, 'verkeerde-doelgroep': 0, 'verkeerd-mechanisme': 0, anders: 0 },
     teruggetrokkenTotaal: 0,
     foutGetalRekenend: 0,
@@ -215,6 +216,13 @@ describe('waarschuwingen (drempels)', () => {
     expect(isVoorlopig({ binnen: 100, wacht: 10 })).toBe(false)
     expect(isVoorlopig({ binnen: 100, wacht: 11 })).toBe(true)
     expect(isVoorlopig({ binnen: 0, wacht: 0 })).toBe(false)
+  })
+
+  it('handmatig geduide artikelen zijn zichtbaar: telling + waarschuwing (geen modelmeting, ADR 0171)', () => {
+    const r = bouwWeekmeting(invoer({ duiding: week({ handmatig: 3, poort: { groen: 8, gedegradeerd: 0, perReden: {} } }) }))
+    expect(r.artikelen.handmatig).toBe(3)
+    expect(r.waarschuwingen.map((w) => w.code)).toEqual(['handmatig-geduid'])
+    expect(r.waarschuwingen[0].tekst).toContain('3 van 8')
   })
 
   it('een schone, volledig geduide week geeft geen waarschuwing', () => {

@@ -379,9 +379,72 @@ export async function herstelParameterOmhulsel({ text }: { text: string }): Prom
   return veranderd && Object.keys(schoon).length > 0 ? JSON.stringify(schoon) : null
 }
 
-// ── Runner ───────────────────────────────────────────────────────────────────
+// ── Voorbereiding en schrijven (gedeeld met de handmatige inhaalslag) ────────
+//
+// De cron (`duidEen`) en `scripts/krant/duiding-inhaalslag.ts` delen deze
+// helpers. Alleen de BRON van de modeluitvoer verschilt: `generateObject` of
+// een duiding die een Claude-sessie handmatig schreef. Grondslag, meta,
+// controles en de geconditioneerde schrijfactie zijn dus letterlijk dezelfde
+// code — een handmatige duiding kan de poort niet omzeilen.
 
-const WACHTENDE_STATUSSEN = ['wacht', 'mislukt'] as const
+export const WACHTENDE_STATUSSEN = ['wacht', 'mislukt'] as const
+
+export interface DuidingVoorbereiding {
+  /** De grondslagtekst (eigen kop + fragment), exact zoals de controles hem zien. */
+  tekst: string
+  meta: DuidingMetaZonderPoort
+  controleBron: ControleBron
+}
+
+/**
+ * Grondslag, meta en controlebron voor één artikel. Null als het artikel
+ * geen eigen grondslag heeft (kop én fragment leeg) — dan valt er niets te
+ * duiden en blijft de rij 'wacht'.
+ */
+export function bereidDuidingVoor(artikel: WachtendArtikel, modelId: string): DuidingVoorbereiding | null {
+  const grondslag = bepaalGrondslag(artikel)
+  if (!grondslag) return null
+  const { tekst, soort } = grondslag
+  // De grondslagTEKST zelf staat al in `news_articles.bron_fragment`; we
+  // bewaren alleen haar vingerafdruk, zodat achteraf na te lopen is of een
+  // duiding bij de huidige kolominhoud hoort (keuze 4: geen tweede kopie).
+  return {
+    tekst,
+    meta: {
+      grondslag: soort,
+      grondslagSha256: createHash('sha256').update(tekst, 'utf8').digest('hex'),
+      tekens: tekst.length,
+      model: modelId,
+      kopBron: 'bron',
+      modeltekst: false,
+    },
+    controleBron: { tekst, published_at: artikel.published_at, published_bron: artikel.published_bron },
+  }
+}
+
+/**
+ * Schrijf de uitkomst van één duiding, geconditioneerd op `id` + een wachtende
+ * status. Een schrijffout werpt; `false` betekent dat een parallelle run (de
+ * cron, of een tweede inhaalslag) deze rij al afhandelde.
+ */
+export async function schrijfDuidingUitkomst(
+  supabase: SupabaseClient,
+  artikelId: string,
+  velden: Record<string, unknown>,
+  pogingen: number,
+  now: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('news_articles')
+    .update({ ...velden, duiding_pogingen: pogingen, geduid_at: now })
+    .eq('id', artikelId)
+    .in('duiding_status', [...WACHTENDE_STATUSSEN])
+    .select('id')
+  if (error) throw error
+  return (data?.length ?? 0) > 0
+}
+
+// ── Runner ───────────────────────────────────────────────────────────────────
 
 async function duidEen(
   supabase: SupabaseClient,
@@ -399,42 +462,17 @@ async function duidEen(
    * schrijffout werpt (de werker telt 'mislukt'); nul geraakte rijen betekent
    * dat een parallelle run deze rij al afhandelde — dan telt hij hier niet.
    */
-  const schrijf = async (
+  const schrijf = (
     velden: Record<string, unknown>,
     /** Alleen de providerstoring wijkt af: die laat de teller staan (`isProviderStoring`). */
     opts: { pogingen?: number } = {},
-  ): Promise<boolean> => {
-    const { data, error } = await supabase
-      .from('news_articles')
-      .update({ ...velden, duiding_pogingen: opts.pogingen ?? pogingen, geduid_at: now })
-      .eq('id', artikel.id)
-      .in('duiding_status', [...WACHTENDE_STATUSSEN])
-      .select('id')
-    if (error) throw error
-    return (data?.length ?? 0) > 0
-  }
+  ): Promise<boolean> => schrijfDuidingUitkomst(supabase, artikel.id, velden, opts.pogingen ?? pogingen, now)
   const uitkomstVan = (geschreven: boolean, anders: 'geduid' | 'afgewezen' | 'mislukt') =>
     geschreven ? anders : 'overgeslagen'
 
-  const grondslag = bepaalGrondslag(artikel)
-  if (!grondslag) return 'overgeslagen'
-  const { tekst, soort } = grondslag
-  // De grondslagTEKST zelf staat al in `news_articles.bron_fragment`; we
-  // bewaren alleen haar vingerafdruk, zodat achteraf na te lopen is of een
-  // duiding bij de huidige kolominhoud hoort (keuze 4: geen tweede kopie).
-  const meta: DuidingMetaZonderPoort = {
-    grondslag: soort,
-    grondslagSha256: createHash('sha256').update(tekst, 'utf8').digest('hex'),
-    tekens: tekst.length,
-    model: modelId,
-    kopBron: 'bron',
-    modeltekst: false,
-  }
-  const controleBron: ControleBron = {
-    tekst,
-    published_at: artikel.published_at,
-    published_bron: artikel.published_bron,
-  }
+  const voorbereiding = bereidDuidingVoor(artikel, modelId)
+  if (!voorbereiding) return 'overgeslagen'
+  const { tekst, meta, controleBron } = voorbereiding
 
   let uitvoer: unknown
   try {

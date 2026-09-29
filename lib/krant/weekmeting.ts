@@ -207,6 +207,8 @@ export interface WeekmetingRecord {
     metMechanisme: number
     rekenend: number
     metThema: number
+    /** Door een handmatige inhaalslag geduid — geen meting van het productiemodel. Optioneel voor oude records. */
+    handmatig?: number
     metSamenvatting: number
     /** metSamenvatting / geduid (0–1), of null bij 0 geduid. */
     aandeelSamenvatting: number | null
@@ -307,6 +309,13 @@ export function bepaalWaarschuwingen(r: Omit<WeekmetingRecord, 'waarschuwingen'>
     })
   }
   if (r.artikelen.binnen === 0) uit.push({ code: 'geen-artikelen', tekst: 'Geen enkel artikel binnengekomen deze week' })
+  const handmatig = r.artikelen.handmatig ?? 0
+  if (handmatig > 0) {
+    uit.push({
+      code: 'handmatig-geduid',
+      tekst: `${handmatig} van ${r.artikelen.geduid} duidingen komen uit een handmatige inhaalslag: geen meting van het productiemodel`,
+    })
+  }
   if (r.verversingen.onvolledig) {
     uit.push({ code: 'editierun-onvolledig', tekst: 'De editierun liep niet volledig: de lege edities zijn een ondergrens' })
   }
@@ -401,6 +410,7 @@ export function bouwWeekmeting(inv: WeekmetingInvoer): WeekmetingRecord {
       metMechanisme: w?.metMechanisme ?? 0,
       rekenend: w?.rekenend ?? 0,
       metThema: w?.metThema ?? 0,
+      handmatig: w?.handmatig ?? 0,
       metSamenvatting,
       aandeelSamenvatting: aandeel(metSamenvatting, geduid),
       aandeelThema: aandeel(w?.metThema ?? 0, geduid),
