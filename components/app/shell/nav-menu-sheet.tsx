@@ -7,16 +7,14 @@ import { ChevronDown, RotateCw } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { TapTarget } from '@/components/editorial/tap-target'
 import {
-  mainNav,
-  navGroups,
-  menuNav,
-  globalNav,
   isMenuEntryActive,
   SIMPLE_HIDDEN_NAV_HREFS,
   type MenuEntry,
   type NavColor,
   type NavItem,
+  type NavSurface,
 } from '@/lib/nav-config'
+import { useNavSurface } from '@/lib/hooks/use-nav-surface'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import {
   useLeverScores,
@@ -30,11 +28,13 @@ import { usePlanStatus } from '@/components/app/plan-status-provider'
  * De takken van de sheet: het platte menu (Home, de vier hefbomen, De
  * toekomst) plus Mijn. Mijn staat op desktop in de zijbalk-footer; op mobiel
  * is deze sheet de enige plek voor zijn onderdelen, dus hij hangt er onder.
+ *
+ * Beide komen uit `useNavSurface()` (Krant 2B): voor een Krant-account is het
+ * menu leeg en wijst Mijn naar /mijn/account — zie `navSurfaceFor`.
  */
-const SHEET_ENTRIES: MenuEntry[] = [
-  ...menuNav,
-  { ...mainNav[2]!, icon: mainNav[2]!.icon!, children: navGroups[2]!.items },
-]
+function sheetEntries(nav: NavSurface): MenuEntry[] {
+  return [...nav.menu, nav.mijn]
+}
 
 const statusDotClass: Record<LeverStatus, string> = {
   green: 'bg-emerald-500',
@@ -103,6 +103,7 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   // onthouden — en de begintoestand is al afgestemd op de weergavemodus.
   const [branchOverride, setBranchOverride] = useState<Record<string, boolean>>({})
   const planStatus = usePlanStatus()
+  const nav = useNavSurface()
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
@@ -144,7 +145,7 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
           sheet zit) de laatste "Overal beschikbaar"-knoppen niet bedekt. */}
       <div className="space-y-5 pb-24">
         {/* Hoofdpagina's + hun sub-routes als één gestapelde lijst */}
-        {SHEET_ENTRIES.map((item) => {
+        {sheetEntries(nav).map((item) => {
           const Icon = item.icon
           const active = isMenuEntryActive(pathname, item.href)
           const c = colorClasses[item.color]
@@ -290,7 +291,7 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
             Overal beschikbaar
           </h3>
           <div className="grid grid-cols-2 gap-1.5">
-            {globalNav.map((item) => {
+            {nav.globalNav.map((item) => {
               const Icon = item.icon
               if (item.href) {
                 const active = isActive(item.href)

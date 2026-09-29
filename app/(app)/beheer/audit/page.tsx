@@ -15,6 +15,7 @@ interface AdminAction {
 const ACTION_LABELS: Record<string, string> = {
   'subscription.update': 'Abonnement gewijzigd',
   'user.role': 'Rol gewijzigd',
+  'user.product': 'Product gewijzigd',
   'user.block': 'Account geblokkeerd',
   'user.unblock': 'Account gedeblokkeerd',
   'config.update': 'Configuratie gewijzigd',

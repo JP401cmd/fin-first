@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
@@ -44,6 +45,13 @@ import { parsePlatformStatus } from '@/lib/platform-status'
 import { CommandPaletteProvider } from '@/components/command-palette/command-palette-provider'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { resolveActiveModules } from '@/lib/modules/resolve'
+import {
+  PATHNAME_HEADER,
+  isKrantAccount,
+  krantRedirect,
+  shouldMountFin,
+} from '@/lib/modules/krant-grens'
+import { KrantRouteGuard } from '@/components/app/shell/krant-route-guard'
 import { getActiveAppKeys } from '@/lib/category-deepening-keys'
 import {
   buildCategoryAppLinks,
@@ -382,6 +390,30 @@ export default async function AppLayout({
   // App-zichtbaarheid binnen een module volgt los hiervan de tracking-flags op
   // assets/debts (zie `sidebarActiveAppKeys` hieronder).
   const activeModules = resolveActiveModules(profile)
+  const isSuperadmin = profile?.role === 'superadmin'
+
+  // ── Krant-grens (Krant 2B) ──────────────────────────────
+  // Een Krant-account (alleen 'nieuws') ziet alleen de routes uit
+  // `lib/modules/krant-grens.ts`; al het andere gaat server-side naar /nieuws.
+  // De layout kent zijn pad niet: de proxy geeft het mee als request-header.
+  // Voor elk ander account draait dit blok niet eens (ook geen headers()-read).
+  //
+  // Dit dekt de harde laadbeurt en router.refresh(). Bij een client-navigatie
+  // rendert Next deze gedeelde layout niet opnieuw (Partial Rendering); daar
+  // bewaakt `KrantRouteGuard` rond `children` dezelfde grens met dezelfde
+  // beslisfunctie.
+  if (isKrantAccount(activeModules)) {
+    const krantTarget = krantRedirect(
+      (await headers()).get(PATHNAME_HEADER),
+      activeModules,
+      isSuperadmin,
+    )
+    if (krantTarget) redirect(krantTarget)
+  }
+  // Fin (companion, chatpaneel, "Vraag Fin", AI-keuze) niet voor een
+  // Krant-account (besluit B11). Voor elk ander account: `true`, dus exact de
+  // mounts van vóór Krant 2B.
+  const finEnabled = shouldMountFin(activeModules)
   const coachHasTransactionsModule = activeModules.includes('budgetteren')
   const coachHasHoldingsModule = activeModules.includes('aandelenregistratie')
   const coachHasFireModule = activeModules.includes('toekomstplannen')
@@ -684,6 +716,7 @@ export default async function AppLayout({
                 er nog niet is (migratie niet uitgerold) — nooit een 500, zelfde
                 defensieve lijn als /api/ai-execution-prefs bij foutcode 42703. */}
             <ChatProvider
+              finEnabled={finEnabled}
               userId={user.id}
               initialChatHistoryMode={
                 profile?.chat_history_mode === 'apparaat' || profile?.chat_history_mode === 'uit'
@@ -759,7 +792,9 @@ export default async function AppLayout({
                                   Rendert niets tot de server een kandidaat
                                   aanwijst én het ~2,5 s stil is; op /beheer en
                                   in immersieve taakflows zwijgt hij helemaal. */}
-                              <VragenlijstUitnodiging />
+                              {/* "Nu invullen" opent de vragenlijst in Fins chat —
+                                  zonder Fin (Krant-account) is dat een dode knop. */}
+                              {finEnabled && <VragenlijstUitnodiging />}
                               {/* Eenmalige AI-keuze (ADR 0155) voor accounts zonder
                                   vastgelegde keuze — of met een keuze voor een
                                   oudere versie van de feiten (AI_CONSENT_VERSION
@@ -771,6 +806,8 @@ export default async function AppLayout({
                                   waarvan de POST óók zou falen. */}
                               <AiConsentInterstitial
                                 open={
+                                  // De Krant kent geen AI (B11): nooit de AI-keuze voorleggen.
+                                  finEnabled &&
                                   profile != null &&
                                   // ADR 0157: alleen wie AI al hééft wordt
                                   // gevraagd; de rest krijgt de privacy pas
@@ -781,7 +818,11 @@ export default async function AppLayout({
                                     profile.ai_consent_version !== AI_CONSENT_VERSION)
                                 }
                               />
-                              {children}
+                              {/* Client-kant van de Krant-grens: vangt de
+                                  client-navigatie op waarbij deze layout niet
+                                  opnieuw rendert. Voor elk niet-Krant-account een
+                                  doorgeefluik. */}
+                              <KrantRouteGuard isSuperadmin={isSuperadmin}>{children}</KrantRouteGuard>
                             </ResponsiveShell>
                           </PlanStatusProvider>
                           </CashflowStatusProvider>
@@ -791,11 +832,13 @@ export default async function AppLayout({
                             (hasAi-gate). Buiten de provider valt useFeatureAccess
                             terug op subscriptions:[] → hasAi=false → elke
                             AI-abonnee ziet de upsell i.p.v. de chat. */}
-                        <ChatPanelLazy />
+                        {finEnabled && <ChatPanelLazy />}
                       </FeatureAccessProvider>
-                      <Suspense fallback={null}>
-                        <ChatPromptDeeplink />
-                      </Suspense>
+                      {finEnabled && (
+                        <Suspense fallback={null}>
+                          <ChatPromptDeeplink />
+                        </Suspense>
+                      )}
                       {/* Bezoekregister voor de welkomstgids (leest niets,
                           schrijft hooguit één keer per slug per sessie). Eigen
                           Suspense-grens vanwege useSearchParams. */}
@@ -807,6 +850,10 @@ export default async function AppLayout({
                       <Suspense fallback={null}>
                         <ActivityModuleTracker />
                       </Suspense>
+                      {/* Fins companion (.willhome + de bubbel in de nav-pill).
+                          Niet voor een Krant-account (B11): het Fin-slot in de
+                          pill blijft dan leeg en verbergt zichzelf. */}
+                      {finEnabled && (
                       <Suspense fallback={null}>
                         <FinHome
                           coachState={coachState}
@@ -820,11 +867,14 @@ export default async function AppLayout({
                           headerLabel={coachConfig.headerLabel}
                         />
                       </Suspense>
+                      )}
                     </div>
                   </WelcomeGuideProvider>
                   </FinSlotProvider>
                 </ModuleColorProvider>
-                <NotificationModal />
+                {/* Buiten de FeatureAccessProvider: de moduleset gaat als prop mee
+                    voor de footer-links binnen de Krant-grens (Krant 2B). */}
+                <NotificationModal activeModules={activeModules} />
                 {/* ADR 0158 — de eerste ophaal na de onboarding. Rendert niets;
                     moet binnen GlobalSyncProvider hangen omdat hij dezelfde
                     ronde start als de syncknop. */}

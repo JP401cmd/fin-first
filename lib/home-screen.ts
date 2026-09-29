@@ -10,8 +10,19 @@
  * SINGLE SOURCE OF TRUTH voor de waarden en de bijbehorende routes. Consumers:
  *  - `lib/supabase/proxy.ts` (edge middleware) — daarom is dit bewust een PURE
  *    module: géén React, géén 'use client', géén Node-API's.
- *  - `app/api/home-screen/route.ts` (zod-enum uit HOME_SCREEN_VALUES)
+ *  - `app/api/home-screen/route.ts` (zod-enum uit HOME_SCREEN_PICKABLE)
+ *  - `app/api/modules/route.ts` (schrijft 'nieuws' bij de productkeuze Krant)
  *  - `lib/hooks/use-home-screen.tsx` (client-provider, geseed uit de layout)
+ *  - `components/mijn/home-screen-picker.tsx` (toont alleen PICKABLE)
+ *  - `lib/beheer/gebruik-analyse/schema.ts` (fail-closed zod op de verdeling)
+ *
+ * TWEE LIJSTEN (Krant 2A fase 2, ADR 0184):
+ *  - `HOME_SCREEN_VALUES` — alles wat de kolom mag bevatten (spiegel van de
+ *    CHECK `profiles_home_screen_check`, migratie 20261006120000). Gebruik
+ *    deze voor LEZEN en valideren van opgeslagen waarden.
+ *  - `HOME_SCREEN_PICKABLE` — wat een gebruiker zelf mag kiezen. 'nieuws' zit
+ *    daar bewust niet in: die zet alleen de server bij de productkeuze Krant.
+ *    Gebruik deze voor elk schrijfpad vanuit de client en elke keuzelijst.
  */
 
 import {
@@ -20,20 +31,32 @@ import {
   type ActiveModulesRow,
 } from '@/lib/modules/resolve'
 
-export const HOME_SCREEN_VALUES = ['overzicht', 'budget'] as const
+/** Alle persisteerbare waarden — spiegel van de CHECK op profiles.home_screen. */
+export const HOME_SCREEN_VALUES = ['overzicht', 'budget', 'nieuws'] as const
 
 export type HomeScreen = (typeof HOME_SCREEN_VALUES)[number]
+
+/**
+ * De waarden die een gebruiker zelf kiest (picker, ⌘K, PUT /api/home-screen).
+ * 'nieuws' ontbreekt bewust: een Geheel-gebruiker kan de Krant niet als
+ * startscherm kiezen — de Krant is een product (PUT /api/modules), geen scherm.
+ */
+export const HOME_SCREEN_PICKABLE = ['overzicht', 'budget'] as const satisfies readonly HomeScreen[]
+
+export type PickableHomeScreen = (typeof HOME_SCREEN_PICKABLE)[number]
 
 export const DEFAULT_HOME_SCREEN: HomeScreen = 'overzicht'
 
 /**
- * Route per keuze. 'budget' wijst naar de canonieke Budgetteren-pagina
+ * Route per waarde. 'budget' wijst naar de canonieke Budgetteren-pagina
  * (label "Budgetteren", OVERVIEW_APP_SUBROUTES in lib/nav-config.ts) — niet
- * naar de legacy /core/budgets-alias.
+ * naar de legacy /core/budgets-alias. 'nieuws' is de Krant-home, dezelfde
+ * route als `NEWS_ONLY_HOME_HREF`.
  */
 export const HOME_SCREEN_HREFS: Record<HomeScreen, string> = {
   overzicht: '/overzicht',
   budget: '/overzicht/budget',
+  nieuws: '/nieuws',
 }
 
 export function isHomeScreen(value: unknown): value is HomeScreen {
@@ -55,7 +78,7 @@ export function homeHrefFor(value: unknown): string {
 }
 
 /** Home van een account met alleen de module 'nieuws' (de Krant). */
-export const NEWS_ONLY_HOME_HREF = '/nieuws'
+export const NEWS_ONLY_HOME_HREF = HOME_SCREEN_HREFS.nieuws
 
 /**
  * Home-route uit de profielrij: de productgrens wint van de voorkeur.

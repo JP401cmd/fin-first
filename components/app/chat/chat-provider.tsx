@@ -87,6 +87,14 @@ type ChatContextType = {
    * tweede definitie van "heeft deze gebruiker schulden".
    */
   dataGaps: CoachDataGaps | null
+  /**
+   * Is Fin in deze shell gemount? `false` voor een Krant-account (besluit B11,
+   * `shouldMountFin` in lib/modules/krant-grens.ts): dan is er geen chatpaneel,
+   * gaat de chat nooit open en verbergen de "Vraag Fin"-ingangen zich. Default
+   * `true` — elk ander account en elke render buiten de layout zien exact het
+   * gedrag van vóór Krant 2B.
+   */
+  finEnabled: boolean
 }
 
 const ChatContext = createContext<ChatContextType | null>(null)
@@ -113,8 +121,11 @@ export function ChatProvider({
   userId = null,
   initialChatHistoryMode = 'account',
   dataGaps = null,
+  finEnabled = true,
 }: {
   children: ReactNode
+  /** Zie `ChatContextType.finEnabled`. */
+  finEnabled?: boolean
   userId?: string | null
   /**
    * Server-geseed uit `profiles.chat_history_mode`. Default `'account'` — óók
@@ -124,7 +135,22 @@ export function ChatProvider({
   initialChatHistoryMode?: ChatHistoryMode
   dataGaps?: CoachDataGaps | null
 }) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpenState, setIsOpen] = useState(false)
+  // Zonder Fin gaat de chat nooit open — ook niet via een vastgepinde stand uit
+  // localStorage of een "Vraag Fin" van een oppervlak dat zich niet verborg.
+  // Afgeleid i.p.v. elke setter te gaten: één regel, en voor `finEnabled`
+  // = true is dit exact `isOpenState`.
+  const isOpen = finEnabled && isOpenState
+  // Productwissel zonder harde reload (Krant → Geheel): terwijl Fin uit stond kan
+  // `isOpenState` op `true` zijn blijven staan — een vastgepinde stand uit
+  // localStorage, of een setter die zelf niet gate. Zonder deze reset zou de
+  // chat bij de wissel ongevraagd openspringen. Staat-aanpassing tijdens de
+  // render (React-patroon "vorige waarde onthouden"), niet in een effect.
+  const [finEnabledFrom, setFinEnabledFrom] = useState(finEnabled)
+  if (finEnabledFrom !== finEnabled) {
+    setFinEnabledFrom(finEnabled)
+    if (finEnabled) setIsOpen(false)
+  }
   const [chatHistoryMode, setChatHistoryModeState] = useState<ChatHistoryMode>(initialChatHistoryMode)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [isPinned, setIsPinnedState] = useState(false)
@@ -184,10 +210,12 @@ export function ChatProvider({
   const pendingAnsweredRef = useRef<(() => void) | null>(null)
 
   const openWithMessage = useCallback((message: string, onAnswered?: () => void) => {
+    // Geen Fin: geen wachtende vraag die later alsnog ergens landt.
+    if (!finEnabled) return
     pendingAnsweredRef.current = onAnswered ?? null
     setPendingMessage(message)
     setIsOpen(true)
-  }, [])
+  }, [finEnabled])
 
   const clearPendingMessage = useCallback(() => {
     setPendingMessage(null)
@@ -258,7 +286,7 @@ export function ChatProvider({
       openMelding, meldingRequested, clearMeldingRequest,
       openGids, gidsRequested, clearGidsRequest,
       openVragenlijst, vragenlijstRequested, clearVragenlijstRequest,
-      userId, chatHistoryMode, setChatHistoryMode, dataGaps,
+      userId, chatHistoryMode, setChatHistoryMode, dataGaps, finEnabled,
     }}>
       {children}
     </ChatContext.Provider>

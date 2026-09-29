@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { ALL_MODULES } from '@/lib/module-registry'
-import { isNewsOnly, resolveActiveModules } from './resolve'
+import { ALL_MODULES, validateModules } from '@/lib/module-registry'
+import { HOME_SCREEN_VALUES, resolveHomeHref } from '@/lib/home-screen'
+import { PRODUCTS, PRODUCT_PRESETS, isNewsOnly, resolveActiveModules } from './resolve'
 
 describe('resolveActiveModules — bestaande profielen (poort K1: gedragsneutraal)', () => {
   // Productie 21 sep 2026: 26 × alle zes, 3 × null. Vóór Krant 2A las de
@@ -62,5 +63,46 @@ describe('isNewsOnly', () => {
     expect(isNewsOnly(['budgetteren', 'nieuws'])).toBe(false)
     expect(isNewsOnly(ALL_MODULES)).toBe(false)
     expect(isNewsOnly([])).toBe(false)
+  })
+})
+
+describe('PRODUCT_PRESETS (Krant 2A fase 2, ADR 0184)', () => {
+  it('precies twee producten: krant en geheel', () => {
+    expect([...PRODUCTS]).toEqual(['krant', 'geheel'])
+    expect(Object.keys(PRODUCT_PRESETS).sort()).toEqual([...PRODUCTS].sort())
+  })
+
+  it("krant = alleen 'nieuws', home 'nieuws'", () => {
+    expect(PRODUCT_PRESETS.krant).toEqual({ modules: ['nieuws'], homeScreen: 'nieuws' })
+  })
+
+  it("geheel = alle modules in catalogusvolgorde, home 'overzicht'", () => {
+    expect(PRODUCT_PRESETS.geheel).toEqual({ modules: ALL_MODULES, homeScreen: 'overzicht' })
+    expect(PRODUCT_PRESETS.geheel.modules).not.toBe(ALL_MODULES)
+  })
+
+  it.each(PRODUCTS)('%s: de moduleset is geldig en overleeft een round-trip door de lezer', (p) => {
+    const { modules, homeScreen } = PRODUCT_PRESETS[p]
+    expect(validateModules([...modules]).valid).toBe(true)
+    // Wat de route schrijft, leest de shell exact zo terug (catalogusvolgorde, geen fail-open).
+    expect(resolveActiveModules({ active_modules: [...modules] })).toEqual([...modules])
+    expect(HOME_SCREEN_VALUES).toContain(homeScreen)
+  })
+
+  it('de preset-home klopt met de productgrens van resolveHomeHref', () => {
+    expect(isNewsOnly(resolveActiveModules({ active_modules: [...PRODUCT_PRESETS.krant.modules] }))).toBe(true)
+    expect(isNewsOnly(resolveActiveModules({ active_modules: [...PRODUCT_PRESETS.geheel.modules] }))).toBe(false)
+    const row = (p: 'krant' | 'geheel') => ({
+      active_modules: [...PRODUCT_PRESETS[p].modules],
+      home_screen: PRODUCT_PRESETS[p].homeScreen,
+    })
+    expect(resolveHomeHref(row('krant'))).toBe('/nieuws')
+    expect(resolveHomeHref(row('geheel'))).toBe('/overzicht')
+  })
+
+  it('is bevroren — een consument kan de preset niet muteren', () => {
+    expect(Object.isFrozen(PRODUCT_PRESETS)).toBe(true)
+    expect(Object.isFrozen(PRODUCT_PRESETS.krant.modules)).toBe(true)
+    expect(Object.isFrozen(PRODUCT_PRESETS.geheel.modules)).toBe(true)
   })
 })

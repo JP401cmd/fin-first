@@ -37,7 +37,7 @@ type Props = {
  * verdwijnen.
  */
 export function NotificationBundle({ bundle, onRead, onClose, density = 'ruim', paddingClass = 'px-5' }: Props) {
-  const { openWithMessage } = useChatContext()
+  const { openWithMessage, finEnabled } = useChatContext()
   const [expanded, setExpanded] = useState(bundle.hasUrgent)
 
   const handleAskAI = useCallback(
@@ -84,6 +84,9 @@ export function NotificationBundle({ bundle, onRead, onClose, density = 'ruim', 
 
       {/* Eén chat-vraag over de hele groep, in plaats van één knop per melding
           — dat was precies de stapeling die de bundel oplost. */}
+      {/* Niet zonder Fin (Krant-account, B11) — `!== false`: een context
+          zonder de vlag is het gedrag van vóór Krant 2B. */}
+      {finEnabled !== false && (
       <div className={`${paddingClass} pb-3`}>
         <button
           type="button"
@@ -94,6 +97,7 @@ export function NotificationBundle({ bundle, onRead, onClose, density = 'ruim', 
           Vraag Fin over deze {count}
         </button>
       </div>
+      )}
 
       {expanded && (
         <div>

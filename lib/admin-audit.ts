@@ -4,6 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export type AdminActionName =
   | 'subscription.update'
   | 'user.role'
+  // Krant 2D fase 1 (B12): beheer zet een account om naar Krant of Geheel. Wist niets.
+  | 'user.product'
   | 'user.block'
   | 'user.unblock'
   | 'user.activity'

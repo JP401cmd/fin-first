@@ -65,8 +65,13 @@ export function DangerZone({ currentEmail }: { currentEmail: string }) {
             <p className="text-sm text-[var(--ink-2)] leading-relaxed">
               Dit wist <span className="font-semibold text-red-700">al je data</span> uit
               TriFinity en verwijdert je account definitief. Daarna kun je niet
-              meer inloggen. Dit is <span className="font-semibold">onomkeerbaar</span> —
-              exporteer eerst je gegevens als je een back-up wilt.
+              meer inloggen. Dit is <span className="font-semibold">onomkeerbaar</span> —{' '}
+              {/* Direct naar de export: /mijn/account ligt binnen de Krant-grens,
+                  /mijn/geavanceerd (waar de exportknop staat) niet. */}
+              <a href="/api/account/export" download className="font-medium underline underline-offset-2">
+                exporteer eerst je gegevens
+              </a>{' '}
+              als je een back-up wilt.
             </p>
 
             <label

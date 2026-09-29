@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T15:39:37.086Z",
+  "generatedAt": "2026-09-29T16:39:55.825Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
@@ -189,13 +189,13 @@
     }
   },
   "stats": {
-    "routes": 136,
-    "routesProduction": 90,
-    "api": 342,
+    "routes": 137,
+    "routesProduction": 91,
+    "api": 344,
     "tables": 105,
-    "migrations": 270,
+    "migrations": 271,
     "integrations": 25,
-    "components": 1253,
+    "components": 1266,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -670,6 +670,12 @@
       "url": "/household-invite",
       "file": "app/household-invite/page.tsx",
       "group": "persoonlijk",
+      "isTest": false
+    },
+    {
+      "url": "/krant/meer",
+      "file": "app/(app)/krant/meer/page.tsx",
+      "group": "overig",
       "isTest": false
     },
     {
@@ -1486,6 +1492,12 @@
       {
         "url": "/holdings/[id]",
         "file": "app/holdings/[id]/page.tsx",
+        "group": "overig",
+        "isTest": false
+      },
+      {
+        "url": "/krant/meer",
+        "file": "app/(app)/krant/meer/page.tsx",
         "group": "overig",
         "isTest": false
       },
@@ -2338,6 +2350,14 @@
     {
       "url": "/api/admin/users/block",
       "file": "app/api/admin/users/block/route.ts",
+      "domain": "admin",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/admin/users/product",
+      "file": "app/api/admin/users/product/route.ts",
       "domain": "admin",
       "methods": [
         "POST"
@@ -3822,6 +3842,14 @@
       ]
     },
     {
+      "url": "/api/modules",
+      "file": "app/api/modules/route.ts",
+      "domain": "modules",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/monthly-checkin",
       "file": "app/api/monthly-checkin/route.ts",
       "domain": "monthly-checkin",
@@ -4729,7 +4757,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 55,
+      "count": 56,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -5173,6 +5201,14 @@
         {
           "url": "/api/admin/users/block",
           "file": "app/api/admin/users/block/route.ts",
+          "domain": "admin",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/users/product",
+          "file": "app/api/admin/users/product/route.ts",
           "domain": "admin",
           "methods": [
             "POST"
@@ -7928,6 +7964,21 @@
       ]
     },
     {
+      "domain": "modules",
+      "label": "modules",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/modules",
+          "file": "app/api/modules/route.ts",
+          "domain": "modules",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "monthly-checkin",
       "label": "monthly-checkin",
       "count": 1,
@@ -8879,7 +8930,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 270
+    "migrationCount": 271
   },
   "tablesByDomain": [
     {
@@ -9437,11 +9488,11 @@
     }
   ],
   "components": {
-    "total": 1253,
+    "total": 1266,
     "groups": [
       {
         "group": "app",
-        "count": 465,
+        "count": 472,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9611,6 +9662,7 @@
           "fin-dots",
           "fin-home",
           "fin-home.test",
+          "fin-krant.test",
           "fin-table",
           "floating-nav-button",
           "floating-nav-button.action-bar.test",
@@ -9671,7 +9723,10 @@
           "kassabon-shell",
           "koopkracht-erosie",
           "koopkracht-erosie-onttrekken",
+          "krant-grens-links.test",
           "krant-meting-panel",
+          "krant-route-guard",
+          "krant-shell.test",
           "krant-weekmeting-panel",
           "krant-weekmeting-panel.test",
           "lab-harp",
@@ -9781,6 +9836,8 @@
           "portfolio-allocation-chart",
           "postpone-form",
           "privacy-hidden-notice",
+          "product-keuze",
+          "product-keuze.test",
           "projectie-laadlaag",
           "projectie-laadlaag.test",
           "pull-refresh-indicator",
@@ -9872,6 +9929,7 @@
           "toekomst-overlay-balloons",
           "toekomst-overlay.test",
           "top-bar",
+          "top-bar.krant.test",
           "top-bar.render.test",
           "transacties-feed",
           "transacties-feed.test",
@@ -10491,12 +10549,13 @@
       },
       {
         "group": "mijn",
-        "count": 53,
+        "count": 55,
         "items": [
           "abonnement-section",
           "abonnement-section.test",
           "account-basis-section",
           "account-client",
+          "account-client.krant.test",
           "ai-credits-section",
           "ai-execution-choice",
           "ai-execution-group-list",
@@ -10533,6 +10592,7 @@
           "local-chat-panel.test",
           "local-model-section",
           "local-setup-steps",
+          "meer-trifinity-kaart",
           "mijlpalen-tijdlijn",
           "mijlpalen-tijdlijn.test",
           "mijn-overview",
@@ -10746,6 +10806,19 @@
         ]
       },
       {
+        "group": "command-palette",
+        "count": 7,
+        "items": [
+          "command-palette",
+          "command-palette-provider",
+          "command-palette.actions-grid.test",
+          "command-palette.krant.test",
+          "command-palette.overlay.test",
+          "command-palette.sync.test",
+          "command-palette.touch.test"
+        ]
+      },
+      {
         "group": "aangifte",
         "count": 6,
         "items": [
@@ -10755,18 +10828,6 @@
           "review-step",
           "upload-step",
           "upload-step.test"
-        ]
-      },
-      {
-        "group": "command-palette",
-        "count": 6,
-        "items": [
-          "command-palette",
-          "command-palette-provider",
-          "command-palette.actions-grid.test",
-          "command-palette.overlay.test",
-          "command-palette.sync.test",
-          "command-palette.touch.test"
         ]
       },
       {
@@ -10798,6 +10859,15 @@
           "cashflow-section",
           "cashflow-section.test",
           "vaste-kosten-analyse"
+        ]
+      },
+      {
+        "group": "krant",
+        "count": 3,
+        "items": [
+          "krant-meer-artikel",
+          "krant-meer-artikel.test",
+          "meer-trifinity-knop"
         ]
       },
       {
@@ -11402,6 +11472,10 @@
       "beta": [
         {
           "name": "app_settings",
+          "write": false
+        },
+        {
+          "name": "profiles",
           "write": false
         },
         {
@@ -12022,6 +12096,12 @@
           "name": "app_settings",
           "write": true
         },
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "modules": [
         {
           "name": "profiles",
           "write": true
@@ -12744,6 +12824,7 @@
             "/api/admin/tier-config",
             "/api/admin/user-delete",
             "/api/admin/users/block",
+            "/api/admin/users/product",
             "/api/admin/users/role"
           ]
         },
@@ -12904,6 +12985,14 @@
           "write": true,
           "routes": [
             "/api/module-guide/progress"
+          ]
+        },
+        {
+          "domain": "modules",
+          "label": "modules",
+          "write": true,
+          "routes": [
+            "/api/modules"
           ]
         },
         {
@@ -13108,6 +13197,14 @@
           "write": false,
           "routes": [
             "/api/bank-connect/callback"
+          ]
+        },
+        {
+          "domain": "beta",
+          "label": "beta",
+          "write": false,
+          "routes": [
+            "/api/beta/addon"
           ]
         },
         {
@@ -19138,6 +19235,21 @@
       "file": "docs/adr/0183-de-tijdlijn-van-de-krant-als-opt-in-beta.md"
     },
     {
+      "id": "0184-de-krant-als-afgesloten-product-modules-weer-leidend",
+      "title": "De Krant als afgesloten product: modules weer leidend, de keuze is een product",
+      "status": "voorgesteld",
+      "date": "2026-09-29",
+      "elements": [
+        "app-comp",
+        "fn-nieuws",
+        "as-nieuws",
+        "do-meta",
+        "t-supabase"
+      ],
+      "summary": "`profiles.active_modules` bepaalt weer wat een account is. Eén pure helper (`resolveActiveModules`) is de enige lezing van de kolom. Een account wisselt tussen twee producten, **Krant** (alleen `nieuws`) en **Geheel** (alle modules), en dat gaat uitsluitend via `PUT /api/modules`",
+      "file": "docs/adr/0184-de-krant-als-afgesloten-product-modules-weer-leidend.md"
+    },
+    {
       "id": "0185-de-regelkalender-als-tweeling-van-de-fiscale-wijzigingslog",
       "title": "De regelkalender is de machineleesbare tweeling van de fiscale wijzigingslog",
       "status": "voorgesteld",
@@ -19159,6 +19271,21 @@
       ],
       "summary": "Tot nu toe kende de app één globaal Anthropic-model (`ai_model_anthropic` = Sonnet 4.5) voor élke feature. De meting over 14 dagen (tot 29 sep 2026): de nieuws-cron (`nieuws_duiding` + `nieuws_ingest`) droeg ≈ $15 van de ≈ $16. Twee derde daarvan was input van de duiding: ≈ 10.00",
       "file": "docs/adr/0186-model-per-ai-feature.md"
+    },
+    {
+      "id": "0188-de-weg-omhoog-van-krant-naar-geheel",
+      "title": "De weg omhoog van de Krant naar het Geheel (fase 1)",
+      "status": "voorgesteld",
+      "date": "2026-09-29",
+      "elements": [
+        "app-comp",
+        "sp-nieuws",
+        "as-nieuws",
+        "do-meta",
+        "t-supabase"
+      ],
+      "summary": "Krant 2D fase 1 (besluit B12) geeft een Krant-account een ingang om zelf naar het volledige TriFinity over te stappen, en geeft beheer een ingang om het product van een account allebei de kanten op te zetten. Beide lopen over dezelfde schrijfweg als ADR 0184: er komt geen derde p",
+      "file": "docs/adr/0188-de-weg-omhoog-van-krant-naar-geheel.md"
     }
   ],
   "churn": {
@@ -19219,7 +19346,7 @@
       {
         "file": "lib/release-notes.ts",
         "loc": 3987,
-        "commits": 25
+        "commits": 26
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -20512,8 +20639,31 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-29",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Schermen",
+        "added": [
+          "/krant/meer"
+        ],
+        "removed": []
+      },
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/admin/users/product",
+          "/api/modules"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+13"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -21001,10 +21151,10 @@
     },
     {
       "date": "2026-09-29",
-      "api": 342,
-      "components": 1253,
+      "api": 344,
+      "components": 1266,
       "tables": 105,
-      "routesProduction": 90
+      "routesProduction": 91
     }
   ]
 }

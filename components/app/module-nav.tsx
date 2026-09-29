@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import type { ModuleNavConfig, DomainColor } from '@/lib/navigation'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
+import { useNavSurface } from '@/lib/hooks/use-nav-surface'
 
 const colorStyles: Record<DomainColor, { active: string; hover: string; border: string }> = {
   amber: {
@@ -51,9 +52,14 @@ export function ModuleNav({
   const pathname = usePathname()
   const styles = colorStyles[config.color]
   const { features } = useFeatureAccess()
+  // Productgrens (Krant 2B): een Krant-account ziet op /mijn alleen de tabs
+  // binnen de grens — zie navSurfaceFor. Voor elk ander account altijd waar.
+  const { isVisible } = useNavSurface()
 
   const visibleItems = config.items.filter(
-    item => !item.featureId || isFeatureAccessible(features, item.featureId)
+    item =>
+      (!item.featureId || isFeatureAccessible(features, item.featureId)) &&
+      isVisible(item.href),
   )
 
   if (hideOnBasePath && isActive(pathname, config.basePath, config.basePath)) {

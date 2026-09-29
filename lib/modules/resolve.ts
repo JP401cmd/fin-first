@@ -16,6 +16,9 @@
  */
 
 import { MODULE_CATALOG, ALL_MODULES, type ModuleId } from '@/lib/module-registry'
+// Alleen een type: lib/home-screen.ts importeert deze module runtime, dus een
+// runtime-import terug zou een cyclus zijn. `import type` wordt weggegomd.
+import type { HomeScreen } from '@/lib/home-screen'
 
 /** Minimale profielvorm: alleen de kolom die deze helper leest. */
 export interface ActiveModulesRow {
@@ -56,3 +59,39 @@ export function resolveActiveModules(
 export function isNewsOnly(modules: readonly ModuleId[]): boolean {
   return modules.length === 1 && modules[0] === 'nieuws'
 }
+
+// ── Productkeuze (Krant 2A fase 2, ADR 0184) ───────────────────────────────
+
+/**
+ * De producten waartussen een account wisselt. De keuze is een PRODUCT, geen
+ * modulelijst (keuze 2A van de eigenaar): de client stuurt `{ product }` naar
+ * `PUT /api/modules` en de server kiest de preset. Een derde ingang (bv. de
+ * Budget-ingang uit het GTM-plan) is hier later één regel.
+ */
+export const PRODUCTS = ['krant', 'geheel'] as const
+
+export type Product = (typeof PRODUCTS)[number]
+
+export interface ProductPreset {
+  /** Wat in `profiles.active_modules` komt. */
+  readonly modules: readonly ModuleId[]
+  /** Wat in `profiles.home_screen` komt (persisteerbaar, niet per se kiesbaar). */
+  readonly homeScreen: HomeScreen
+}
+
+/**
+ * Preset per product — de énige plek die zegt welke modules en welk
+ * homescherm bij een product horen.
+ *
+ * - krant  → alleen 'nieuws', home 'nieuws' (/nieuws). Opent de Krant; de
+ *   productgrens zelf (routes, Fin, AI) is Krant 2B.
+ * - geheel → alle modules in catalogusvolgorde, home 'overzicht' (de default).
+ *
+ * Bevroren kopieën: een consument die per ongeluk muteert, kan noch de preset
+ * noch de gedeelde `ALL_MODULES`-instantie vervuilen. Pure data — edge-veilig,
+ * net als de rest van deze module.
+ */
+export const PRODUCT_PRESETS: Readonly<Record<Product, ProductPreset>> = Object.freeze({
+  krant: Object.freeze({ modules: Object.freeze<ModuleId[]>(['nieuws']), homeScreen: 'nieuws' }),
+  geheel: Object.freeze({ modules: Object.freeze<ModuleId[]>([...ALL_MODULES]), homeScreen: 'overzicht' }),
+})

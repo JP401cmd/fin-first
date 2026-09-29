@@ -10,6 +10,7 @@ import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { getPageInfo } from '@/lib/page-info-content'
 import { COACH_STATE_KEY, parseCoachState } from '@/lib/coach-state'
+import { useNavSurface } from '@/lib/hooks/use-nav-surface'
 
 type PartnerNotifMode = 'all_shared' | 'threshold' | 'categories' | 'disabled'
 
@@ -83,6 +84,10 @@ function NotifToggleRow({
 export default function MijnNotificatiesPage() {
   const supabase = createClient()
   const simple = useDisplayMode().mode === 'simple'
+  // Krant 2B: een Krant-account heeft geen weekbriefing (receivesBriefing) en
+  // geen Fin (B11) — die twee schakelaars tonen we hem dus niet. De rest van de
+  // pagina (en de kopij erboven) is 2C.
+  const { isKrant } = useNavSurface()
 
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
     budget: true,
@@ -427,6 +432,7 @@ export default function MijnNotificatiesPage() {
                     enabled={anyNotifOn}
                     onToggle={toggleAllNotifPrefs}
                   />
+                  {!isKrant && (
                   <NotifToggleRow
                     Icon={WEEKLY_BRIEFING_EMAIL_TOGGLE.icon}
                     label={WEEKLY_BRIEFING_EMAIL_TOGGLE.label}
@@ -435,6 +441,7 @@ export default function MijnNotificatiesPage() {
                     onToggle={() => void toggleBriefingEmail()}
                     disabled={briefingEmailSaving}
                   />
+                  )}
                   <NotifToggleRow
                     Icon={CalendarCheck}
                     label="Maandelijkse geldcheck-in"
@@ -443,6 +450,7 @@ export default function MijnNotificatiesPage() {
                     onToggle={() => void toggleCheckin()}
                     disabled={checkinSaving}
                   />
+                  {!isKrant && (
                   <NotifToggleRow
                     Icon={Lightbulb}
                     label={FIN_PROACTIEF_LABEL}
@@ -451,6 +459,7 @@ export default function MijnNotificatiesPage() {
                     onToggle={() => void toggleFinProactief()}
                     disabled={finProactiefSaving}
                   />
+                  )}
                 </div>
               ) : (
                 <>
@@ -480,6 +489,7 @@ export default function MijnNotificatiesPage() {
                   </div>
 
                   {/* Briefing per e-mail — aparte opt-in (profiles-kolom, default UIT) */}
+                  {!isKrant && (
                   <div className="mt-4 border border-[var(--border-ed)]">
                     <NotifToggleRow
                       Icon={WEEKLY_BRIEFING_EMAIL_TOGGLE.icon}
@@ -490,10 +500,12 @@ export default function MijnNotificatiesPage() {
                       disabled={briefingEmailSaving}
                     />
                   </div>
+                  )}
 
                   {/* W-016 — Fins proactieve tips. Bewust een eigen kader naast de
                       meldingstypen hierboven: dit gaat niet over het belletje maar
                       over de kaart die Fin uit zichzelf op een pagina laat zien. */}
+                  {!isKrant && (
                   <div className="mt-4 border border-[var(--border-ed)]">
                     <NotifToggleRow
                       Icon={Lightbulb}
@@ -504,6 +516,7 @@ export default function MijnNotificatiesPage() {
                       disabled={finProactiefSaving}
                     />
                   </div>
+                  )}
                 </>
               )}
 

@@ -32,6 +32,10 @@ const { mockClaims, userCalls, serviceState, mockBetaFlag } = vi.hoisted(() => (
     recentCount: 0 as number | null,
     countError: null as unknown,
     countFilter: null as { col: string; val: unknown } | null,
+    // Krant 2B: `profiles.active_modules` van de eigen rij (null = alle modules).
+    profileModules: null as unknown,
+    profileError: null as unknown,
+    profileReads: 0,
   },
   mockBetaFlag: { value: true },
 }))
@@ -39,6 +43,16 @@ const { mockClaims, userCalls, serviceState, mockBetaFlag } = vi.hoisted(() => (
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     from: (table: string) => ({
+      // Alleen de Krant-grens leest (eigen rij, `active_modules`); telt niet
+      // mee in `userCalls`, dat de schrijfacties vastlegt.
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => {
+            serviceState.profileReads++
+            return { data: { active_modules: serviceState.profileModules }, error: serviceState.profileError }
+          },
+        }),
+      }),
       insert: async (payload: unknown) => {
         userCalls.push({ table, op: 'insert', payload })
         return { error: table === 'consent_events' ? serviceState.consentError : null }
@@ -123,6 +137,9 @@ beforeEach(() => {
   serviceState.recentCount = 0
   serviceState.countError = null
   serviceState.countFilter = null
+  serviceState.profileModules = null
+  serviceState.profileError = null
+  serviceState.profileReads = 0
   mockBetaFlag.value = true
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -210,6 +227,7 @@ describe('POST /api/beta/addon', () => {
     const { createClient } = await import('@/lib/supabase/server')
     vi.mocked(createClient).mockResolvedValueOnce({
       from: (table: string) => ({
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { active_modules: null }, error: null }) }) }),
         insert: async () => ({ error: null }),
         update: () => ({ eq: async () => ({ error: table === 'profiles' ? { message: 'kolom weg' } : null }) }),
       }),
@@ -265,5 +283,54 @@ describe('POST /api/beta/addon', () => {
     const res = await POST(req({ tier: 'ai', active: false, source: 'mijn-privacy' }))
     expect(res.status).toBe(500)
     expect(userCalls).toHaveLength(0)
+  })
+})
+
+describe('POST /api/beta/addon — Krant-grens (Krant 2B)', () => {
+  it.each([
+    [{ tier: 'ai', active: true, source: 'interstitial' }],
+    [{ tier: 'connected', active: true, source: 'onboarding' }],
+  ])('een Krant-account zet geen add-on aan: 403 forbidden, geen toestemming, geen RPC (%j)', async (body) => {
+    serviceState.profileModules = ['nieuws']
+    const res = await POST(req(body))
+    expect(res.status).toBe(403)
+    const json = await res.json()
+    expect(json.code).toBe('forbidden')
+    expect(typeof json.error).toBe('string')
+    expect(serviceState.rpcCalls).toHaveLength(0)
+    expect(userCalls).toHaveLength(0)
+  })
+
+  it('een Krant-account mag een add-on wél uitzetten (intrekken + withdrawn)', async () => {
+    serviceState.profileModules = ['nieuws']
+    serviceState.subs = ['ai']
+    const res = await POST(req({ tier: 'ai', active: false, source: 'mijn-privacy' }))
+    expect(res.status).toBe(200)
+    expect(serviceState.rpcCalls[0].args).toEqual({ p_user_id: USER, p_tier: 'ai', p_active: false })
+    expect(userCalls).toContainEqual(
+      expect.objectContaining({ table: 'consent_events', payload: expect.objectContaining({ decision: 'withdrawn' }) }),
+    )
+  })
+
+  it.each([
+    ['null', null],
+    ['alle zes', ['budgetteren', 'vermogensregistratie', 'aandelenregistratie', 'inzicht_acties', 'toekomstplannen', 'nieuws']],
+    ['nieuws + budgetteren', ['nieuws', 'budgetteren']],
+  ])('bestaand profiel (%s) merkt niets: AI aan gaat door zoals voorheen', async (_label, modules) => {
+    serviceState.profileModules = modules
+    const res = await POST(req({ tier: 'ai', active: true, source: 'interstitial' }))
+    expect(res.status).toBe(200)
+    expect(serviceState.rpcCalls).toEqual([
+      { fn: 'beta_set_addon', args: { p_user_id: USER, p_tier: 'ai', p_active: true } },
+    ])
+    expect(serviceState.profileReads).toBe(1)
+  })
+
+  it('een leesfout op het profiel laat niets door (generieke 500, geen RPC)', async () => {
+    serviceState.profileError = { message: 'db down' }
+    const res = await POST(req({ tier: 'connected', active: true, source: 'interstitial' }))
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).not.toContain('db down')
+    expect(serviceState.rpcCalls).toHaveLength(0)
   })
 })

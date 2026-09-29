@@ -20,6 +20,7 @@ import {
 import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
 import { BUDGET_OR_SPLIT_FILTER, BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
 import { buildMilestoneCopy } from '@/lib/milestones/copy'
+import { isKrantProfile, receivesBriefing } from '@/lib/modules/krant-grens'
 import { MILESTONE_FRESH_WINDOW_MS, type AchievedMilestoneRow } from '@/lib/milestones/types'
 import {
   buildTipTerugNotifications,
@@ -607,12 +608,17 @@ export async function GET(request: NextRequest) {
     // dat allang gebeurd is. Hooguit 1x per kalenderjaar, gegate via app_settings —
     // zelfde ritme als de WOZ-/pensioenreminder hierboven, zodat wie bewust
     // handmatig blijft niet elke poll dezelfde vraag krijgt.
+    // Krant-grens (Krant 2B): de eigen `active_modules` voor de weekbriefing-
+    // melding hieronder (4c). Meegenomen in de profiel-select van dít blok, zodat
+    // er geen extra query bij komt. Faalt deze lezing, dan blijft hij `null` en
+    // valt 4c terug op het gedrag van vóór 2B (melding wél).
+    let ownModulesRow: { active_modules?: unknown } | null = null
     if (computeSlow) try {
       const grondslagKey = `grondslag_budget_last_sent_${user.id}`
       const [grondslagProfileRes, grondslagBudgetsRes, grondslagLastRes] = await Promise.all([
         supabase
           .from('profiles')
-          .select('income_source, expenses_source')
+          .select('income_source, expenses_source, active_modules')
           .eq('id', user.id)
           .maybeSingle(),
         supabase
@@ -624,6 +630,7 @@ export async function GET(request: NextRequest) {
         supabase.from('app_settings').select('value').eq('key', grondslagKey).maybeSingle(),
       ])
 
+      ownModulesRow = grondslagProfileRes.data
       const grondslagBudgetten = grondslagBudgetsRes.data ?? []
       const uitkomst = beslisGrondslagBudget({
         incomeSource: grondslagProfileRes.data?.income_source ?? null,
@@ -671,7 +678,10 @@ export async function GET(request: NextRequest) {
     //    die week "verbruikt" en verschijnt hij pas de week erna: een gat van
     //    dagen in plaats van 15 minuten. Niet gebrand ⇒ de push herhaalt zich
     //    elke recompute, met hetzelfde (stabiele) id — idempotent.
-    if (computeSlow) try {
+    //
+    // Een Krant-account heeft geen briefing (Krant 2B, `receivesBriefing`): geen
+    // melding en ook geen opgebrande week-key.
+    if (computeSlow && receivesBriefing(ownModulesRow)) try {
       const briefingWeekKey = `briefing_notified_week_${user.id}`
       const { data: lastBriefingWeekRow } = await supabase
         .from('app_settings')
@@ -1173,6 +1183,12 @@ export async function GET(request: NextRequest) {
       ])
 
       profile = profileRes.data
+      // Krant-grens (Krant 2B): de horizon-meldingen wijzen naar /mijn/profiel,
+      // /overzicht/schulden en /toekomst en dragen een "Vraag Fin" — allemaal
+      // buiten wat een Krant-account heeft. `active_modules` stond al in de
+      // select maar werd nergens gelezen. Voor elk ander profiel (null, alle
+      // zes, elke andere subset) is dit `true` en blijft alles gelijk.
+      const horizonAlertsApply = !isKrantProfile(profile)
       const dateOfBirth = profile?.date_of_birth
       // Netto vermogen op dezelfde grondslag als dashboard-data-loader:
       // actieve posten, gewogen met net_worth_inclusion_pct.
@@ -1186,7 +1202,7 @@ export async function GET(request: NextRequest) {
       )
 
       // Alert: no date of birth set
-      if (!dateOfBirth) {
+      if (horizonAlertsApply && !dateOfBirth) {
         const id = 'horizon_no_dob'
         slow.push({
           id,
@@ -1204,7 +1220,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Alert: has debts
-      if (totalDebts > 0) {
+      if (horizonAlertsApply && totalDebts > 0) {
         const id = 'horizon_has_debt'
         const debtFormatted = totalDebts.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 })
         slow.push({
@@ -1225,7 +1241,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Alert: FIRE not reachable (simple check: no monthly savings or net worth negative)
-      if (dateOfBirth) {
+      if (horizonAlertsApply && dateOfBirth) {
         // Compute monthly income/expenses from budgets for a rough savings check
         const monthlyIncome = (budgetsRes.data ?? [])
           .filter(b => b.budget_type === 'income' && !b.parent_id)

@@ -56,6 +56,7 @@ import { fuzzyScore } from '@/lib/command-palette/fuzzy'
 import { readRecents, pushRecent, recentsToCommandItems } from '@/lib/command-palette/recents'
 import type { CommandItem, EntitySearchResponse } from '@/lib/command-palette/types'
 import { SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
+import { useNavSurface } from '@/lib/hooks/use-nav-surface'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -117,6 +118,7 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
   )
 
   const { activeModules } = useModuleAccess()
+  const nav = useNavSurface()
   const { masked, toggle: togglePrivacy } = useMaskedAmounts()
   const { mode: displayMode, toggle: toggleDisplayMode } = useDisplayMode()
   const { view: euroView, toggle: toggleEuroView } = useEuroView()
@@ -178,11 +180,15 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
     if (displayMode === 'simple') {
       filtered = filtered.filter((p) => !(p.href && SIMPLE_HIDDEN_NAV_HREFS.includes(p.href)))
     }
+    // Productgrens (Krant 2B): een Krant-account vindt hier alleen de pagina's
+    // binnen de grens — dezelfde beslissing als zijbalk en nav-sheet
+    // (navSurfaceFor). Beheer blijft voor een superadmin, zoals de grens zelf.
+    filtered = filtered.filter((p) => !p.href || nav.isVisible(p.href))
     if (role === 'superadmin') {
       return [...filtered, ...getAdminPageItems()]
     }
     return filtered
-  }, [activeModules, role, displayMode])
+  }, [activeModules, role, displayMode, nav])
 
   const allActions = useMemo(
     () => buildActionItems(actionCtx, activeModules),
@@ -202,8 +208,13 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
   const [recents, setRecents] = useState<CommandItem[]>([])
   useEffect(() => {
     if (!open) return
-    setRecents(recentsToCommandItems(readRecents(userId)))
-  }, [open, userId])
+    // Productgrens (Krant 2B): een recent uit localStorage kan van vóór een
+    // productwissel zijn (of van een ander tabblad). Alleen wat binnen de grens
+    // ligt blijft staan — dezelfde `isVisible` als de pagina's hierboven. Voor
+    // elk ander account filtert dit niets weg.
+    const opgeslagen = recentsToCommandItems(readRecents(userId))
+    setRecents(nav.isKrant ? opgeslagen.filter((r) => r.href != null && nav.isVisible(r.href)) : opgeslagen)
+  }, [open, userId, nav])
 
   // ── Entity-search (debounced) ──────────────────────────────────────────────
   useEffect(() => {

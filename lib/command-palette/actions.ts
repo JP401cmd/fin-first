@@ -10,6 +10,7 @@ import {
 import type { EuroView } from '@/lib/euro-display'
 import type { HomeScreen } from '@/lib/home-screen'
 import type { ModuleId } from '@/lib/module-registry'
+import { isKrantAccount } from '@/lib/modules/krant-grens'
 import type { Perspective, PerspectiveOption } from '@/lib/types/perspective'
 import type { CommandItem, CommandModuleContext } from './types'
 
@@ -87,6 +88,13 @@ type ActionDef = {
   subordinate?: boolean
   module?: CommandModuleContext
   requiredModule?: ModuleId
+  /**
+   * Toont het palet deze actie óók voor een Krant-account (Krant 2B)? Standaard
+   * niet: de Krant is een afgesloten product, en de meeste acties gaan over
+   * iets wat hij niet heeft (startscherm, koppelingen, euro-weergave van
+   * projecties, perspectief). Alleen wat op elke pagina zin heeft staat op `true`.
+   */
+  krantZichtbaar?: true
   build: (ctx: ActionRunContext) => () => void | Promise<void>
 }
 
@@ -112,6 +120,7 @@ const ACTIONS: ActionDef[] = [
     getIcon: (ctx) => (ctx.privacyMasked ? Eye : EyeOff),
     keywords: ['Bedragen verbergen', 'Bedragen tonen', 'Privacy'],
     module: 'globaal',
+    krantZichtbaar: true,
     build: (ctx) => () => {
       ctx.togglePrivacy()
       ctx.closePalette()
@@ -134,6 +143,7 @@ const ACTIONS: ActionDef[] = [
     getIcon: (ctx) => (ctx.displayMode === 'simple' ? Layers : PanelTopClose),
     keywords: ['Weergave', 'Volledige weergave', 'Eenvoudige weergave'],
     module: 'globaal',
+    krantZichtbaar: true,
     build: (ctx) => () => {
       ctx.toggleDisplayMode()
       ctx.closePalette()
@@ -207,6 +217,7 @@ const ACTIONS: ActionDef[] = [
     // Ondergeschikt: uitloggen hoort in het rijtje, maar niet als primaire knop.
     subordinate: true,
     module: 'globaal',
+    krantZichtbaar: true,
     build: (ctx) => () => {
       ctx.closePalette()
       ctx.router.push('/logout')
@@ -256,12 +267,20 @@ function buildPerspectiveActions(ctx: ActionRunContext): CommandItem[] {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-/** Bouwt de runtime-CommandItem[] uit het action-register voor de huidige context. */
+/**
+ * Bouwt de runtime-CommandItem[] uit het action-register voor de huidige context.
+ *
+ * Krant-account (`isKrantAccount(activeModules)`, Krant 2B): alleen de acties
+ * met `krantZichtbaar`, en geen perspectief-acties. Voor elk ander account is
+ * de uitkomst die van vóór 2B.
+ */
 export function buildActionItems(
   ctx: ActionRunContext,
   activeModules: ReadonlyArray<ModuleId>,
 ): CommandItem[] {
+  const krant = isKrantAccount(activeModules)
   const staticItems = ACTIONS
+    .filter((a) => !krant || a.krantZichtbaar === true)
     .filter((a) => !a.requiredModule || activeModules.includes(a.requiredModule))
     .map<CommandItem>((a) => ({
       id: a.id,
@@ -276,5 +295,5 @@ export function buildActionItems(
       run: a.build(ctx),
     }))
 
-  return [...staticItems, ...buildPerspectiveActions(ctx)]
+  return krant ? staticItems : [...staticItems, ...buildPerspectiveActions(ctx)]
 }

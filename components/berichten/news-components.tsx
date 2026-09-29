@@ -122,7 +122,13 @@ export function RelevanceBlock({ relevance }: { relevance: string }) {
 // ── News article actions ─────────────────────────────────────────────
 
 export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsItem; isRead: boolean; onMarkRead: (id: string) => void }) {
-  const { openWithMessage } = useChatContext()
+  // `finEnabled` is false voor een Krant-account (B11): dan geen "Bespreek met
+  // Fin" en geen "Maak actie" (acties horen bij Fins stroom, /overzicht/tips,
+  // en die ligt buiten de Krant-grens).
+  const { openWithMessage, finEnabled: finFlag } = useChatContext()
+  // `!== false`: een context zonder de vlag (oude mock, render buiten de
+  // layout) betekent "Fin aan" — het gedrag van vóór Krant 2B.
+  const finEnabled = finFlag !== false
   const [actionState, setActionState] = useState<'idle' | 'saving' | 'done'>('idle')
   const [feedbackGiven, setFeedbackGiven] = useState(false)
 
@@ -201,7 +207,7 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
-      {!isBronkop && (
+      {finEnabled && !isBronkop && (
         <button
           type="button"
           onClick={handleDiscuss}
@@ -211,7 +217,7 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
           Bespreek met Fin
         </button>
       )}
-      {item.impactType === 'direct' && (
+      {finEnabled && item.impactType === 'direct' && (
         <button
           type="button"
           onClick={handleCreateAction}
