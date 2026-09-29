@@ -1265,3 +1265,7 @@
 
 - **API-routes** toegevoegd: /api/v1/krant/config, /api/v1/krant/feedback, /api/v1/krant/profiel
 - **Integraties** verwijderd: OpenRouter
+
+## 2026-09-29
+
+- Geen wijzigingen.

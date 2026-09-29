@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T10:09:36.665Z",
+  "generatedAt": "2026-09-29T10:15:49.642Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
@@ -193,7 +193,7 @@
     "routesProduction": 90,
     "api": 345,
     "tables": 105,
-    "migrations": 269,
+    "migrations": 270,
     "integrations": 24,
     "components": 1251,
     "providers": 19,
@@ -8936,7 +8936,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 269
+    "migrationCount": 270
   },
   "tablesByDomain": [
     {
@@ -19215,6 +19215,18 @@
       "file": "docs/adr/0185-de-regelkalender-als-tweeling-van-de-fiscale-wijzigingslog.md"
     },
     {
+      "id": "0186-model-per-ai-feature",
+      "title": "Model per AI-feature, effort standaard laag, prompt-caching op de duiding",
+      "status": "aanvaard",
+      "date": "2026-09-29",
+      "elements": [
+        "t-aigateway",
+        "as-nieuws"
+      ],
+      "summary": "Tot nu toe kende de app één globaal Anthropic-model (`ai_model_anthropic` = Sonnet 4.5) voor élke feature. De meting over 14 dagen (tot 29 sep 2026): de nieuws-cron (`nieuws_duiding` + `nieuws_ingest`) droeg ≈ $15 van de ≈ $16. Twee derde daarvan was input van de duiding: ≈ 10.00",
+      "file": "docs/adr/0186-model-per-ai-feature.md"
+    },
+    {
       "id": "0187-api-v1-met-bearer",
       "title": "API v1 met Bearer: een native ingang naar de Krant, als de lezer onder RLS, met het contract als bron",
       "status": "voorgesteld",
@@ -19240,7 +19252,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 66
+        "commits": 67
       },
       {
         "path": "app/(app)/toekomst",
@@ -20510,25 +20522,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-29",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/v1/krant/config",
-          "/api/v1/krant/feedback",
-          "/api/v1/krant/profiel"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Integraties",
-        "added": [],
-        "removed": [
-          "OpenRouter"
-        ]
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
