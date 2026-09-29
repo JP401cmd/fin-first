@@ -50,6 +50,9 @@ const KNOWN_GETMODEL_CONSUMERS = [
   'lib/ai/extract-financial-data.ts',
   'lib/ai/screen-publish-metadata.ts',
   'lib/briefing/redactie.ts',
+  // Krant 1E (ADR 0190): de AI-laag op de tijdlijn — groep 'nieuws', gate in de
+  // knop- en cronroute (isCloudAllowed vóór maakAiStap).
+  'lib/krant/tijdlijn-ai.ts',
 ].sort()
 
 function readRoute(route: string): string {

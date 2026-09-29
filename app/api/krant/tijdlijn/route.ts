@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { badRequest, forbidden, serverError, unauthorized } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
-import { krantBronVoor } from '@/lib/krant/tijdlijn-bron'
+import { krantBronVoor, leestTijdlijn } from '@/lib/krant/tijdlijn-bron'
 import { WEEK_KEY, decodeerCursor, heeftNieuw, laadTijdlijnPagina } from '@/lib/krant/tijdlijn-lezen'
 
 /**
@@ -16,7 +16,8 @@ import { WEEK_KEY, decodeerCursor, heeftNieuw, laadTijdlijnPagina } from '@/lib/
  * own-row-RLS; het id komt uit auth.getUser(), er is geen parameter voor een
  * andere lezer, en er komt geen service-role aan te pas (lib/krant/tijdlijn-lezen.ts).
  * Dezelfde bronkeuze als /nieuws (B40): wie niet de tijdlijn leest, krijgt 403
- * — ook zolang de bèta-vlag dicht staat.
+ * — ook zolang de bèta-vlag dicht staat. Sinds 1E leest de Krant met AI (bron
+ * 'ai') dezelfde tijdlijn (`leestTijdlijn`).
  */
 
 export const dynamic = 'force-dynamic'
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
 
   try {
     const { bron } = await krantBronVoor(supabase, user.id)
-    if (bron !== 'tijdlijn') return forbidden()
+    if (!leestTijdlijn(bron)) return forbidden()
     if (params.get('peek') === '1') return NextResponse.json({ nieuw: await heeftNieuw(supabase, user.id) })
     const pagina = await laadTijdlijnPagina(supabase, user.id, { cursor, week })
     return NextResponse.json({ pagina })

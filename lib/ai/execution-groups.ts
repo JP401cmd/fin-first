@@ -181,6 +181,10 @@ export const FEATURE_GROUP: Record<AiTokenFeature, AiExecutionScope> = {
   budget_suggesties: 'documenten',
 
   nieuws: 'nieuws',
+  // De AI-laag op de tijdlijn (Krant 1E, ADR 0190): dezelfde uitvoergroep als
+  // de oude AI-Krant — staat 'nieuws' op lokaal, dan draait de laag niet (er
+  // is geen lokale variant) en krijgt de lezer de tijdlijn zonder AI.
+  krant_ai: 'nieuws',
 
   // Centrale bronverzameling: cron, service-role, uitsluitend openbaar nieuws.
   // Geen gebruikersgegevens → geen gebruikerskeuze. Zie de kop van dit bestand.
@@ -350,10 +354,30 @@ export const AI_ROUTE_BINDINGS: readonly AiRouteBinding[] = [
 
   // Nieuws
   {
+    // Uitgefaseerd sinds Krant 1E (ADR 0190): alleen nog de oude Krant bij een
+    // dichte tijdlijn-vlag (bron 'oud'). De route blijft tot de opruimkaart.
     route: 'app/api/news/route.ts',
     feature: 'nieuws',
     scope: 'nieuws',
     modelCallIn: 'app/api/news/route.ts',
+    gated: true,
+  },
+  // De AI-laag op de tijdlijn (Krant 1E): de knop en de dagcron. De modelcall
+  // zit in lib/krant/tijdlijn-ai.ts; de route toetst isCloudAllowed per lezer
+  // vóór hij de laag maakt (maakAiStap). Een weigering is geen 403 maar een
+  // verversing zonder AI.
+  {
+    route: 'app/api/krant/tijdlijn/vernieuwen/route.ts',
+    feature: 'krant_ai',
+    scope: 'nieuws',
+    modelCallIn: 'lib/krant/tijdlijn-ai.ts',
+    gated: true,
+  },
+  {
+    route: 'app/api/krant/tijdlijn/cron/route.ts',
+    feature: 'krant_ai',
+    scope: 'nieuws',
+    modelCallIn: 'lib/krant/tijdlijn-ai.ts',
     gated: true,
   },
 

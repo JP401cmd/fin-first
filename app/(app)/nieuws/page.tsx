@@ -3,12 +3,11 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { NieuwsOnlyClient } from '@/components/berichten/nieuws-only-client'
 import { TijdlijnClient } from '@/components/berichten/tijdlijn-client'
 import { KrantWacht } from '@/components/berichten/krant-wacht'
-import { TerugNaarTijdlijn } from '@/components/berichten/terug-naar-tijdlijn'
 import { KrantBezwaar } from '@/components/berichten/krant-bezwaar'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { magTesteditieZien } from '@/lib/krant/testeditie-toegang'
-import { krantBronVoor } from '@/lib/krant/tijdlijn-bron'
+import { krantBronVoor, leestTijdlijn } from '@/lib/krant/tijdlijn-bron'
 import { laadTijdlijn } from '@/lib/krant/tijdlijn-lezen'
 
 export default async function NieuwsOnlyPage() {
@@ -25,12 +24,13 @@ export default async function NieuwsOnlyPage() {
   if (!user) redirect('/login')
 
   // B40 (Krant 1C fase 2): de SERVER kiest de bron. De tijdlijn zonder AI is
-  // de standaard; de AI-Krant alleen als bewuste keuze van een Geheel-account;
-  // een Krant-account krijgt nooit /api/news (geen doodlopende AI-upsell) maar
-  // bij een dichte bèta-vlag een neutrale "komt eraan". Zie lib/krant/tijdlijn-bron.ts.
-  const { bron, variant, inBeta, kanAiKiezen } = await krantBronVoor(supabase, user.id)
+  // de standaard; de Krant MET AI (sinds 1E, ADR 0190: dezelfde tijdlijn met de
+  // AI-laag) alleen als bewuste keuze van een Geheel-account; een Krant-account
+  // krijgt nooit /api/news (geen doodlopende AI-upsell) maar bij een dichte
+  // bèta-vlag een neutrale "komt eraan". Zie lib/krant/tijdlijn-bron.ts.
+  const { bron, kanAiKiezen } = await krantBronVoor(supabase, user.id)
 
-  if (bron === 'tijdlijn') {
+  if (leestTijdlijn(bron)) {
     const [overzicht, bezwaarRes] = await Promise.all([
       laadTijdlijn(supabase, user.id),
       supabase.from('profiles').select('krant_schaduw_bezwaar_at').eq('id', user.id).maybeSingle(),
@@ -40,6 +40,7 @@ export default async function NieuwsOnlyPage() {
         <NavStackMeta title="Krant" topBar={{ kind: 'rich' }} />
         <TijdlijnClient
           overzicht={overzicht}
+          bron={bron}
           kanAiKiezen={kanAiKiezen}
           bezwaar={Boolean(bezwaarRes.data?.krant_schaduw_bezwaar_at)}
         />
@@ -68,6 +69,12 @@ export default async function NieuwsOnlyPage() {
     )
   }
 
+  // bron 'oud': de oude Krant met AI van vóór 1C (NieuwsOnlyClient → /api/news).
+  // UITGEFASEERD SINDS 1E — hij blijft alleen bestaan zolang de tijdlijn voor
+  // deze lezer dicht is (TIJDLIJN_BETA_OPEN false, geen superadmin). Een lezer
+  // die de Krant met AI koos, landt nooit meer hier (hij krijgt de tijdlijn
+  // mét laag), dus de balk "Naar de tijdlijn" is vervallen.
+  //
   // Keuze 12 (kaart 1B): de schaduweditie is tot 1C onzichtbaar, behalve als
   // testsectie voor SUPERADMIN (22 sep: versmald van testaccounts+superadmin
   // — `is_demo_user` bleek geen betrouwbaar testaccount-predicaat, zie
@@ -86,8 +93,6 @@ export default async function NieuwsOnlyPage() {
           + account) zichtbaar blijft. Zonder expliciete topBar kiest de
           pathname-watcher 'simple' (geen cluster). */}
       <NavStackMeta title="Krant" topBar={{ kind: 'rich' }} />
-      {/* Wie bewust de AI-Krant koos terwijl de tijdlijn open is, kan terug. */}
-      {variant === 'ai' && inBeta && <TerugNaarTijdlijn />}
       <NieuwsOnlyClient userId={user.id} toonTestsectie={toonTestsectie} />
       {/* /privacy 2.4 §3 en §8 beloven een bezwaar "onderaan je Krant" — ook
           onder de Krant met AI, want de weekrun maakt ook voor deze lezer

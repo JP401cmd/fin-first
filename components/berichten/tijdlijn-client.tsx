@@ -24,6 +24,13 @@ import type { TijdlijnBericht, TijdlijnBlok, TijdlijnOverzicht, TijdlijnPagina }
  * bedragen op: de regel voor jou (`tekst`) is het sjabloon zoals de matcher het
  * vulde. B2 (ADR 0172): de Krant rekent alleen in euro's — dus ook hier geen
  * vrijheidstijd of dagen.
+ *
+ * KRANT 1E (ADR 0190): de Krant MET AI is dezelfde tijdlijn met een laag erop
+ * (`bron = 'ai'`). Onder de regel voor jou staat dan de toelichting van het
+ * model met het label "met AI"; een bericht dat het model zelf koos draagt
+ * "door AI toegevoegd". Geen naam of avatar van een assistent (K9). De keuze
+ * wist niets: "Liever de Krant met AI" en "Liever zonder AI" wisselen alleen
+ * de laag voor de volgende verversing.
  */
 
 const DATUM_TIJD = new Intl.DateTimeFormat('nl-NL', {
@@ -146,16 +153,34 @@ function Bericht({ bericht, nieuw }: { bericht: TijdlijnBericht; nieuw: boolean 
 
       {/* De regel voor jou — persoonlijk, gemarkeerd met de accentlijn. Bij
           vorm 'raakt' levert de loader de kop uit de catalogus ("Over jouw
-          situatie", sjabloon raakt-kop, B37); anders het label "Voor jou". */}
-      <div
-        data-testid="regel-voor-jou"
-        className="mt-3 border-l-2 border-[var(--module-active-500)] bg-[var(--module-active-50)] px-3 py-2"
-      >
-        <p className="mb-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--module-active-700)]">
-          {bericht.kop ?? 'Voor jou'}
-        </p>
-        <p className="whitespace-pre-line text-[14px] leading-relaxed text-[var(--ink)]">{bericht.tekst}</p>
-      </div>
+          situatie", sjabloon raakt-kop, B37); anders het label "Voor jou".
+          Een bericht dat het model toevoegde (vorm 'ai') heeft geen regel. */}
+      {bericht.tekst.length > 0 && (
+        <div
+          data-testid="regel-voor-jou"
+          className="mt-3 border-l-2 border-[var(--module-active-500)] bg-[var(--module-active-50)] px-3 py-2"
+        >
+          <p className="mb-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--module-active-700)]">
+            {bericht.kop ?? 'Voor jou'}
+          </p>
+          <p className="whitespace-pre-line text-[14px] leading-relaxed text-[var(--ink)]">{bericht.tekst}</p>
+        </div>
+      )}
+
+      {/* Krant 1E: de toelichting van het model — altijd als AI gelabeld, met
+          een gestippelde lijn zodat hij nooit voor de geattesteerde regel
+          doorgaat. */}
+      {bericht.aiTekst && (
+        <div
+          data-testid="ai-toelichting"
+          className="mt-2 border-l-2 border-dashed border-[var(--module-active-400)] px-3 py-2"
+        >
+          <p className="mb-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--module-active-700)]">
+            {bericht.aiToegevoegd ? 'Door AI toegevoegd · met AI' : 'Met AI'}
+          </p>
+          <p className="whitespace-pre-line text-[14px] leading-relaxed text-[var(--ink-2)]">{bericht.aiTekst}</p>
+        </div>
+      )}
 
       {heeftUitleg && (
         <details className="group mt-3 text-[13px] text-[var(--ink-3)]">
@@ -341,19 +366,30 @@ function ArchiefWeek({
 
 // ── Bevestigingen ────────────────────────────────────────────────────────────
 
-type Bevestiging = 'ai' | null
+type Bevestiging = 'ai' | 'zonder-ai' | null
+
+/** De regel onder de kop als de laatste verversing zonder AI was (K5). */
+function zonderAiTekst(reden: 'quotum' | 'anders'): string {
+  return reden === 'quotum'
+    ? 'Deze keer zonder AI: de vijf verversingen met AI van deze week zijn gebruikt. De regel voor jou staat er wel.'
+    : 'Deze keer zonder AI. De regel voor jou staat er wel.'
+}
 
 // ── Hoofdcomponent ───────────────────────────────────────────────────────────
 
 export function TijdlijnClient({
   overzicht,
+  bron = 'tijdlijn',
   kanAiKiezen,
   bezwaar,
 }: {
   overzicht: TijdlijnOverzicht
+  /** 'ai' = de lezer koos de Krant met AI (Krant 1E); 'tijdlijn' = zonder AI. */
+  bron?: 'tijdlijn' | 'ai'
   kanAiKiezen: boolean
   bezwaar: boolean
 }) {
+  const metAi = bron === 'ai'
   const router = useRouter()
   const { pagina, gelezenTot } = overzicht
 
@@ -403,9 +439,11 @@ export function TijdlijnClient({
         setStatusFout(true)
         return
       }
-      const data = (await res.json().catch(() => null)) as { status?: string; items?: number; leeg?: boolean } | null
+      const data = (await res.json().catch(() => null)) as { status?: string; items?: number; leeg?: boolean; ai?: string } | null
+      const zonderAi =
+        metAi && (data?.ai === 'quotum' || data?.ai === 'teruggevallen' || data?.ai === 'geweigerd') ? ' Deze keer zonder AI.' : ''
       if (data?.status === 'ververst' && !data.leeg && typeof data.items === 'number' && data.items > 0) {
-        setStatus(data.items === 1 ? '1 nieuw bericht.' : `${data.items} nieuwe berichten.`)
+        setStatus((data.items === 1 ? '1 nieuw bericht.' : `${data.items} nieuwe berichten.`) + zonderAi)
       } else {
         setStatus('Er is niets nieuws sinds de vorige keer.')
       }
@@ -449,7 +487,7 @@ export function TijdlijnClient({
       const res = await fetch('/api/krant/variant', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variant: 'ai' }),
+        body: JSON.stringify({ variant: bevestiging === 'ai' ? 'ai' : 'tijdlijn' }),
       })
       if (!res.ok) {
         setBevestigFout(await leesFout(res, 'Opslaan is niet gelukt. Probeer het later opnieuw.'))
@@ -478,11 +516,15 @@ export function TijdlijnClient({
     <div className="relative mx-auto max-w-3xl px-4 pb-16 pt-6 sm:px-6">
       <PageInfoButton content={getPageInfo('/nieuws/tijdlijn', '/nieuws')} className="absolute right-4 top-6 sm:right-6 sm:top-8" />
       <PageOpening
-        kicker="Persoonlijke tijdlijn"
+        kicker={metAi ? 'Persoonlijke tijdlijn · met AI' : 'Persoonlijke tijdlijn'}
         titleBefore=""
         emphasis="Krant"
         titleAfter=""
-        deck="Het nieuws dat jouw situatie raakt, met bij elk bericht wat het voor jou betekent."
+        deck={
+          metAi
+            ? 'Het nieuws dat jouw situatie raakt, met bij elk bericht wat het voor jou betekent en een toelichting van een AI-model.'
+            : 'Het nieuws dat jouw situatie raakt, met bij elk bericht wat het voor jou betekent.'
+        }
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--border-ed)] pt-3">
           <p className="flex-1 font-mono text-[11px] tabular-nums text-[var(--ink-4)]">
@@ -493,6 +535,12 @@ export function TijdlijnClient({
           {vernieuwKnop}
         </div>
       </PageOpening>
+
+      {metAi && overzicht.laatsteZonderAi && (
+        <p data-testid="zonder-ai" className="mt-3 text-[13px] text-[var(--ink-3)]">
+          {zonderAiTekst(overzicht.laatsteZonderAi)}
+        </p>
+      )}
 
       <p
         role="status"
@@ -558,10 +606,17 @@ export function TijdlijnClient({
 
           <KrantBezwaar bezwaar={bezwaar} context="tijdlijn" />
 
-          {kanAiKiezen && (
+          {!metAi && kanAiKiezen && (
             <div>
               <Button variant="secondary" size="sm" onClick={() => openBevestiging('ai')}>
                 Liever de Krant met AI
+              </Button>
+            </div>
+          )}
+          {metAi && (
+            <div>
+              <Button variant="secondary" size="sm" onClick={() => openBevestiging('zonder-ai')}>
+                Liever zonder AI
               </Button>
             </div>
           )}
@@ -574,12 +629,11 @@ export function TijdlijnClient({
         onClose={() => {
           if (!bezig) setBevestiging(null)
         }}
-        destructive
-        title="Naar de Krant met AI?"
+        title={bevestiging === 'zonder-ai' ? 'Verder zonder AI?' : 'De Krant met AI?'}
         footer={
           <ModalFooter
             primary={{
-              label: 'Tijdlijn wissen',
+              label: bevestiging === 'zonder-ai' ? 'Zonder AI verder' : 'Met AI verder',
               onClick: () => void bevestig(),
               loading: bezig,
             }}
@@ -588,7 +642,23 @@ export function TijdlijnClient({
         }
       >
         <div className="space-y-3 px-5 py-4 text-[14px] leading-relaxed text-[var(--ink-2)]">
-          <p>Je tijdlijn wordt dan direct gewist. Terugkomen kan altijd, je tijdlijn begint dan opnieuw.</p>
+          {bevestiging === 'zonder-ai' ? (
+            <p>
+              Vanaf de volgende verversing staat er geen AI-toelichting meer onder je berichten. Wat er al staat, blijft staan.
+              Je tijdlijn blijft zoals hij is.
+            </p>
+          ) : (
+            <>
+              <p>
+                Je tijdlijn blijft zoals hij is. Vanaf de volgende verversing schrijft een AI-model onder elk bericht een korte
+                toelichting, en het mag hoogstens drie berichten toevoegen. Die herken je aan het label &lsquo;met AI&rsquo;.
+              </p>
+              <p>
+                Daarvoor gaan de berichten en je nieuwsprofiel in banden naar de AI-aanbieder, zonder je naam. Met AI kan
+                hoogstens vijf keer per week; daarna gewoon zonder AI. Terug naar zonder AI kan altijd.
+              </p>
+            </>
+          )}
           {bevestigFout && (
             <p role="alert" className="text-[13px] text-[var(--negative)]">
               {bevestigFout}

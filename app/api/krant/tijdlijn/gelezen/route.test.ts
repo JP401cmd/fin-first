@@ -27,7 +27,11 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 const mockKrantBronVoor = vi.fn()
-vi.mock('@/lib/krant/tijdlijn-bron', () => ({ krantBronVoor: (...a: unknown[]) => mockKrantBronVoor(...a) }))
+// leestTijdlijn blijft de echte (pure) functie: welke bron de tijdlijn leest, is hier juist de toets.
+vi.mock('@/lib/krant/tijdlijn-bron', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/krant/tijdlijn-bron')>()
+  return { ...actual, krantBronVoor: (...a: unknown[]) => mockKrantBronVoor(...a) }
+})
 
 import { PUT } from './route'
 
@@ -50,18 +54,25 @@ describe('auth', () => {
 })
 
 describe('bronkeuze (security G3)', () => {
-  it('403 zolang deze lezer de tijdlijn niet leest (bv. bron "wacht" of "ai"), geen upsert', async () => {
+  it('403 zolang deze lezer de tijdlijn niet leest (bv. bron "wacht" of "oud"), geen upsert', async () => {
     mockKrantBronVoor.mockResolvedValue({ bron: 'wacht', krantAccount: true, variant: null, inBeta: false, kanAiKiezen: false })
     const res = await PUT()
     expect(res.status).toBe(403)
     expect(mockUpsert).not.toHaveBeenCalled()
   })
 
-  it('403 ook voor bron "ai" (bewuste keuze voor de AI-Krant)', async () => {
-    mockKrantBronVoor.mockResolvedValue({ bron: 'ai', krantAccount: false, variant: 'ai', inBeta: true, kanAiKiezen: true })
+  it('403 ook voor bron "oud" (de oude Krant bij een dichte vlag)', async () => {
+    mockKrantBronVoor.mockResolvedValue({ bron: 'oud', krantAccount: false, variant: null, inBeta: false, kanAiKiezen: true })
     const res = await PUT()
     expect(res.status).toBe(403)
     expect(mockUpsert).not.toHaveBeenCalled()
+  })
+
+  it('bron "ai" (1E): de Krant met AI is dezelfde tijdlijn — gelezen-tot wordt gewoon gezet', async () => {
+    mockKrantBronVoor.mockResolvedValue({ bron: 'ai', krantAccount: false, variant: 'ai', inBeta: true, kanAiKiezen: true })
+    const res = await PUT()
+    expect(res.status).toBe(200)
+    expect(mockUpsert).toHaveBeenCalledTimes(1)
   })
 })
 

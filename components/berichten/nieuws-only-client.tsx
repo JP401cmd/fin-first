@@ -1,5 +1,11 @@
 'use client'
 
+// UITGEFASEERD SINDS 1E (Krant 1E, ADR 0190). De Krant met AI is sindsdien de
+// tijdlijn met een AI-laag (components/berichten/tijdlijn-client.tsx). Dit
+// component rendert alleen nog voor bron 'oud': een gewone lezer zolang
+// TIJDLIJN_BETA_OPEN dicht staat. Niet uitbreiden; verwijderen hoort bij de
+// opruimkaart na de K1-poort.
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Newspaper, Loader2, RefreshCw, AlertCircle, Cpu } from 'lucide-react'

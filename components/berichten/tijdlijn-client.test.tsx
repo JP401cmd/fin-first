@@ -47,6 +47,9 @@ function bericht(p: Partial<TijdlijnBericht> & { id: string }): TijdlijnBericht 
     vorm: 'direct',
     kop: null,
     tekst: 'Voor jou scheelt dit tussen € 120 en € 240 per jaar.',
+    aiTekst: null,
+    aiToegevoegd: false,
+    metAi: false,
     waarom: ['Je hebt een koopwoning.'],
     watMist: [],
     deadline: null,
@@ -76,6 +79,7 @@ function overzicht(p: Partial<TijdlijnOverzicht> = {}): TijdlijnOverzicht {
     achtergrond: null,
     katern: null,
     legeTekst: null,
+    laatsteZonderAi: null,
     ...p,
   }
 }
@@ -231,12 +235,14 @@ describe('TijdlijnClient', () => {
     expect(screen.getByRole('button', { name: 'Liever de Krant met AI' })).toBeTruthy()
   })
 
-  it('AI-keuze: na bevestiging PUT variant ai en refresh', async () => {
+  it('AI-keuze (1E): de bevestiging belooft dat de tijdlijn blijft; PUT variant ai en refresh', async () => {
     render(<TijdlijnClient overzicht={overzicht()} kanAiKiezen bezwaar={false} />)
     fireEvent.click(screen.getByRole('button', { name: 'Liever de Krant met AI' }))
     const dialoog = screen.getByRole('dialog')
-    expect(within(dialoog).getByText(/Je tijdlijn wordt dan direct gewist/)).toBeTruthy()
-    fireEvent.click(within(dialoog).getByRole('button', { name: 'Tijdlijn wissen' }))
+    expect(within(dialoog).getByText(/Je tijdlijn blijft zoals hij is/)).toBeTruthy()
+    expect(dialoog.textContent).not.toMatch(/gewist|wissen/i)
+    expect(within(dialoog).queryByRole('button', { name: 'Tijdlijn wissen' })).toBeNull()
+    fireEvent.click(within(dialoog).getByRole('button', { name: 'Met AI verder' }))
     await waitFor(() => expect(refreshSpy).toHaveBeenCalled())
     const call = fetchMock.mock.calls.find(([url]) => url === '/api/krant/variant')!
     expect(call[1]).toMatchObject({ method: 'PUT' })
@@ -319,5 +325,78 @@ describe('TijdlijnClient — kop bij vorm raakt (B37)', () => {
     const regel = screen.getByTestId('regel-voor-jou')
     expect(regel.textContent).toContain('Over jouw situatie')
     expect(regel.textContent).not.toContain('Voor jou')
+  })
+})
+
+describe('TijdlijnClient — de Krant met AI (1E, ADR 0190)', () => {
+  const metAiOverzicht = (p: Partial<TijdlijnOverzicht> = {}) =>
+    overzicht({
+      pagina: {
+        berichten: [
+          bericht({ id: 'a', titel: 'Box 3 in 2027', aiTekst: 'Met jouw spaargeld valt dit bericht in de groep die het raakt.', metAi: true }),
+          bericht({ id: 'b', titel: 'Zonder toelichting', metAi: true }),
+          bericht({ id: 'c', titel: 'Door het model gekozen', vorm: 'ai', tekst: '', aiTekst: 'Dit gaat over huurders.', aiToegevoegd: true, metAi: true }),
+        ],
+        volgende: null,
+      },
+      totaal: 3,
+      ...p,
+    })
+
+  it('toont de AI-toelichting onder de regel met het label "met AI", en "door AI toegevoegd" bij een toevoeging', () => {
+    render(<TijdlijnClient overzicht={metAiOverzicht()} bron="ai" kanAiKiezen bezwaar={false} />)
+    const toelichtingen = screen.getAllByTestId('ai-toelichting')
+    expect(toelichtingen).toHaveLength(2)
+    expect(toelichtingen[0].textContent).toMatch(/^Met AI/)
+    expect(toelichtingen[1].textContent).toMatch(/Door AI toegevoegd · met AI/)
+    // Een toegevoegd bericht heeft geen matcherregel; de andere twee wel.
+    expect(screen.getAllByTestId('regel-voor-jou')).toHaveLength(2)
+  })
+
+  it('bron tijdlijn: een eerder met AI geschreven bericht houdt zijn label (momentopname), de knoppen zijn die van zonder AI', () => {
+    render(<TijdlijnClient overzicht={metAiOverzicht()} kanAiKiezen bezwaar={false} />)
+    // Een eerder met AI geschreven bericht blijft als momentopname staan, mét zijn label.
+    expect(screen.getAllByTestId('ai-toelichting')).toHaveLength(2)
+    // Maar de kop en de knoppen zijn die van de Krant zonder AI.
+    expect(screen.getByRole('button', { name: 'Liever de Krant met AI' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Liever zonder AI' })).toBeNull()
+  })
+
+  it('bron ai: de knop "Liever zonder AI" (niet de AI-keuze), en PUT variant tijdlijn na bevestiging', async () => {
+    render(<TijdlijnClient overzicht={metAiOverzicht()} bron="ai" kanAiKiezen bezwaar={false} />)
+    expect(screen.queryByRole('button', { name: 'Liever de Krant met AI' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Liever zonder AI' }))
+    const dialoog = screen.getByRole('dialog')
+    expect(dialoog.textContent).toMatch(/Wat er al staat, blijft staan/)
+    fireEvent.click(within(dialoog).getByRole('button', { name: 'Zonder AI verder' }))
+    await waitFor(() => expect(refreshSpy).toHaveBeenCalled())
+    const call = fetchMock.mock.calls.find(([url]) => url === '/api/krant/variant')!
+    expect(JSON.parse(call[1].body as string)).toEqual({ variant: 'tijdlijn' })
+  })
+
+  it('"deze keer zonder AI": quotum en overige terugval, alleen voor bron ai', () => {
+    const { rerender } = render(<TijdlijnClient overzicht={metAiOverzicht({ laatsteZonderAi: 'quotum' })} bron="ai" kanAiKiezen bezwaar={false} />)
+    expect(screen.getByTestId('zonder-ai').textContent).toMatch(/Deze keer zonder AI: de vijf verversingen met AI van deze week zijn gebruikt/)
+    rerender(<TijdlijnClient overzicht={metAiOverzicht({ laatsteZonderAi: 'anders' })} bron="ai" kanAiKiezen bezwaar={false} />)
+    expect(screen.getByTestId('zonder-ai').textContent).toMatch(/^Deze keer zonder AI./)
+    rerender(<TijdlijnClient overzicht={metAiOverzicht({ laatsteZonderAi: null })} bron="ai" kanAiKiezen bezwaar={false} />)
+    expect(screen.queryByTestId('zonder-ai')).toBeNull()
+    rerender(<TijdlijnClient overzicht={metAiOverzicht({ laatsteZonderAi: 'quotum' })} kanAiKiezen bezwaar={false} />)
+    expect(screen.queryByTestId('zonder-ai')).toBeNull()
+  })
+
+  it('Vernieuwen met AI: meldt "Deze keer zonder AI." als de laag terugviel', async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === '/api/krant/tijdlijn/vernieuwen' ? jsonRes(200, { status: 'ververst', items: 2, leeg: false, ai: 'quotum' }) : jsonRes(200, {}),
+    )
+    render(<TijdlijnClient overzicht={metAiOverzicht()} bron="ai" kanAiKiezen bezwaar={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vernieuwen' }))
+    await waitFor(() => expect(screen.getByText('2 nieuwe berichten. Deze keer zonder AI.')).toBeTruthy())
+  })
+
+  it('K9: geen naam of avatar van een assistent', () => {
+    const { container } = render(<TijdlijnClient overzicht={metAiOverzicht()} bron="ai" kanAiKiezen bezwaar={false} />)
+    expect(container.textContent ?? '').not.toMatch(/Fin/)
+    expect(container.querySelector('[data-testid*="fin"], [class*="fin-dots"]')).toBeNull()
   })
 })

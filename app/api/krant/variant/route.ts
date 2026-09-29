@@ -9,12 +9,13 @@ import { zetKrantVariant } from '@/lib/krant/tijdlijn-keuzes'
 
 /**
  * PUT /api/krant/variant { variant: 'ai' | 'tijdlijn' } — welke Krant de lezer
- * leest (Krant 1C fase 2, B40).
+ * leest (Krant 1C fase 2, B40; betekenis sinds 1E, ADR 0190).
  *
- *   'tijdlijn'  terug naar de standaard (de variant leeg).
- *   'ai'        de AI-Krant, alleen voor een Geheel-account met AI aan en een
- *               AI-abonnement (B10/B23; een Krant-account krijgt nooit AI, B11). De tijdlijn
- *               wordt DIRECT gewist (besluit 28-09, terugweg = wissen).
+ *   'tijdlijn'  zonder AI: terug naar de standaard (de variant leeg, K2).
+ *   'ai'        de Krant MET AI — dezelfde tijdlijn met de AI-laag erop, alleen
+ *               voor een Geheel-account met AI aan en een AI-abonnement
+ *               (B10/B23). Een Krant-account krijgt nooit AI, ook niet via deze
+ *               route (B11/K2: 403). Sinds 1E WIST DEZE KEUZE NIETS (K1).
  *
  * Het id komt uit de sessie; `krant_variant` schrijft alleen de service-role
  * (kolomgrant, migratie 20261004120000) — uitsluitend voor dat id.

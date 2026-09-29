@@ -16,6 +16,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  *   - de hertoets vlak vóór schrijven (`ververs(..., hertoetsVoorSchrijven: true)`)
  *     kan `overgeslagen: true` teruggeven (bezwaar/AI-keuze ná de profielselectie);
  *   - summary = tellingen; een falende lezer stopt de run niet.
+ *   - Krant 1E: wie de Krant MET AI koos (en mag) leest dezelfde tijdlijn en
+ *     wordt dus óók ververst, mét een AI-stap; de privacy-poort
+ *     (isCloudAllowed 'nieuws') draait per AI-lezer vóór de stap bestaat.
  */
 
 const mockRecordJobRun = vi.fn()
@@ -28,6 +31,10 @@ vi.mock('@/lib/krant/tijdlijn-run', () => ({
   ververs: (...a: unknown[]) => mockVervers(...a),
   ruimAlleTijdlijnenOp: (...a: unknown[]) => mockRuim(...a),
 }))
+const mockIsCloudAllowed = vi.fn()
+vi.mock('@/lib/ai/privacy-gate', () => ({ isCloudAllowed: (...a: unknown[]) => mockIsCloudAllowed(...a) }))
+const mockMaakAiStap = vi.fn((opties: { cloudToegestaan: boolean }) => ({ stap: 'ai', ...opties }))
+vi.mock('@/lib/krant/tijdlijn-ai', () => ({ maakAiStap: (o: { cloudToegestaan: boolean }) => mockMaakAiStap(o) }))
 const beta = { open: false }
 vi.mock('@/lib/krant/tijdlijn-beta', () => ({
   inTijdlijnBeta: (rol: string | null) => beta.open || rol === 'superadmin',
@@ -119,6 +126,7 @@ beforeEach(() => {
   ]
   mockVervers.mockImplementation(async (_s: unknown, i: { userId: string }) => ({ editieId: `e-${i.userId}`, profielType: 'x', leeg: false, items: 2 }))
   mockRuim.mockResolvedValue(1)
+  mockIsCloudAllowed.mockResolvedValue(true)
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://db.test'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
   delete process.env.VERCEL_ENV
@@ -201,13 +209,51 @@ describe('wie er ververst wordt', () => {
     expect(gedraaid().sort()).toEqual(['u-admin', 'u-geheel', 'u-lezer'])
   })
 
-  it('wie bewust de AI-Krant koos (variant ai) mét AI toegestaan, valt eruit — een Krant-account nooit (die heeft geen AI-variant)', async () => {
+  it('1E: wie de Krant MET AI koos (variant ai, AI toegestaan) wordt óók ververst — mét AI-stap; een Krant-account nooit met AI', async () => {
     beta.open = true
     aiVarianten = [{ user_id: 'u-geheel' }, { user_id: 'u-lezer' }]
     const res = await GET(req('cron-secret'))
-    expect(gedraaid().sort()).toEqual(['u-admin', 'u-lezer'])
+    expect(gedraaid().sort()).toEqual(['u-admin', 'u-geheel', 'u-lezer'])
+    const perLezer = new Map(mockVervers.mock.calls.map(([, i]) => [(i as { userId: string }).userId, i as { aiStap: unknown }]))
+    expect(perLezer.get('u-geheel')!.aiStap).toEqual({ stap: 'ai', cloudToegestaan: true })
+    expect(perLezer.get('u-admin')!.aiStap).toBeNull()
+    // Het Krant-account (u-lezer) heeft variant ai in de rij, maar krijgt nooit de laag.
+    expect(perLezer.get('u-lezer')!.aiStap).toBeNull()
+    // De privacy-poort draaide alleen voor de AI-lezer, met groep 'nieuws'.
+    expect(mockIsCloudAllowed).toHaveBeenCalledTimes(1)
+    expect(mockIsCloudAllowed.mock.calls[0].slice(1)).toEqual(['u-geheel', 'nieuws'])
     const { summary } = (await res.json()) as { summary: Record<string, unknown> }
-    expect(summary).toMatchObject({ lezers: 2, buitenBeta: 1 })
+    expect(summary).toMatchObject({ lezers: 3, buitenBeta: 0, aiLezers: 1 })
+  })
+
+  it('1E, K6: staat nieuws op lokaal / privé-modus, dan krijgt de laag cloudToegestaan false (en een leesfout telt als nee)', async () => {
+    beta.open = true
+    aiVarianten = [{ user_id: 'u-geheel' }]
+    mockIsCloudAllowed.mockResolvedValueOnce(false)
+    await GET(req('cron-secret'))
+    expect(mockMaakAiStap).toHaveBeenCalledWith({ cloudToegestaan: false })
+    mockMaakAiStap.mockClear()
+    mockIsCloudAllowed.mockRejectedValueOnce(new Error('db weg'))
+    await GET(req('cron-secret'))
+    expect(mockMaakAiStap).toHaveBeenCalledWith({ cloudToegestaan: false })
+  })
+
+  it('1E: de summary telt de AI-laag mee — alleen aantallen', async () => {
+    beta.open = true
+    aiVarianten = [{ user_id: 'u-geheel' }]
+    mockVervers.mockImplementation(async (_s: unknown, i: { userId: string }) => ({
+      editieId: 'e',
+      profielType: 'x',
+      leeg: false,
+      items: 2,
+      ...(i.userId === 'u-geheel'
+        ? { ai: { uitkomst: 'met-ai', reden: null, tellers: { getallenTegengehouden: 1, wftTegengehouden: 2, schemaTegengehouden: 0, toelichtingen: 1, toevoegingen: 1, terugvalBericht: 1, terugvalLaag: 0 } } }
+        : {}),
+    }))
+    const res = await GET(req('cron-secret'))
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(summary).toMatchObject({ aiLezers: 1, aiMetAi: 1, aiQuotum: 0, aiGeweigerd: 0, aiTerugvalLaag: 0, aiTerugvalBericht: 1, aiGetallenTegengehouden: 1, aiWftTegengehouden: 2, aiToevoegingen: 1 })
+    for (const v of Object.values(summary)) expect(['number', 'boolean']).toContain(typeof v)
   })
 
   it('AI gekozen zonder AI toegestaan (ai_enabled false): de keuze wint niet — tóch tijdlijn (eindreview Y2)', async () => {

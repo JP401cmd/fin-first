@@ -17,14 +17,14 @@ import { featuresForTier } from './subscription-catalog'
 import { AI_EXECUTION_GROUPS } from './ai/execution-groups'
 
 describe('UNIFIED_FEATURES — verdeling per tier', () => {
-  it('telt 18 features: 11 gratis + 1 connected + 6 ai', () => {
+  it('telt 19 features: 12 gratis + 1 connected + 6 ai (sinds Krant 1E: + krant)', () => {
     const perTier = UNIFIED_FEATURES.reduce<Record<string, number>>((acc, f) => {
       acc[f.requiredTier] = (acc[f.requiredTier] ?? 0) + 1
       return acc
     }, {})
 
-    expect(perTier).toEqual({ gratis: 11, connected: 1, ai: 6 })
-    expect(UNIFIED_FEATURES.length).toBe(18)
+    expect(perTier).toEqual({ gratis: 12, connected: 1, ai: 6 })
+    expect(UNIFIED_FEATURES.length).toBe(19)
   })
 
   it('feature-id\'s zijn uniek', () => {

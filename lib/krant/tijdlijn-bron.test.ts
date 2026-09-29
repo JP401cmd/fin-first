@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aiKrantToegestaan, bepaalKrantBron, krantBronVoor, type KrantBron, type KrantVariant } from './tijdlijn-bron'
+import { aiKrantToegestaan, bepaalKrantBron, krantBronVoor, leestTijdlijn, type KrantBron, type KrantVariant } from './tijdlijn-bron'
 
 /**
  * bepaalKrantBron (B40) — élke tak: krantAccount × variant × inBeta × aiToegestaan.
@@ -11,6 +11,11 @@ import { aiKrantToegestaan, bepaalKrantBron, krantBronVoor, type KrantBron, type
  * matrix bewijst dat expliciet: elke rij wordt met aiToegestaan zowel true als
  * false getoetst, en voor alle rijen buiten variant='ai'/!krantAccount moet de
  * uitkomst gelijk blijven.
+ *
+ * SINDS KRANT 1E (ADR 0190): 'ai' betekent "de tijdlijn MET de AI-laag" en
+ * bestaat alleen binnen de bèta; de oude AI-Krant van vóór 1C heet voortaan
+ * 'oud' (dichte vlag, Geheel-account). De twee betekenissen delen geen waarde
+ * meer — dat is precies wat deze tabel vastzet.
  */
 describe('bepaalKrantBron — waarheidstabel', () => {
   const varianten: KrantVariant[] = [null, 'tijdlijn', 'ai']
@@ -18,8 +23,9 @@ describe('bepaalKrantBron — waarheidstabel', () => {
 
   const verwacht = (krantAccount: boolean, variant: KrantVariant, inBeta: boolean, aiToegestaan: boolean): KrantBron => {
     if (krantAccount) return inBeta ? 'tijdlijn' : 'wacht'
+    if (!inBeta) return 'oud'
     if (variant === 'ai' && aiToegestaan) return 'ai'
-    return inBeta ? 'tijdlijn' : 'ai'
+    return 'tijdlijn'
   }
 
   for (const krantAccount of bools) {
@@ -52,9 +58,36 @@ describe('bepaalKrantBron — waarheidstabel', () => {
     // Binnen de bèta: de nieuwe standaard is 'tijdlijn' — dus de stale 'ai'-keuze verandert van uitkomst.
     expect(bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: true, aiToegestaan: true })).toBe('ai')
     expect(bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: true, aiToegestaan: false })).toBe('tijdlijn')
-    // Buiten de bèta is de standaard toevallig ook 'ai' — geen zichtbaar verschil, maar wel hetzelfde codepad.
-    expect(bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: false, aiToegestaan: true })).toBe('ai')
-    expect(bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: false, aiToegestaan: false })).toBe('ai')
+    // Buiten de bèta: altijd de oude Krant ('oud') — de AI-LAAG krijgt alleen wie in de bèta zit (1E).
+    expect(bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: false, aiToegestaan: true })).toBe('oud')
+    expect(bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: false, aiToegestaan: false })).toBe('oud')
+  })
+
+  it('1E: standaard ZONDER AI, ook met AI aan en een AI-abonnement (K2)', () => {
+    expect(bepaalKrantBron({ krantAccount: false, variant: null, inBeta: true, aiToegestaan: true })).toBe('tijdlijn')
+    expect(bepaalKrantBron({ krantAccount: false, variant: 'tijdlijn', inBeta: true, aiToegestaan: true })).toBe('tijdlijn')
+  })
+
+  it("1E: 'ai' (de laag) en 'oud' (de oude Krant) delen nooit een invoer — bij een dichte vlag nooit 'ai'", () => {
+    for (const krantAccount of bools) for (const variant of varianten) for (const aiToegestaan of bools) {
+      expect(bepaalKrantBron({ krantAccount, variant, inBeta: false, aiToegestaan })).not.toBe('ai')
+      expect(bepaalKrantBron({ krantAccount, variant, inBeta: true, aiToegestaan })).not.toBe('oud')
+    }
+  })
+
+  it('1E: een Krant-account krijgt nooit de AI-laag of de oude Krant, ook niet met variant ai en AI toegestaan', () => {
+    for (const inBeta of bools) {
+      expect(['tijdlijn', 'wacht']).toContain(bepaalKrantBron({ krantAccount: true, variant: 'ai', inBeta, aiToegestaan: true }))
+    }
+  })
+})
+
+describe('leestTijdlijn — met en zonder AI-laag is dezelfde tijdlijn', () => {
+  it("'tijdlijn' en 'ai' wel, 'oud' en 'wacht' niet", () => {
+    expect(leestTijdlijn('tijdlijn')).toBe(true)
+    expect(leestTijdlijn('ai')).toBe(true)
+    expect(leestTijdlijn('oud')).toBe(false)
+    expect(leestTijdlijn('wacht')).toBe(false)
   })
 })
 

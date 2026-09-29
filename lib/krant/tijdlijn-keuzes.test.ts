@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+// Sinds Krant 1E (K1) wist de AI-keuze de tijdlijn niet meer. De mock blijft
+// staan als struikeldraad: roept iemand wisTijdlijn weer aan, dan ziet deze
+// suite het.
 const mockWisTijdlijn = vi.fn()
 vi.mock('./tijdlijn-run', () => ({ wisTijdlijn: (...a: unknown[]) => mockWisTijdlijn(...a) }))
 
@@ -16,27 +19,28 @@ beforeEach(() => {
 // ── zetKrantVariant ──────────────────────────────────────────────────────────
 
 describe('zetKrantVariant', () => {
-  it("'ai': upsert krant_variant 'ai' op de eigen rij + wisTijdlijn voor die id", async () => {
+  it("'ai' (1E, K1): upsert krant_variant 'ai' op de eigen rij — en de tijdlijn wordt NIET gewist", async () => {
     // Geen 'profiles'-rij in deze fixture → wisBandenZonderDoel's eigen
     // profiel-lezing vindt niets en geeft fail-safe false terug (geen bezwaar
     // bekend = geen wis) — zie de aparte 'wisBandenZonderDoel'-tests voor die kant.
     const nep = maakNepClient({ nieuwsprofiel: [{ user_id: UID, krant_variant: null }] })
     const uit = await zetKrantVariant(nep.client as never, UID, 'ai')
-    expect(uit).toEqual({ variant: 'ai', gewist: 3, profielGewist: false })
+    expect(uit).toEqual({ variant: 'ai', profielGewist: false })
     expect(nep.rijen('nieuwsprofiel')).toEqual([expect.objectContaining({ user_id: UID, krant_variant: 'ai' })])
-    expect(mockWisTijdlijn).toHaveBeenCalledTimes(1)
-    expect(mockWisTijdlijn.mock.calls[0][1]).toBe(UID)
+    expect(mockWisTijdlijn).not.toHaveBeenCalled()
+    // Geen enkele delete op de tijdlijn.
+    expect(nep.queries.some((q) => q.table === 'krant_edities' && q.stappen.some((st) => st.m === 'delete'))).toBe(false)
   })
 
   it("'tijdlijn': de kolom naar null, en niets gewist", async () => {
     const nep = maakNepClient({ nieuwsprofiel: [{ user_id: UID, krant_variant: 'ai' }] })
     const uit = await zetKrantVariant(nep.client as never, UID, 'tijdlijn')
-    expect(uit).toEqual({ variant: null, gewist: 0, profielGewist: false })
+    expect(uit).toEqual({ variant: null, profielGewist: false })
     expect(nep.rijen('nieuwsprofiel')).toEqual([expect.objectContaining({ user_id: UID, krant_variant: null })])
     expect(mockWisTijdlijn).not.toHaveBeenCalled()
   })
 
-  it("'ai' gekozen ná een al staand bezwaar: de banden gaan alsnog weg (security Y2 — klikvolgorde bezwaar dan AI)", async () => {
+  it("'ai' gekozen ná een al staand bezwaar: de banden BLIJVEN — de Krant met AI is sinds 1E dezelfde tijdlijn (security Y2 herzien)", async () => {
     // Werkelijke tijdlijnlezer die AI mag kiezen: superadmin (inBeta true zolang
     // TIJDLIJN_BETA_OPEN false is), Geheel-account, ai_enabled + AI-abonnement.
     const nep = maakNepClient({
@@ -44,11 +48,21 @@ describe('zetKrantVariant', () => {
       nieuwsprofiel: [{ user_id: UID, krant_variant: null }],
     })
     const uit = await zetKrantVariant(nep.client as never, UID, 'ai')
-    // bron wordt nu 'ai' (niet meer 'tijdlijn') en er staat al een bezwaar → banden weg.
-    expect(uit.profielGewist).toBe(true)
+    // bron wordt 'ai' = tijdlijn + laag: het profiel heeft nog een doel (de knop).
+    expect(uit.profielGewist).toBe(false)
     const [np] = nep.rijen('nieuwsprofiel')
     expect(np.krant_variant).toBe('ai')
-    expect(np.herkomst).toEqual({})
+    expect(mockWisTijdlijn).not.toHaveBeenCalled()
+  })
+
+  it("'ai' bij een DICHTE vlag (gewone lezer, bron 'oud') ná een bezwaar: de banden gaan wél weg", async () => {
+    const nep = maakNepClient({
+      profiles: [{ id: UID, role: 'user', active_modules: null, ai_enabled: true, active_subscriptions: ['ai'], krant_schaduw_bezwaar_at: '2026-09-29T08:00:00Z' }],
+      nieuwsprofiel: [{ user_id: UID, krant_variant: null, geboortejaar: 1990, herkomst: { inkomen: 'afgeleid' } }],
+    })
+    const uit = await zetKrantVariant(nep.client as never, UID, 'ai')
+    expect(uit.profielGewist).toBe(true)
+    expect(nep.rijen('nieuwsprofiel')[0].geboortejaar).toBeNull()
   })
 
   it('upsert draagt updated_at en gebeurt op onConflict user_id (geen dubbele rij)', async () => {
@@ -141,7 +155,7 @@ describe('zetSchaduwBezwaar(true)', () => {
     expect(np.geboortejaar).toBe(1990)
   })
 
-  it('klikvolgorde (security Y2): eerst bezwaar terwijl nog een tijdlijnlezer → banden blijven; kiest hij dáárna de AI-Krant → banden gaan alsnog weg', async () => {
+  it('klikvolgorde (security Y2, herzien in 1E): eerst bezwaar als tijdlijnlezer → banden blijven; kiest hij dáárna de Krant met AI → banden blijven óók (zelfde tijdlijn)', async () => {
     const profiles = [{ id: UID, role: 'superadmin', active_modules: null, ai_enabled: true, active_subscriptions: ['ai'], krant_schaduw_bezwaar_at: null }]
     const nep = maakNepClient({ profiles, krant_edities: [], nieuwsprofiel: [profielMetBand({ krant_variant: 'tijdlijn' })] })
 
@@ -150,18 +164,17 @@ describe('zetSchaduwBezwaar(true)', () => {
     expect(nep.rijen('nieuwsprofiel')[0].geboortejaar).toBe(1990)
 
     const daarna = await zetKrantVariant(nep.client as never, UID, 'ai')
-    expect(daarna.profielGewist).toBe(true)
+    expect(daarna.profielGewist).toBe(false)
     const [np] = nep.rijen('nieuwsprofiel')
     expect(np.krant_variant).toBe('ai')
-    expect(np.geboortejaar).toBeNull()
-    expect(np.herkomst).toEqual({})
+    expect(np.geboortejaar).toBe(1990)
   })
 
   it('de bèta-vlag dicht (inBeta false) + bezwaar: banden gaan óók weg zonder dat er ooit een AI-variant is gekozen (variant null)', async () => {
     // Gewone user (geen superadmin) → inBeta false zolang TIJDLIJN_BETA_OPEN
     // false is. Geen gekozen variant: het nieuwsprofiel heeft dus geen doel
     // meer zodra de lezer bezwaar maakt, want /nieuws toont voor hem sowieso
-    // niet de tijdlijn (bron wordt 'ai', de pre-1C standaard).
+    // niet de tijdlijn (bron wordt 'oud', de pre-1C standaard).
     const nep = maakNepClient({
       profiles: [{ id: UID, role: 'user', active_modules: null, krant_schaduw_bezwaar_at: null }],
       krant_edities: [],

@@ -5,10 +5,12 @@ import { recordJobRun } from '@/lib/job-runs'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { mapWithConcurrency } from '@/lib/concurrency'
 import { isNewsOnly, resolveActiveModules } from '@/lib/modules/resolve'
+import { isCloudAllowed } from '@/lib/ai/privacy-gate'
 import { laadKandidaten } from '@/lib/krant/editie-loader'
 import { ruimAlleTijdlijnenOp, ververs } from '@/lib/krant/tijdlijn-run'
 import { inTijdlijnBeta } from '@/lib/krant/tijdlijn-beta'
-import { aiKrantToegestaan, bepaalKrantBron } from '@/lib/krant/tijdlijn-bron'
+import { aiKrantToegestaan, bepaalKrantBron, leestTijdlijn, type KrantBron } from '@/lib/krant/tijdlijn-bron'
+import { maakAiStap } from '@/lib/krant/tijdlijn-ai'
 
 export const maxDuration = 300
 
@@ -27,7 +29,8 @@ export const TIJDLIJN_CRON_CONCURRENCY = 3
  *
  * Voor wie (B40, fase 2): iedereen met de module nieuws en afgeronde
  * onboarding wiens /nieuws de tijdlijn ÍS — dezelfde `bepaalKrantBron` als de
- * pagina, dus niet wie bewust de AI-Krant koos (krant_variant 'ai'). Zolang
+ * pagina; sinds 1E hoort daar ook wie de Krant MET AI koos bij (bron 'ai',
+ * dezelfde tijdlijn met de laag). Zolang
  * TIJDLIJN_BETA_OPEN false staat (de tijdelijke schakelaar uit B40) is dat
  * uitsluitend de superadmin (`inTijdlijnBeta`): geen verwerking voor gewone
  * lezers vóór /privacy 2.4 live is. Wie bezwaar maakte tegen verwerking op de
@@ -41,6 +44,14 @@ export const TIJDLIJN_CRON_CONCURRENCY = 3
  * van 120 dagen (B32) over ALLE tijdlijnen — ook van wie deze run overslaat. Geen idempotentie per dag nodig: een tweede run voegt alleen
  * toe wat er nog niet stond (gezien = de eigen tijdlijn; de partiële unieke
  * index vangt een race met de knop).
+ *
+ * Krant 1E (ADR 0190): een lezer die de Krant MET AI koos (bron 'ai') krijgt
+ * dezelfde verversing mét de AI-laag. De PRIVACY-POORT staat hier per lezer
+ * (`isCloudAllowed(service, id, 'nieuws')`, vóór de laag bestaat): lokaal of
+ * privé-modus = een verversing zonder AI, er gaat niets naar een aanbieder
+ * (K6). De rest van de poorten zit in de laag (tier, Krant-account, bezwaar,
+ * quotum van 5 per 7 dagen, tegoed). De summary telt de laag mee — alleen
+ * aantallen (ADR 0146).
  *
  * Spiegelt /api/krant/cron: CRON_SECRET fail-closed in productie, geen
  * job_runs-write vóór de auth, service-role-client, en een summary met alleen
@@ -73,6 +84,24 @@ export interface TijdlijnCronSummary {
   tijdBudgetOp: boolean
   /** De opruimstap van 120 dagen faalde (los van de verversingen; security G2). */
   opruimenMislukt: boolean
+  /** Krant 1E — lezers met bron 'ai' (de Krant met AI) in deze run. */
+  aiLezers: number
+  /** Verversingen waar ≥ 1 AI-tekst bleef staan. */
+  aiMetAi: number
+  /** Verversingen zonder AI omdat de weeklimiet (5) op was. */
+  aiQuotum: number
+  /** Verversingen zonder AI omdat een poort weigerde (privacy, tier, bezwaar, tegoed, model-config). */
+  aiGeweigerd: number
+  /** Verversingen waar het model werd aangeroepen maar niets bleef staan. */
+  aiTerugvalLaag: number
+  /** Matcherberichten zonder AI-toelichting (over alle AI-verversingen). */
+  aiTerugvalBericht: number
+  /** AI-teksten die vervielen op een getal of datum zonder grond. */
+  aiGetallenTegengehouden: number
+  /** AI-teksten die vervielen op de Wft-lijst, de koopmetafoor of een naam. */
+  aiWftTegengehouden: number
+  /** Door het model toegevoegde berichten die bleven staan. */
+  aiToevoegingen: number
 }
 
 /** Paginagrootte voor de profielselectie: ruim onder PostgREST max_rows (1000). */
@@ -114,6 +143,15 @@ export async function GET(request: Request) {
     kandidatenOngeldig: 0,
     tijdBudgetOp: false,
     opruimenMislukt: false,
+    aiLezers: 0,
+    aiMetAi: 0,
+    aiQuotum: 0,
+    aiGeweigerd: 0,
+    aiTerugvalLaag: 0,
+    aiTerugvalBericht: 0,
+    aiGetallenTegengehouden: 0,
+    aiWftTegengehouden: 0,
+    aiToevoegingen: 0,
   }
 
   // De bewaartermijn (B32) EERST en los van de rest: een fout in de selectie of
@@ -177,19 +215,23 @@ export async function GET(request: Request) {
       for (const v of (varianten ?? []) as Array<{ user_id: string }>) aiLezers.add(v.user_id)
     }
 
-    const lezers = zonderBezwaar
-      .filter(
-        (p) =>
-          bepaalKrantBron({
-            krantAccount: isNewsOnly(p.modules),
-            variant: aiLezers.has(p.id) ? 'ai' : null,
-            inBeta: inTijdlijnBeta(p.role),
-            aiToegestaan: aiKrantToegestaan(p),
-          }) === 'tijdlijn',
+    // Sinds 1E leest ook bron 'ai' de tijdlijn (met de laag); 'oud' en 'wacht' niet.
+    const bronPerLezer = new Map<string, KrantBron>()
+    for (const p of zonderBezwaar) {
+      bronPerLezer.set(
+        p.id,
+        bepaalKrantBron({
+          krantAccount: isNewsOnly(p.modules),
+          variant: aiLezers.has(p.id) ? 'ai' : null,
+          inBeta: inTijdlijnBeta(p.role),
+          aiToegestaan: aiKrantToegestaan(p),
+        }),
       )
-      .map((p) => p.id)
+    }
+    const lezers = zonderBezwaar.filter((p) => leestTijdlijn(bronPerLezer.get(p.id)!)).map((p) => p.id)
     summary.lezers = lezers.length
     summary.buitenBeta = zonderBezwaar.length - lezers.length
+    summary.aiLezers = lezers.filter((id) => bronPerLezer.get(id) === 'ai').length
 
     if (lezers.length > 0) {
       const [{ artikelen, ongeldig }, aowRows] = await Promise.all([laadKandidaten(service, now), getAowLeeftijden(service)])
@@ -202,7 +244,13 @@ export async function GET(request: Request) {
           return
         }
         try {
-          const uitkomst = await ververs(service, { userId, now, aowRows, kandidaten: artikelen, hertoetsVoorSchrijven: true })
+          let aiStap: ReturnType<typeof maakAiStap> | null = null
+          if (bronPerLezer.get(userId) === 'ai') {
+            // De privacy-poort per lezer, vóór de laag bestaat. Leesfout = nee.
+            const cloudToegestaan = await isCloudAllowed(service, userId, 'nieuws').catch(() => false)
+            aiStap = maakAiStap({ cloudToegestaan })
+          }
+          const uitkomst = await ververs(service, { userId, now, aowRows, kandidaten: artikelen, hertoetsVoorSchrijven: true, aiStap })
           if (uitkomst.overgeslagen) {
             // Intussen de AI-Krant gekozen of bezwaar gemaakt: niets geschreven.
             summary.overgeslagen++
@@ -211,6 +259,17 @@ export async function GET(request: Request) {
           summary.verversingen++
           summary.berichten += uitkomst.items
           if (uitkomst.leeg) summary.leeg++
+          if (uitkomst.ai) {
+            const { uitkomst: ai, tellers } = uitkomst.ai
+            if (ai === 'met-ai') summary.aiMetAi++
+            else if (ai === 'quotum') summary.aiQuotum++
+            else if (ai === 'geweigerd') summary.aiGeweigerd++
+            summary.aiTerugvalLaag += ai === 'teruggevallen' ? 1 : 0
+            summary.aiTerugvalBericht += tellers.terugvalBericht
+            summary.aiGetallenTegengehouden += tellers.getallenTegengehouden
+            summary.aiWftTegengehouden += tellers.wftTegengehouden
+            summary.aiToevoegingen += tellers.toevoegingen
+          }
         } catch (err) {
           // 23505 op de partiële unieke index = de knop was deze lezer net voor:
           // de compensatie in schrijfEditie haalde deze verversing weg en er is

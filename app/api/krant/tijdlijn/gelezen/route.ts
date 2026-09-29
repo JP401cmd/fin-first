@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { forbidden, serverError, unauthorized } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
-import { krantBronVoor } from '@/lib/krant/tijdlijn-bron'
+import { krantBronVoor, leestTijdlijn } from '@/lib/krant/tijdlijn-bron'
 
 /**
  * PUT /api/krant/tijdlijn/gelezen — "tot hier gelezen" voor de tijdlijn
@@ -28,7 +28,7 @@ export async function PUT() {
   if (!user) return unauthorized()
 
   const { bron } = await krantBronVoor(supabase, user.id)
-  if (bron !== 'tijdlijn') return forbidden()
+  if (!leestTijdlijn(bron)) return forbidden()
 
   const nu = new Date().toISOString()
   const { error } = await supabase

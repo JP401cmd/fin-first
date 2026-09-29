@@ -1,3 +1,10 @@
+// UITGEFASEERD SINDS 1E (Krant 1E, ADR 0190). De Krant met AI is sindsdien de
+// tijdlijn met een AI-laag (lib/krant/tijdlijn-ai.ts); /nieuws leidt een lezer
+// die voor AI koos niet meer hierheen. Deze route (en de cache news_cache:* in
+// app_settings) dient alleen nog bron 'oud' — een gewone lezer zolang
+// TIJDLIJN_BETA_OPEN dicht staat. Niet uitbreiden; de oude edities zijn met
+// migratie 20261008120000 omgezet naar krant_edities. Verwijderen hoort bij de
+// opruimkaart na de K1-poort.
 import { streamObject } from 'ai'
 import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'

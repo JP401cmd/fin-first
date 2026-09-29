@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { errorResponse, forbidden, serverError, unauthorized } from '@/lib/api/respond'
+import { isCloudAllowed } from '@/lib/ai/privacy-gate'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { verversEigenTijdlijn } from '@/lib/krant/tijdlijn-vernieuwen'
+import { maakAiStap } from '@/lib/krant/tijdlijn-ai'
 
 /**
  * POST /api/krant/tijdlijn/vernieuwen — de knop "Vernieuwen" op /nieuws
@@ -12,7 +14,15 @@ import { verversEigenTijdlijn } from '@/lib/krant/tijdlijn-vernieuwen'
  * service-role omdat krant_edities/items geen INSERT-policy voor sessies
  * hebben — uitsluitend voor dát id (lib/krant/tijdlijn-vernieuwen.ts).
  *
- *   200 { status: 'ververst', items, leeg } | { status: 'niets-nieuws' }
+ * Krant 1E (ADR 0190): voor een lezer die de Krant MET AI koos, draait de
+ * AI-laag mee. De PRIVACY-POORT staat hier, vóór de laag bestaat
+ * (`isCloudAllowed(…, 'nieuws')`: kill-switch én de keuze lokaal/cloud voor
+ * nieuws). Weigert hij, dan krijgt de laag `cloudToegestaan: false` en wordt
+ * het een gewone verversing zonder AI — geen 403: de lezer vroeg om vernieuwen,
+ * niet om AI. Een leesfout op de poort telt als "nee" (fail-closed). De overige
+ * poorten (tier, Krant-account, bezwaar, quotum, tegoed) zitten in de laag zelf.
+ *
+ *   200 { status: 'ververst', items, leeg, ai? } | { status: 'niets-nieuws' }
  *   429 { error, code: 'te_snel' }          hoogstens één verversing per 10 minuten
  *   403                                      deze lezer leest de tijdlijn niet (B40 / bèta-vlag)
  */
@@ -29,7 +39,9 @@ export async function POST() {
   if (!user) return unauthorized()
 
   try {
-    const uitkomst = await verversEigenTijdlijn(getServiceClient(), user.id)
+    const cloudToegestaan = await isCloudAllowed(supabase, user.id, 'nieuws').catch(() => false)
+    const aiStap = maakAiStap({ cloudToegestaan })
+    const uitkomst = await verversEigenTijdlijn(getServiceClient(), user.id, { aiStap })
     if (uitkomst.status === 'geen-tijdlijn') return forbidden()
     if (uitkomst.status === 'te-snel') {
       const res = errorResponse('Je hebt net vernieuwd. Probeer het over een paar minuten opnieuw.', 429, 'te_snel')

@@ -44,7 +44,10 @@ export const KATERN_ONDER = 5
 
 /** Kolommen van `krant_editie_items` die de lezer ziet — de eigen rij, meta + momentopname. */
 export const TIJDLIJN_ITEM_KOLOMMEN =
-  'id, editie_id, created_at, positie, vorm, tekst, waarom, wat_mist, deadline, snapshot, krant_edities!inner(week_key)'
+  'id, editie_id, created_at, positie, vorm, tekst, ai_tekst, ai_toegevoegd, waarom, wat_mist, deadline, snapshot, krant_edities!inner(week_key, met_ai)'
+
+/** Het vormtype van een tijdlijnbericht: de matchervormen plus 'ai' (Krant 1E — toegevoegd door het model, of een omgezet bericht uit de oude AI-Krant). */
+export type TijdlijnVorm = EditieVorm | 'ai'
 
 export interface TijdlijnBericht {
   id: string
@@ -53,11 +56,17 @@ export interface TijdlijnBericht {
   createdAt: string
   weekKey: string
   positie: number
-  vorm: EditieVorm
+  vorm: TijdlijnVorm
   /** De kop boven de regel — alleen bij 'raakt' ("Over jouw situatie", sjabloon raakt-kop, B37); anders null. */
   kop: string | null
-  /** De regel voor jou (sjabloon, geattesteerd). */
+  /** De regel voor jou (sjabloon, geattesteerd). Leeg bij vorm 'ai': dan is er geen matcherregel. */
   tekst: string
+  /** Krant 1E: de toelichting van het model onder de regel (label "met AI"); null = geen. */
+  aiTekst: string | null
+  /** Krant 1E: het model koos dit bericht (label "door AI toegevoegd"). */
+  aiToegevoegd: boolean
+  /** Krant 1E: de verversing van dit bericht had de AI-laag (met_ai). */
+  metAi: boolean
   /** "Waarom zie ik dit?" — grep-bare regels van de matcher. */
   waarom: string[]
   /** Profielvelden die ontbraken voor een bedrag. */
@@ -109,6 +118,13 @@ export interface TijdlijnOverzicht {
   katern: TijdlijnBlok | null
   /** De lege tekst van de laatste verversing als de hele tijdlijn leeg is. */
   legeTekst: string | null
+  /**
+   * Krant 1E: had de LAATSTE verversing geen AI terwijl de laag wel draaide?
+   * 'quotum' = de weeklimiet was op; 'anders' = teruggevallen of geweigerd
+   * (model, guards, een poort); null = met AI, leeg, of geen AI-laag. De
+   * client toont het alleen aan een lezer die de Krant met AI koos.
+   */
+  laatsteZonderAi: 'quotum' | 'anders' | null
 }
 
 // ── Cursor ───────────────────────────────────────────────────────────────────
@@ -146,13 +162,15 @@ interface ItemRij {
   editie_id: string
   created_at: string
   positie: number
-  vorm: EditieVorm
+  vorm: TijdlijnVorm
   tekst: string
+  ai_tekst?: string | null
+  ai_toegevoegd?: boolean | null
   waarom: string[] | null
   wat_mist: string[] | null
   deadline: unknown
   snapshot: Record<string, unknown> | null
-  krant_edities: { week_key: string } | Array<{ week_key: string }> | null
+  krant_edities: { week_key: string; met_ai?: boolean | null } | Array<{ week_key: string; met_ai?: boolean | null }> | null
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null)
@@ -169,6 +187,9 @@ export function rijNaarBericht(r: ItemRij): TijdlijnBericht {
     vorm: r.vorm,
     kop: r.vorm === 'raakt' ? renderSjabloon('raakt-kop', 0) : null,
     tekst: r.tekst,
+    aiTekst: str(r.ai_tekst),
+    aiToegevoegd: r.ai_toegevoegd === true,
+    metAi: editie?.met_ai === true,
     waarom: r.waarom ?? [],
     watMist: r.wat_mist ?? [],
     deadline: r.deadline ?? null,
@@ -231,6 +252,7 @@ interface VerversingRij {
   lege_tekst: string | null
   algemeen: { kop?: string; label?: string; items?: AlgemeenItem[]; achtergrond?: TijdlijnBlok } | null
   created_at: string
+  ai_uitkomst?: string | null
 }
 
 /** De id's uit deze set die NU 'geduid' zijn (RPC, zie kopcommentaar). Leeg in → leeg uit, zonder roundtrip. */
@@ -257,7 +279,7 @@ export async function laadTijdlijn(supabase: SupabaseClient, userId: string): Pr
     // alleen schrijft als er iets nieuws is). Nieuwste eerst.
     supabase
       .from('krant_edities')
-      .select('id, week_key, item_count, leeg, lege_tekst, algemeen, created_at')
+      .select('id, week_key, item_count, leeg, lege_tekst, algemeen, created_at, ai_uitkomst')
       .eq('user_id', userId)
       .eq('bron', 'tijdlijn')
       .order('created_at', { ascending: false })
@@ -298,7 +320,15 @@ export async function laadTijdlijn(supabase: SupabaseClient, userId: string): Pr
     achtergrond: blok(alg?.achtergrond, geduid),
     katern: toonKatern && alg ? blok({ kop: alg.kop, label: alg.label, items: alg.items }, geduid) : null,
     legeTekst: totaal === 0 ? (laatste?.lege_tekst ?? null) : null,
+    laatsteZonderAi: zonderAiVan(laatste?.ai_uitkomst ?? null),
   }
+}
+
+/** ai_uitkomst van de laatste verversing → de regel "deze keer zonder AI" (K5). */
+export function zonderAiVan(uitkomst: string | null): 'quotum' | 'anders' | null {
+  if (uitkomst === 'quotum') return 'quotum'
+  if (uitkomst === 'teruggevallen' || uitkomst === 'geweigerd') return 'anders'
+  return null
 }
 
 /**

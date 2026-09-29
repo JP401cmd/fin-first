@@ -155,6 +155,16 @@ const BEWUST_ZONDER_POORT: Record<string, string> = {
   'app/api/admin/news-ingest/route.ts': 'Superadmin-only beheervariant van de ingest; beheer valt buiten de productgrens.',
   'app/api/admin/extraction-test/route.ts':
     'Superadmin-only testbank voor documentextractie; beheer valt buiten de productgrens (privé-gate draagt hij wél).',
+  // Krant 1E (ADR 0190): de tijdlijn is geen AI-functie — de knop en de dagcron
+  // verversen óók zonder AI, dus een 403 zou de Krant zelf blokkeren. De poort
+  // zit in de AI-laag: lib/krant/tijdlijn-ai.ts#maakAiStap roept
+  // checkTierGate(…, 'ai') aan en valt bij een weigering (ook reden 'krant')
+  // terug op dezelfde verversing zonder AI. Bewezen hieronder (bronscan) en in
+  // lib/krant/tijdlijn-ai.test.ts.
+  'app/api/krant/tijdlijn/vernieuwen/route.ts':
+    'Verversen is geen AI-functie; de AI-laag toetst checkTierGate(…, \'ai\') zelf en valt terug op zonder AI (Krant 1E).',
+  'app/api/krant/tijdlijn/cron/route.ts':
+    'Cron per lezer; de AI-laag toetst checkTierGate(…, \'ai\') zelf en valt terug op zonder AI (Krant 1E).',
 }
 
 const AI_ROUTES = [
@@ -185,6 +195,16 @@ describe('bronscan — elke AI-route gaat door de centrale poort', () => {
     const weigert =
       /aiSubscriptionRequired\(/.test(src) || /if \(await checkTierGate\([^)]*'ai'\)\) return false/.test(src)
     expect(weigert, `${route} vertaalt een weigering niet naar een 403`).toBe(true)
+  })
+
+  it("Krant 1E: de AI-laag van de tijdlijn roept checkTierGate(…, 'ai') aan vóór getModel, en een weigering wordt 'zonder AI' — nooit een call", () => {
+    const src = bron('lib/krant/tijdlijn-ai.ts')
+    expect(src).toMatch(/from '@\/lib\/require-tier'/)
+    const poort = src.search(/checkTierGate\(service, userId, 'ai'\)/)
+    const model = src.search(/getModel\(service, KRANT_AI_FEATURE/)
+    expect(poort).toBeGreaterThan(-1)
+    expect(model).toBeGreaterThan(poort)
+    expect(src).toMatch(/if \(tier\) return zonderAi\(items, 'geweigerd', tier\.reason === 'krant' \? 'krant' : 'tier'\)/)
   })
 
   it('elke route die getModel/streamText/generateText aanroept staat op de lijst of heeft een reden', () => {

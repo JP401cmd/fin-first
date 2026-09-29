@@ -2279,6 +2279,11 @@ export const CALCULATIONS: Calculation[] = [
       'lib/krant/profiel-afleiding.ts',
       'lib/krant/editie-run.ts',
       'lib/krant/tijdlijn-run.ts',
+      // Krant 1E (ADR 0190): de AI-laag rekent NIETS — hij toetst dat elk getal
+      // in een AI-tekst al in de duiding, de matcherregel of de gesaneerde
+      // context staat (toetsAiTekst, nummer-grond). Hier opgenomen omdat hij
+      // de uitkomst van deze motor als grondslag leest.
+      'lib/krant/ai-laag.ts',
       'lib/box3-data.ts',
       'lib/box1-tax.ts',
       'lib/aow-leeftijd.ts',
@@ -2288,6 +2293,8 @@ export const CALCULATIONS: Calculation[] = [
       'leidProfielAf',
       'runEditieVoor',
       'ververs',
+      'kiesAiKandidaten',
+      'toetsAiTekst',
       'matchEditie',
       'voldoetAanLeescontract',
       'toetsRegel',

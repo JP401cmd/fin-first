@@ -779,7 +779,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   '/nieuws/tijdlijn': {
     insight:
       'Je Krant is een persoonlijke tijdlijn: nieuws dat jouw situatie raakt komt bovenaan, met bij elk bericht wat het voor jou betekent en waarom je het ziet. Een bericht blijft staan zoals het toen was en verdwijnt na 120 dagen.',
-    grip: 'Vernieuwen haalt het nieuwste op; oudere berichten vind je per week in het archief.',
+    grip: 'Vernieuwen haalt het nieuwste op; oudere berichten vind je per week in het archief. Heb je AI aan, dan kun je onderaan kiezen voor de Krant met AI: je tijdlijn blijft staan en onder elk bericht komt een toelichting met het label "met AI".',
   },
   '/berichten': {
     insight:
