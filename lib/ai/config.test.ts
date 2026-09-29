@@ -32,7 +32,7 @@ vi.mock('@/lib/ai/ai-failure-middleware', () => ({
 vi.mock('@/lib/supabase/service', () => ({ getServiceClient: () => ({ from: mockFrom }) }))
 vi.mock('@/lib/ai/token-usage', () => ({ tokenLoggingMiddleware: mockTokenLoggingMiddleware }))
 
-import { getModel, AIConfigError } from './config'
+import { getModel, AIConfigError, effortMiddleware } from './config'
 import { AI_ERROR_CODE } from './error-copy'
 
 function appSettingsChain(rows: { key: string; value: string }[]) {
@@ -148,5 +148,36 @@ describe('getModel — userId voor token-logging', () => {
     metSleutel()
     await getModel(fakeSupabase, undefined, { userId: 'user-123' })
     expect(mockTokenLoggingMiddleware).not.toHaveBeenCalled()
+  })
+})
+
+describe('getModel — model per feature', () => {
+  it('een feature-override bepaalt het model dat gelogd wordt', async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
+    mockFrom.mockImplementation(() =>
+      appSettingsChain([
+        { key: 'ai_model_anthropic', value: 'claude-sonnet-5' },
+        { key: 'ai_model_anthropic:nieuws_ingest', value: 'claude-haiku-4-5' },
+      ]),
+    )
+    await getModel(fakeSupabase, 'nieuws_ingest', { userId: null })
+    await getModel(fakeSupabase, 'chat', { userId: null })
+    expect(mockTokenLoggingMiddleware.mock.calls[0][0]).toMatchObject({ modelId: 'claude-haiku-4-5' })
+    expect(mockTokenLoggingMiddleware.mock.calls[1][0]).toMatchObject({ modelId: 'claude-sonnet-5' })
+  })
+})
+
+describe('effortMiddleware', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transform = (params: any) => (effortMiddleware('low').transformParams as any)({ params, type: 'generate', model: {} })
+
+  it('zet effort wanneer de callsite er geen meegeeft, en behoudt andere opties', async () => {
+    const uit = await transform({ prompt: [], providerOptions: { anthropic: { structuredOutputMode: 'jsonTool' } } })
+    expect(uit.providerOptions.anthropic).toEqual({ structuredOutputMode: 'jsonTool', effort: 'low' })
+  })
+
+  it('een effort van de callsite wint', async () => {
+    const uit = await transform({ prompt: [], providerOptions: { anthropic: { effort: 'high' } } })
+    expect(uit.providerOptions.anthropic.effort).toBe('high')
   })
 })

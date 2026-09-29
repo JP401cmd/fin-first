@@ -908,9 +908,12 @@ Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "gel
         const result = await generateText({
           model,
           prompt,
-          maxOutputTokens: 200,
+          // Ruime cap: op Sonnet 5 tellen denktokens mee in max_tokens en telt de
+          // tokenizer ~30 % meer (ADR 0186). Output betaal je alleen voor wat er komt.
+          maxOutputTokens: 800,
         })
-        aiIntroduction = result.text?.trim() || null
+        // Afgekapt (cap bereikt) = geen inleiding, nooit een halve zin.
+        aiIntroduction = result.finishReason === 'length' ? null : result.text?.trim() || null
         await recordAiUsage(supabase, user.id, 'report')
       } catch {
         // AI introduction is optional — report should never fail because of it

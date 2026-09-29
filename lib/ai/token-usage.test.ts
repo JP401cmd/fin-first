@@ -122,3 +122,30 @@ describe('tokenLoggingMiddleware — geeft userId door', () => {
     expect(insertedRow().user_id).toBeNull()
   })
 })
+
+describe('logAiTokens — prompt-caching', () => {
+  it('schrijft het gecachete deel apart, met input_tokens als totaal', async () => {
+    const { client } = fakeSupabase()
+    const cached = { inputTokens: { total: 10_000, cacheRead: 9_000, cacheWrite: 0 }, outputTokens: { total: 200 } }
+    await logAiTokens({ supabase: client, ...base, usage: cached, userId: null })
+    expect(insertedRow()).toMatchObject({ input_tokens: 10_000, cache_read_tokens: 9_000 })
+    expect(insertedRow()).not.toHaveProperty('cache_write_tokens')
+  })
+
+  it('ontbreekt de migratie, dan alsnog loggen zonder het cache-deel', async () => {
+    const { client } = fakeSupabase()
+    mockInsert.mockResolvedValueOnce({ error: { code: 'PGRST204' } } as never)
+    const cached = { inputTokens: { total: 10_000, cacheRead: 9_000 }, outputTokens: { total: 200 } }
+    await logAiTokens({ supabase: client, ...base, usage: cached, userId: null })
+    expect(mockInsert).toHaveBeenCalledTimes(2)
+    expect(mockInsert.mock.calls[1][0]).toMatchObject({ input_tokens: 10_000, output_tokens: 200 })
+    expect(mockInsert.mock.calls[1][0]).not.toHaveProperty('cache_read_tokens')
+  })
+
+  it('zonder caching geen cache-kolommen in de insert (werkt ook vóór de migratie)', async () => {
+    const { client } = fakeSupabase()
+    await logAiTokens({ supabase: client, ...base, usage, userId: null })
+    expect(insertedRow()).not.toHaveProperty('cache_read_tokens')
+    expect(insertedRow()).not.toHaveProperty('cache_write_tokens')
+  })
+})

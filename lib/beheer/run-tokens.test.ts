@@ -216,7 +216,8 @@ describe('loadRunTokens — de queryvorm', () => {
     const kolommen = String(calls.find((c) => c.methode === 'select')?.args[0])
       .split(',')
       .map((k) => k.trim())
-    expect(kolommen).toEqual(['provider', 'model', 'input_tokens', 'output_tokens', 'created_at'])
+    // cache_*_tokens (29 sep): het gecachete deel van input_tokens — een tokentelling, geen inhoud.
+    expect(kolommen).toEqual(['provider', 'model', 'input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens', 'created_at'])
     expect(kolommen).not.toContain('user_id')
     expect(kolommen).not.toContain('feature')
 
