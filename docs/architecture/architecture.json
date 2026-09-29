@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T20:11:06.885Z",
+  "generatedAt": "2026-09-29T20:46:26.696Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.23"
+    "version": "0.92.24"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -193,9 +193,9 @@
     "routesProduction": 91,
     "api": 344,
     "tables": 105,
-    "migrations": 271,
-    "integrations": 24,
-    "components": 1289,
+    "migrations": 272,
+    "integrations": 25,
+    "components": 1287,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8930,7 +8930,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 271
+    "migrationCount": 272
   },
   "tablesByDomain": [
     {
@@ -9488,7 +9488,7 @@
     }
   ],
   "components": {
-    "total": 1289,
+    "total": 1287,
     "groups": [
       {
         "group": "app",
@@ -10750,7 +10750,7 @@
       },
       {
         "group": "berichten",
-        "count": 22,
+        "count": 20,
         "items": [
           "archive-edition-card",
           "archive-section",
@@ -10770,8 +10770,6 @@
           "nieuws-only-client",
           "nieuws-only-client.test",
           "section-heading",
-          "terug-naar-tijdlijn",
-          "terug-naar-tijdlijn.test",
           "tijdlijn-client",
           "tijdlijn-client.test"
         ]
@@ -10942,6 +10940,10 @@
     },
     {
       "name": "OpenAI",
+      "category": "AI"
+    },
+    {
+      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -19319,6 +19321,20 @@
       ],
       "summary": "De startpagina van beheer is een dashboard dat antwoord geeft op vijf vragen: wat vraagt nu aandacht, hoe staat elk onderdeel ervoor, welke kant gaat het op, wat is er veranderd, en wat kan dit dashboard niet zien. Het leidt alles af uit bestaande bronnen en bestaande grenzen; he",
       "file": "docs/adr/0189-het-beheerdashboard-ordent-op-beheervraag.md"
+    },
+    {
+      "id": "0190-de-krant-met-ai-als-laag-op-de-tijdlijn",
+      "title": "De Krant met AI als laag op de tijdlijn: dezelfde verversing, een toelichting per bericht, terugval per tekst",
+      "status": "voorgesteld",
+      "date": "2026-09-29",
+      "elements": [
+        "as-nieuws",
+        "do-krant",
+        "t-aigateway",
+        "sp-nieuws"
+      ],
+      "summary": "De Krant met AI is sinds Krant 1E geen eigen editie meer. Het is dezelfde tijdlijnverversing als de Krant zonder AI (ADR 0183), met één extra stap tussen de matcher en het schrijven: een model schrijft per bericht een korte toelichting en mag hoogstens drie berichten toevoegen. D",
+      "file": "docs/adr/0190-de-krant-met-ai-als-laag-op-de-tijdlijn.md"
     }
   ],
   "churn": {
@@ -19330,7 +19346,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 69
+        "commits": 71
       },
       {
         "path": "app/(app)/toekomst",
@@ -19342,7 +19358,7 @@
       },
       {
         "path": "app/api/assets",
-        "commits": 16
+        "commits": 17
       },
       {
         "path": "app/api/household",
@@ -19374,12 +19390,12 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4937,
-        "commits": 40
+        "commits": 41
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 4080,
-        "commits": 28
+        "loc": 4103,
+        "commits": 29
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -19389,7 +19405,7 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3148,
-        "commits": 66
+        "commits": 67
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -20675,11 +20691,18 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "Componenten (aantal)",
+        "label": "Integraties",
         "added": [
-          "+3"
+          "OpenRouter"
         ],
         "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [],
+        "removed": [
+          "-2"
+        ]
       }
     ]
   },
@@ -21170,7 +21193,7 @@
     {
       "date": "2026-09-29",
       "api": 344,
-      "components": 1289,
+      "components": 1287,
       "tables": 105,
       "routesProduction": 91
     }
