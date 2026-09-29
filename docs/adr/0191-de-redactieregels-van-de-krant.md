@@ -57,6 +57,23 @@ pagina zien, geeft óók elke sectie een rij. Die twee waren niet te onderscheid
   van een bekende pagina `gewijzigd` (tot 12 per pagina). Een drempel ("meer dan de helft nieuw
   in één run is basis") is een vervolgpunt.
 
+**Naslaglijsten.** Een uitlegpagina komt niet alleen als sectie binnen. De lijstbron
+"Belastingdienst — Box 3" levert links naar pagina's die zelf uitleg zijn ("Kijk hoe wij uw box
+3-inkomen in 2021 berekend hebben"). Na de eerste versie van deze regel bestond de tijdlijn van
+een spaarder uit 8 van die pagina's, alle 8 als Nieuw (live-run 30 sep 2026).
+
+- `NASLAG_LIJSTEN` in `lib/krant/redactie.ts` noemt de lijstbronnen die naslag verzamelen, op het
+  adres van de lijstpagina. Een link van zo'n lijst is de stand van zaken: geen bericht, wel
+  Achtergrond, achter al het nieuws. Ook geen kandidaat voor het AI-model.
+- Draagt de pagina zelf een echte publicatiedatum, dan is het een bericht met een datum. Het
+  venster en de regel "ouder dan 45 dagen" beslissen dan.
+- Een nieuwslijst (AFM, CPB, de ministeries, de Kamerbrieven) staat er niet in, ook niet als haar
+  berichten geen datum dragen.
+- In code en niet in de bronnenlijst van /beheer/nieuws, zoals `LIJST_PAD_FILTER`: de regel geldt
+  ook als de beheerder de lijst opslaat. Een vlag per bron in beheer is een vervolgpunt.
+- Geen kolom en geen migratie: de matcher leest het adres dat de ingest al bewaart
+  (`bron_pagina_url`).
+
 ### 2. Het bericht past bij de lezer
 
 **2a. Caribisch Nederland.** Het nieuwsprofiel kent geen woonplaats en alle lezers wonen in

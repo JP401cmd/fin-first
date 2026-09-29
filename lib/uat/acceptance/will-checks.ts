@@ -767,6 +767,7 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
       const gewijzigd = art('w44-gewijzigd', { themas: huur }, { bron_soort: 'web_pagina', bron_wijziging: 'gewijzigd' })
       const t1 = matchEditie(huurder, [basisSectie], ctx)
       const t1b = matchEditie(huurder, [gewijzigd], ctx)
+      const naslag = art('w44-naslag', { themas: huur }, { bron_soort: 'web_lijst', bron_pagina_url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3', published_bron: 'eerste_gezien' })
       const caribisch = art('w44-cn', { themas: [{ thema: 'eigen-woning', citaat: 'hypotheekadviseurs bij het geven van passend advies' }] }, { title: 'Caribisch Nederland: leidraad voor hypotheekadvisering' })
       const t2a = matchEditie(koper, [caribisch], ctx)
       const terloops = art('w44-terloops', { themas: huur }, { title: 'Huurtoeslag verandert', bron_fragment: 'De huurtoeslag verandert per 1 januari. Ook op Bonaire gelden nieuwe bedragen.' })
@@ -777,10 +778,11 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
       const gezien = matchEditie(huurder, [art('w44-gezien', { themas: huur }, { published_bron: 'eerste_gezien' })], ctx)
       return {
         expected:
-          'MATCHER_VERSIE=6; basisInTijdlijn=0; gewijzigdInTijdlijn=1; basisInAchtergrond=1; caribischOveral=0; terloopsInTijdlijn=1; bufferWeinigSpaargeld=raakt; bufferVeelSpaargeld=0; cijferZonderRekenregel=0; gezienOp=true; gepubliceerd=null',
+          'MATCHER_VERSIE=6; basisInTijdlijn=0; gewijzigdInTijdlijn=1; basisInAchtergrond=1; naslagInTijdlijn=0; caribischOveral=0; terloopsInTijdlijn=1; bufferWeinigSpaargeld=raakt; bufferVeelSpaargeld=0; cijferZonderRekenregel=0; gezienOp=true; gepubliceerd=null',
         actual:
           `MATCHER_VERSIE=${MATCHER_VERSIE}; basisInTijdlijn=${t1.items.length}; gewijzigdInTijdlijn=${t1b.items.length}; ` +
           `basisInAchtergrond=${t1.algemeen.achtergrond?.items.length ?? 0}; ` +
+          `naslagInTijdlijn=${matchEditie(huurder, [naslag], ctx).items.length}; ` +
           `caribischOveral=${t2a.items.length + (t2a.algemeen.achtergrond?.items.length ?? 0) + t2a.algemeen.items.length}; ` +
           `terloopsInTijdlijn=${matchEditie(huurder, [terloops], ctx).items.length}; ` +
           `bufferWeinigSpaargeld=${weinig.items[0]?.vorm ?? 'geen'}; bufferVeelSpaargeld=${veel.items.length}; ` +

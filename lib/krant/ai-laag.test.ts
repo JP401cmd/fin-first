@@ -140,6 +140,13 @@ describe('kiesAiKandidaten (K3)', () => {
       expect(ids(kiesAiKandidaten([basis, zonderStatus, gewijzigd, nieuws], leeg, ctx())).sort()).toEqual(['gewijzigd', 'nieuws'])
     })
 
+    it('regel 1: een link van een naslaglijst is geen kandidaat', () => {
+      const BOX3 = 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3'
+      const naslag = kandidaat({ id: 'naslag', ...recent, bron_soort: 'web_lijst', bron_pagina_url: BOX3, published_bron: 'eerste_gezien' })
+      const lijst = kandidaat({ id: 'lijst', ...recent, bron_soort: 'web_lijst', bron_pagina_url: 'https://www.afm.nl/nl-nl/sector/actueel', published_bron: 'pagina' })
+      expect(ids(kiesAiKandidaten([naslag, lijst], leeg, ctx()))).toEqual(['lijst'])
+    })
+
     it('regel 2a: een bericht over Caribisch Nederland is nooit een kandidaat', () => {
       const caribisch = kandidaat({ id: 'cn', ...recent, title: 'Inflatie Caribisch Nederland stijgt verder' })
       expect(ids(kiesAiKandidaten([caribisch], leeg, ctx()))).toEqual([])

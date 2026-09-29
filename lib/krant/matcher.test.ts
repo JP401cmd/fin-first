@@ -552,6 +552,21 @@ describe('matcher v6 — redactieregels (ADR 0191)', () => {
       expect(t.items[0].vorm).toBe('raakt')
     })
 
+    // Live-run 30-09-2026: 8 van de 8 berichten waren Box 3-uitlegpagina's van een lijstbron.
+    it('een link van een naslaglijst is geen bericht; met een echte datum wel', () => {
+      const BOX3 = 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3'
+      const uitleg = art({ themas: HUUR }, { id: 'r-naslag', bron_soort: 'web_lijst', bron_pagina_url: BOX3, published_bron: 'eerste_gezien' })
+      const t = matchEditie(huurder, [uitleg], tijdlijn())
+      expect(t.items).toHaveLength(0)
+      expect(matchEditie(huurder, [uitleg], context()).items).toHaveLength(0)
+      // Dezelfde pagina van een nieuwslijst is wél een bericht.
+      const nieuws = { ...uitleg, id: 'r-nieuwslijst', bron_pagina_url: 'https://www.afm.nl/nl-nl/sector/actueel' }
+      expect(matchEditie(huurder, [nieuws], tijdlijn()).items.map((i) => i.artikelId)).toEqual(['r-nieuwslijst'])
+      // En een naslagpagina met een echte datum ook.
+      const gedateerd = { ...uitleg, id: 'r-gedateerd', published_bron: 'meta' }
+      expect(matchEditie(huurder, [gedateerd], tijdlijn()).items.map((i) => i.artikelId)).toEqual(['r-gedateerd'])
+    })
+
     it('in Achtergrond en het katern staat de basis ACHTER al het nieuws, ook als hij nieuwer is', () => {
       const oudNieuws = art({}, { id: 'r-nieuws', fetched_at: '2026-09-15T05:10:00Z', published_at: '2026-09-15T05:10:00Z' })
       const verseBasis = art({}, { id: 'r-basis', fetched_at: '2026-09-20T05:10:00Z', published_at: '2026-09-20T05:10:00Z', bron_soort: 'web_pagina', bron_wijziging: 'basis' })

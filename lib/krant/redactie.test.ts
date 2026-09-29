@@ -8,11 +8,13 @@ import {
   AANHEF_TEKENS,
   CARIBISCH_MIN_TREFFERS_AANHEF,
   CARIBISCH_VERMELDING_AFSTAND,
+  NASLAG_LIJSTEN,
   heeftEchteArtikelDatum,
   heeftEchteDatum,
   isBasisSectie,
   isBufferBericht,
   isCaribischBericht,
+  isNaslagLijst,
   lezersDatum,
   telCaribischeVermeldingen,
 } from './redactie'
@@ -29,6 +31,41 @@ describe('regel 1 — isBasisSectie', () => {
     expect(isBasisSectie({ bron_soort: 'rss', bron_wijziging: null })).toBe(false)
     expect(isBasisSectie({ bron_soort: 'web_lijst', bron_wijziging: null })).toBe(false)
     expect(isBasisSectie({})).toBe(false)
+  })
+
+  // Live-run 30-09-2026: de tijdlijn van een spaarder was 8 × een Box 3-uitlegpagina, alle als "Nieuw".
+  describe('een link van een naslaglijst is de stand van zaken', () => {
+    const BOX3 = 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3'
+
+    it('zonder echte datum: basis', () => {
+      expect(NASLAG_LIJSTEN).toContain(BOX3)
+      expect(isBasisSectie({ bron_soort: 'web_lijst', bron_pagina_url: BOX3, published_bron: 'eerste_gezien' })).toBe(true)
+      expect(isBasisSectie({ bron_soort: 'web_lijst', bron_pagina_url: BOX3 })).toBe(true)
+    })
+
+    it('met een echte datum is het een bericht: venster en "ouder dan 45 dagen" beslissen', () => {
+      for (const published_bron of ['feed', 'meta', 'pagina']) {
+        expect(isBasisSectie({ bron_soort: 'web_lijst', bron_pagina_url: BOX3, published_bron })).toBe(false)
+      }
+    })
+
+    it('een nieuwslijst is geen naslag, ook zonder datum (Kamerbrieven, ministeries, AFM)', () => {
+      for (const url of [
+        'https://www.afm.nl/nl-nl/sector/actueel',
+        'https://www.rijksoverheid.nl/ministeries/ministerie-van-financien',
+        'https://www.tweedekamer.nl/kamerstukken/brieven_regering?qry=%2A',
+        `${BOX3}/iets-anders`,
+      ]) {
+        expect(isNaslagLijst(url), url).toBe(false)
+        expect(isBasisSectie({ bron_soort: 'web_lijst', bron_pagina_url: url, published_bron: 'eerste_gezien' }), url).toBe(false)
+      }
+      expect(isNaslagLijst(null)).toBe(false)
+      expect(isNaslagLijst(undefined)).toBe(false)
+    })
+
+    it('alleen de bronsoort web_lijst: een rss-item met toevallig hetzelfde adres is nieuws', () => {
+      expect(isBasisSectie({ bron_soort: 'rss', bron_pagina_url: BOX3, published_bron: 'eerste_gezien' })).toBe(false)
+    })
   })
 })
 

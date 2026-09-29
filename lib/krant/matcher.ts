@@ -210,6 +210,8 @@ export interface KandidaatArtikel {
   bron_soort?: string | null
   bron_wijziging?: string | null
   bron_fragment?: string | null
+  /** Het adres van de lijst- of uitlegpagina waar het artikel vandaan komt (regel 1: naslaglijsten). */
+  bron_pagina_url?: string | null
 }
 
 export interface MatchContext {

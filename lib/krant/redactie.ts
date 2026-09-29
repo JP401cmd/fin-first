@@ -32,15 +32,46 @@ export const BRON_WIJZIGINGEN = ['basis', 'gewijzigd'] as const
 export type BronWijziging = (typeof BRON_WIJZIGINGEN)[number]
 
 /**
- * Is dit artikel de stand van zaken in plaats van nieuws? Een sectie van een
- * `web_pagina` is alleen nieuws als ze een WIJZIGING is op een pagina die we al
- * kenden (`gewijzigd`). Ontbreekt de status (een rij die de oude ingest na de
- * migratie nog schreef), dan geldt de voorzichtige lezing: basis — liever een
- * wijziging een dag laag in Achtergrond dan een uitlegpagina als "Nieuw".
- * `rss` en `web_lijst` zijn nieuwsberichten en nooit basis.
+ * Lijstbronnen die NASLAG verzamelen in plaats van nieuws: de links op zo'n
+ * pagina zijn zelf uitlegpagina's ("Kijk hoe wij uw box 3-inkomen in 2021
+ * berekend hebben"). Gemeten op 30-09-2026, na de eerste versie van regel 1:
+ * de tijdlijn van een spaarder bestond uit 8 van deze pagina's, alle 8 als
+ * "Nieuw". Een nieuwslijst (AFM, CPB, de ministeries, de Kamerbrieven) staat
+ * hier niet.
+ *
+ * Bewust in code, op het adres van de lijstpagina (`bron_pagina_url`), zoals
+ * `LIJST_PAD_FILTER` en `DETAIL_HOSTS`: het geldt ook als de beheerder de
+ * bronnenlijst opslaat in /beheer/nieuws. `news-sources.test.ts` bewaakt dat
+ * elk adres hier een lijstbron uit de standaardlijst is.
  */
-export function isBasisSectie(a: { bron_soort?: string | null; bron_wijziging?: string | null }): boolean {
-  return a.bron_soort === 'web_pagina' && a.bron_wijziging !== 'gewijzigd'
+export const NASLAG_LIJSTEN: readonly string[] = ['https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3']
+
+export function isNaslagLijst(bronPaginaUrl: string | null | undefined): boolean {
+  return bronPaginaUrl != null && NASLAG_LIJSTEN.includes(bronPaginaUrl)
+}
+
+/**
+ * Is dit artikel de stand van zaken in plaats van nieuws?
+ *
+ *  - Een sectie van een `web_pagina` is alleen nieuws als ze een WIJZIGING is
+ *    op een pagina die we al kenden (`gewijzigd`). Ontbreekt de status (een rij
+ *    die de oude ingest na de migratie nog schreef), dan geldt de voorzichtige
+ *    lezing: basis — liever een wijziging een dag laag in Achtergrond dan een
+ *    uitlegpagina als "Nieuw".
+ *  - Een link van een NASLAGLIJST is de stand van zaken, tenzij de pagina zelf
+ *    een echte publicatiedatum draagt: dan is het een bericht met een datum, en
+ *    beslissen het venster en de regel "ouder dan 45 dagen".
+ *  - `rss` en elke andere `web_lijst` zijn nieuwsberichten en nooit basis.
+ */
+export function isBasisSectie(a: {
+  bron_soort?: string | null
+  bron_wijziging?: string | null
+  bron_pagina_url?: string | null
+  published_bron?: string | null
+}): boolean {
+  if (a.bron_soort === 'web_pagina') return a.bron_wijziging !== 'gewijzigd'
+  if (a.bron_soort === 'web_lijst' && isNaslagLijst(a.bron_pagina_url)) return !heeftEchteDatum(a.published_bron)
+  return false
 }
 
 // ── Regel 2a — Caribisch Nederland ───────────────────────────────────────────

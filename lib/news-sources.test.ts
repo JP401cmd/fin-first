@@ -29,6 +29,7 @@ import {
 } from './news-sources'
 import { isVeiligeBronUrl } from './safe-url'
 import { stripHtml } from './news-html'
+import { NASLAG_LIJSTEN } from './krant/redactie'
 import { BELASTINGDIENST_STORING_HTML, STORING_ZONDER_KOP_HTML } from './news-storing.fixture'
 
 /**
@@ -800,6 +801,18 @@ describe('lijstPadFilter — alleen artikel-links van een lijstpagina (ADR 0191)
     expect(lijstPadFilter('https://www.afm.nl/nl-nl/sector/actueel')).toBeNull()
     expect(lijstPadFilter('geen url')).toBeNull()
     expect(LIJST_PAD_FILTER['www.rijksoverheid.nl']).toEqual(DETAIL_HOSTS['www.rijksoverheid.nl'])
+  })
+})
+
+describe('naslaglijsten (ADR 0191, regel 1) — elk adres is een lijstbron uit de standaardlijst', () => {
+  it('een naslaglijst die niet (meer) als web_lijst in de standaardlijst staat, maakt deze test rood', () => {
+    const lijsten = new Set(
+      standaardWebBronnen(new Date('2026-09-30T00:00:00Z'))
+        .filter((w) => w.soort === 'web_lijst')
+        .map((w) => w.url),
+    )
+    expect(NASLAG_LIJSTEN.length).toBeGreaterThan(0)
+    for (const url of NASLAG_LIJSTEN) expect(lijsten.has(url), url).toBe(true)
   })
 })
 
