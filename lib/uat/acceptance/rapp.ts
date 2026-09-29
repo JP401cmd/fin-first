@@ -148,11 +148,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Persona Tessa (compleet): totaal activa €1.551.000 (13 regels), totaal schulden €454.020 (12 regels). AL-GEDOCUMENTEERDE BUGS (reeds gelogd, niet opnieuw te melden): (1) verhuurrendement 12× te laag — `rental_income` (maandbedrag €950) wordt direct als jaarhuur gebruikt i.p.v. ×12; (2) dit rapport telt geen bankrekeningen mee in "Totaal activa" (structureel scope-verschil met de balans, niet dezelfde grondslag).',
     when: 'Eigen vermogen en het aantal regels worden berekend.',
-    then: 'Eigen vermogen = 1.551.000 − 454.020 = €1.096.980; aantal regels = 13 (activa) + 12 (schulden) = 25. De twee bekende bugs hierboven blijven van kracht in de huidige productiecode — live te herverifiëren, niet opnieuw als bug te loggen.',
+    then: 'Eigen vermogen = 1.551.000 − 454.020 = €1.096.980; aantal regels = 13 (activa) + 12 (schulden) = 25. De twee bekende bugs hierboven blijven van kracht in de huidige productiecode — live te herverifiëren, niet opnieuw als bug te loggen. DETAILREGELS (release 29-09-2026, app/(app)/rapportages/vermogen/detail-parts.ts): bij een levensverzekering komt "Vervalt <datum>" uit `lock_end_date` (de einddatum van de polis); "Begunstigde" verschijnt nooit meer, want `expiry_date` en `beneficiary` bestaan niet in de database. Tessa\'s "Kapitaalverzekering (oud)" heeft geen einddatum, dus daar staat geen vervalregel. Bij een belastingschuld volgt "Betalingsregeling" uit `debtHasPaymentPlan` (vlag OF maandbedrag > 0): Tessa\'s "Belastingaanslag IB" (€200/mnd, vlag niet gezet) draagt die regel nu wél. Totalen en aantal regels veranderen daar niet door.',
     assertion: {
       kind: 'exact',
       expected: 'eigenVermogen=1096980; aantalRegels=25',
-      source: 'app/api/report/vermogen/route.ts r686-693 (eigenVermogen = Σ activa − Σ schulden, gemirrord) — zie rapp-checks.ts',
+      source: 'app/api/report/vermogen/route.ts r686-690 (eigenVermogen = Σ activa − Σ schulden, gemirrord) — zie rapp-checks.ts. Detailregels: buildAssetItem (expiryDate uit lock_end_date bij levensverzekering, beneficiary altijd null) + buildDebtItem (hasPaymentPlan via lib/debt-form-layout.ts#debtHasPaymentPlan) in dezelfde route',
     },
   },
   {

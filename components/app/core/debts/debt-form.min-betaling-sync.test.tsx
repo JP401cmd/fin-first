@@ -85,7 +85,8 @@ describe('syncedMinimumPayment', () => {
 
 describe('DebtForm — Min. betaling volgt het Maandbedrag', () => {
   it('bewerken van het maandbedrag neemt een gelijkstaand minimum mee', () => {
-    render(<DebtForm debt={debt} userAssets={[]} onClose={() => {}} onSaved={() => {}} />)
+    // Creditcard: daar toont het formulier het minimum altijd.
+    render(<DebtForm debt={{ ...debt, debt_type: 'credit_card' }} userAssets={[]} onClose={() => {}} onSaved={() => {}} />)
 
     const minimum = screen.getByTestId('debt-minimum-payment') as HTMLInputElement
     const maandbedrag = screen.getByTestId('debt-monthly-payment') as HTMLInputElement
@@ -101,5 +102,12 @@ describe('DebtForm — Min. betaling volgt het Maandbedrag', () => {
 
     fireEvent.change(screen.getByTestId('debt-monthly-payment'), { target: { value: '1352' } })
     expect((screen.getByTestId('debt-minimum-payment') as HTMLInputElement).value).toBe('500')
+  })
+
+  it('een lening met een gelijkstaand minimum toont het veld niet', () => {
+    render(<DebtForm debt={debt} userAssets={[]} onClose={() => {}} onSaved={() => {}} />)
+
+    expect(screen.queryByTestId('debt-minimum-payment')).toBeNull()
+    expect(screen.getByTestId('debt-monthly-payment')).toBeTruthy()
   })
 })

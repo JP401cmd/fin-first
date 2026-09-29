@@ -114,6 +114,15 @@ import {
   RETIREMENT_PROVIDER_LABELS,
   projectPortfolio,
 } from '@/lib/asset-data'
+import { FormInklapblok, samenvattingVan } from '@/components/app/form-inklapblok'
+import {
+  assetGegevensTitel,
+  assetTeltMeeDelen,
+  kernAssetFields,
+  showsAssetBaseField,
+  showsAssetFieldInMeer,
+  type AssetBaseField,
+} from '@/lib/asset-form-layout'
 import type { SaleConfig } from '@/lib/sale-config'
 import { draftToSaleConfig, saleConfigToDraft, type SaleConfigDraft } from '@/lib/sale-config-draft'
 import { SaleConfigFields } from '@/components/core/sale-config-fields'
@@ -1949,33 +1958,20 @@ export function AssetDetailModal({
             if (asset.lock_end_date) {
               const lockEnd = new Date(asset.lock_end_date)
               const formatted = lockEnd.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
-              if (asset.asset_type === 'vordering') {
+              if (asset.asset_type === 'vordering' || asset.asset_type === 'levensverzekering') {
+                const isPolis = asset.asset_type === 'levensverzekering'
                 const diffMs = lockEnd.getTime() - nowMs
-                const remaining = diffMs <= 0 ? '(afgelopen)' : (() => {
+                const remaining = diffMs <= 0 ? (isPolis ? '(verlopen)' : '(afgelopen)') : (() => {
                   const y = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
                   const m = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
                   if (y > 0) return `(nog ${y} jaar${m > 0 ? ` en ${m} mnd` : ''})`
                   return `(nog ${m} maanden)`
                 })()
-                details.push({ label: 'Einddatum lening', value: `${formatted} ${remaining}` })
+                details.push({ label: isPolis ? 'Einddatum polis' : 'Einddatum lening', value: `${formatted} ${remaining}` })
               } else {
                 details.push({ label: 'Vastgezet tot', value: formatted })
               }
             }
-            // Levensverzekering-specific fields
-            if (asset.expiry_date) {
-              const endDate = new Date(asset.expiry_date)
-              const formatted = endDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
-              const diffMs = endDate.getTime() - nowMs
-              const remaining = diffMs <= 0 ? '(verlopen)' : (() => {
-                const y = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
-                const m = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
-                if (y > 0) return `(nog ${y} jaar${m > 0 ? ` en ${m} mnd` : ''})`
-                return `(nog ${m} maanden)`
-              })()
-              details.push({ label: 'Einddatum polis', value: `${formatted} ${remaining}` })
-            }
-            if (asset.beneficiary) details.push({ label: 'Begunstigde', value: asset.beneficiary })
             // Deelneming-specific fields
             if (asset.kvk_number) details.push({ label: 'KvK-nummer', value: asset.kvk_number })
             if (asset.ownership_percentage != null) details.push({ label: 'Belang', value: `${asset.ownership_percentage}%` })
@@ -3359,7 +3355,9 @@ export function AssetForm({
         })
     }
   }, [isEdit, asset?.id, asset?.asset_type, asset?.has_budget_tracking])
-  const [purchaseDate, setPurchaseDate] = useState(asset?.purchase_date ?? '')
+  // Aankoopdatum, ticker en uitvoerder-type staan niet meer in het formulier; de
+  // opgeslagen waarde gaat ongewijzigd terug (lib/asset-form-layout.ts).
+  const purchaseDate = asset?.purchase_date ?? ''
   // Twee gekoppelde stukjes staat: de KEUZE (eigen rendement of profielrendement)
   // en het getal. Het getal blijft staan wanneer je naar 'profiel' wisselt, zodat
   // terugwisselen je invoer niet wist — maar het wordt dan NIET opgeslagen
@@ -3379,16 +3377,17 @@ export function AssetForm({
   const [taxBenefit, setTaxBenefit] = useState(asset?.tax_benefit ?? false)
   const [isLiquid, setIsLiquid] = useState(asset?.is_liquid ?? true)
   const [lockEndDate, setLockEndDate] = useState(asset?.lock_end_date ?? '')
-  const [tickerSymbol, setTickerSymbol] = useState(asset?.ticker_symbol ?? '')
+  const tickerSymbol = asset?.ticker_symbol ?? ''
   const [rentalIncome, setRentalIncome] = useState(String(asset?.rental_income ?? ''))
   const [wozValue, setWozValue] = useState(String(asset?.woz_value ?? ''))
-  const [retirementProviderType, setRetirementProviderType] = useState(asset?.retirement_provider_type ?? '')
+  const retirementProviderType = asset?.retirement_provider_type ?? ''
   const [depreciationRate, setDepreciationRate] = useState(String(asset?.depreciation_rate ?? ''))
   const [addressPostcode, setAddressPostcode] = useState(asset?.address_postcode ?? '')
   const [addressHouseNumber, setAddressHouseNumber] = useState(asset?.address_house_number ?? '')
-  const [expiryDate, setExpiryDate] = useState(asset?.expiry_date ?? '')
-  const [beneficiary, setBeneficiary] = useState(asset?.beneficiary ?? '')
   const [linkedAssetId, setLinkedAssetId] = useState(asset?.linked_asset_id ?? '')
+  // Deelneming: Box 2 leest belang en dividend (app/api/household/box2).
+  const [ownershipPercentage, setOwnershipPercentage] = useState(String(asset?.ownership_percentage ?? ''))
+  const [annualDividend, setAnnualDividend] = useState(String(asset?.annual_dividend ?? ''))
   // ── Verkoopstrategie in prognose (zie lib/sale-config.ts) ──
   // Concept uit de bestaande sale_config (lib/sale-config-draft.ts; de parser geeft
   // de resolve-time default `wanneer_nodig` terug voor een config-loze niet-liquide
@@ -3488,6 +3487,40 @@ export function AssetForm({
   // Toont de verkoopstrategie-sectie? Geldt voor de niet-liquide types die de
   // horizon-kernel kan liquideren (sale_config in ASSET_TYPE_FIELDS).
   const showSaleConfig = visibleFields.includes('sale_config')
+  // Eén conditie voor weergave én opslag. Bij spaargeld hoort de datum bij
+  // "niet direct opneembaar"; een polis en een vordering hebben altijd een
+  // einddatum (de vordering kent het vinkje niet eens).
+  const showLockEndDate =
+    visibleFields.includes('lock_end_date') && (assetType !== 'savings' || !isLiquid)
+  // `visibleFields` = welke kolommen bij het type horen en dus bewaard blijven;
+  // de indeling hieronder = waar het formulier ze toont (lib/asset-form-layout.ts).
+  // Een veld dat bij het type hoort maar niet getoond wordt, houdt zijn waarde.
+  const kernFields = kernAssetFields(assetType)
+  const inKern = (field: string) => kernFields.includes(field)
+  const inMeer = (field: string) => showsAssetFieldInMeer(assetType, field)
+  // Een opgeslagen inleg blijft zichtbaar, ook bij een type dat het veld normaal
+  // niet toont: hij telt mee en moet dus te wijzigen zijn.
+  const showBase = (field: AssetBaseField) =>
+    showsAssetBaseField(assetType, field, asset?.monthly_contribution)
+  // Samenvattingen die de blokken dicht tonen: wat de cijfers verandert moet
+  // zichtbaar blijven, ook als niemand het blok openklapt.
+  const teltMeeSamenvatting = samenvattingVan(assetTeltMeeDelen({
+    assetType,
+    netWorthInclusionPct,
+    ownership,
+    risicoLabel: riskProfile ? RISK_PROFILE_LABELS[riskProfile as RiskProfile] ?? null : null,
+    verkoopStand: showSaleConfig ? saleDraft.stand : null,
+  }))
+  const gegevensSamenvatting = samenvattingVan([
+    // Zelfde voorwaarden als de schakelaars in het blok: de samenvatting noemt
+    // niets wat het open blok niet laat zien, en gebruikt dezelfde woorden.
+    assetType === 'cash' && budgetingActive && hasBudgetTracking && 'budgetten aan',
+    ['investment', 'crypto', 'savings', 'retirement'].includes(assetType) && hasHoldingsTracking && 'holdings bijgehouden',
+    assetType === 'eigen_huis' && hasWoonbalansTracking && 'hypotheekplanner aan',
+    assetType === 'real_estate' && hasRentalTracking && 'verhuurrendement aan',
+    ((assetType === 'crypto' && initialConnection) || (assetType === 'investment' && initialBrokerConnection)) && 'extern gekoppeld',
+    notes.trim() !== '' && 'met notitie',
+  ])
 
   // Load deelneming options + DGA total when subtype is dga_lening
   useEffect(() => {
@@ -3497,17 +3530,27 @@ export function AssetForm({
       return
     }
     const supabase = createClient()
-    // Fetch deelneming assets
-    supabase.from('assets').select('id, name').eq('asset_type', 'deelneming').eq('is_active', true)
-      .then(({ data }) => setDeelnemingOptions(data ?? []))
-    // Fetch total DGA-leningen (excluding current asset if editing)
-    supabase.from('assets').select('id, current_value').eq('asset_type', 'vordering').eq('is_active', true)
-      .then(({ data }) => {
-        const total = (data ?? [])
-          .filter(a => a.id !== asset?.id)
-          .reduce((sum, a) => sum + Number(a.current_value), 0)
-        setDgaTotal(total)
-      })
+    let cancelled = false
+    // Alleen EIGEN deelnemingen: lezen op `assets` is huishoud-gedeeld, dus
+    // zonder dit filter stond de deelneming van de partner ook in de lijst.
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || cancelled) return
+      supabase.from('assets').select('id, name')
+        .eq('asset_type', 'deelneming').eq('is_active', true).eq('user_id', user.id)
+        .then(({ data }) => { if (!cancelled) setDeelnemingOptions(data ?? []) })
+      // Totaal van de EIGEN DGA-leningen (zonder deze bezitting bij bewerken):
+      // de drempel van de Wet excessief lenen geldt per persoon.
+      supabase.from('assets').select('id, current_value')
+        .eq('asset_type', 'vordering').eq('is_active', true).eq('user_id', user.id)
+        .then(({ data }) => {
+          if (cancelled) return
+          const total = (data ?? [])
+            .filter(a => a.id !== asset?.id)
+            .reduce((sum, a) => sum + Number(a.current_value), 0)
+          setDgaTotal(total)
+        })
+    })
+    return () => { cancelled = true }
   }, [subtype, asset?.id])
 
   // Laad de actieve schulden voor "Aflossen bij verkoop" zodra de
@@ -3587,15 +3630,22 @@ export function AssetForm({
     } else if (!isWithinAssetAmountLimit('current_value', numCurrentValue)) {
       errors.currentValue = assetAmountLimitError('current_value')
     }
-    if (numPurchaseValue === null) {
-      errors.purchaseValue = 'Vul een bedrag van 0 of hoger in.'
-    } else if (!isWithinAssetAmountLimit('purchase_value', numPurchaseValue)) {
-      errors.purchaseValue = assetAmountLimitError('purchase_value')
+    // Een veld dat het formulier niet toont, draagt een opgeslagen waarde die de
+    // gebruiker hier niet kan herstellen. Een fout daarop zou het opslaan
+    // blokkeren zonder dat er een veld is om de melding bij te tonen.
+    if (showBase('purchase_value')) {
+      if (numPurchaseValue === null) {
+        errors.purchaseValue = 'Vul een bedrag van 0 of hoger in.'
+      } else if (!isWithinAssetAmountLimit('purchase_value', numPurchaseValue)) {
+        errors.purchaseValue = assetAmountLimitError('purchase_value')
+      }
     }
-    if (numMonthlyContribution === null) {
-      errors.monthlyContribution = 'Vul een bedrag van 0 of hoger in.'
-    } else if (!isWithinAssetAmountLimit('monthly_contribution', numMonthlyContribution)) {
-      errors.monthlyContribution = assetAmountLimitError('monthly_contribution')
+    if (showBase('monthly_contribution')) {
+      if (numMonthlyContribution === null) {
+        errors.monthlyContribution = 'Vul een bedrag van 0 of hoger in.'
+      } else if (!isWithinAssetAmountLimit('monthly_contribution', numMonthlyContribution)) {
+        errors.monthlyContribution = assetAmountLimitError('monthly_contribution')
+      }
     }
     // Rendementsband per type. Wordt overgeslagen wanneer een afschrijvingspercentage
     // is ingevuld: dan is `expected_return` per definitie 0 (zie de payload hieronder)
@@ -3613,7 +3663,7 @@ export function AssetForm({
         errors.expectedReturn = assetReturnBandError(assetType)
       }
     }
-    if (purchaseDate && isPurchaseDateInFuture(purchaseDate)) {
+    if (showBase('purchase_date') && purchaseDate && isPurchaseDateInFuture(purchaseDate)) {
       errors.purchaseDate = PURCHASE_DATE_FUTURE_ERROR
     }
 
@@ -3621,6 +3671,26 @@ export function AssetForm({
     if (Object.keys(errors).length > 0) {
       scrollToFirstError(errors)
       return
+    }
+
+    // Deelneming: een belang ligt tussen 0 en 100%, dividend is niet negatief.
+    const numOwnershipPercentage = ownershipPercentage.trim() === '' ? null : Number(ownershipPercentage)
+    // Zelfde leesregel als de andere bedragen: `null` = niet te lezen als bedrag.
+    const dividendLeeg = annualDividend.trim() === ''
+    const numAnnualDividend = dividendLeeg ? null : parseAmountInput(annualDividend)
+    if (assetType === 'deelneming') {
+      if (
+        numOwnershipPercentage !== null &&
+        !(Number.isFinite(numOwnershipPercentage) && numOwnershipPercentage > 0 && numOwnershipPercentage <= 100)
+      ) {
+        setValidationError('Vul een belang in dat groter is dan 0 en hoogstens 100%.')
+        return
+      }
+      // Bovengrens gelijk aan die van `POST /api/assets`.
+      if (!dividendLeeg && (numAnnualDividend === null || numAnnualDividend > 100_000_000_000)) {
+        setValidationError('Vul bij dividend een bedrag van 0 of hoger in.')
+        return
+      }
     }
 
     // ── Plausibiliteitsvraag bij een groot bedrag (H8, optie B) ─────────────
@@ -3697,7 +3767,15 @@ export function AssetForm({
       risk_profile: riskProfile || null,
       tax_benefit: visibleFields.includes('tax_benefit') ? taxBenefit : null,
       is_liquid: isCashType ? true : (visibleFields.includes('is_liquid') ? isLiquid : null),
-      lock_end_date: lockEndDate || null,
+      lock_end_date: showLockEndDate ? (lockEndDate || null) : null,
+      // Alleen een DGA-vordering hangt aan een deelneming; elk ander type of
+      // subtype wist de koppeling, zodat een typewissel niets onzichtbaars achterlaat.
+      linked_asset_id:
+        assetType === 'vordering' && subtype === 'dga_lening' ? (linkedAssetId || null) : null,
+      // Alleen bij een deelneming; elk ander type wist ze, zodat een typewissel
+      // geen belang of dividend achterlaat waar Box 2 later op rekent.
+      ownership_percentage: assetType === 'deelneming' ? numOwnershipPercentage : null,
+      annual_dividend: assetType === 'deelneming' ? numAnnualDividend : null,
       ticker_symbol: tickerSymbol || null,
       rental_income: rentalIncome ? Number(rentalIncome) : null,
       woz_value: wozValue ? Number(wozValue) : null,
@@ -3920,65 +3998,15 @@ export function AssetForm({
       size="lg"
     >
         <div className="space-y-3 px-6">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-                placeholder="Spaarrekening"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
-              <select
-                value={assetType}
-                onChange={(e) => handleTypeChange(e.target.value as AssetType)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              >
-                {Object.entries(ASSET_TYPE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Huishouden */}
-          <OwnershipToggle
-            value={ownership}
-            onChange={setOwnership}
-            hasHousehold={hasHousehold}
-          />
-
-          {/* Netto vermogen inclusie — logisch onder huishouden */}
+          {/* ── Kern: wat de berekeningen voedt ── */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-              Neem dit % mee in netto vermogen en berekeningen naar de horizon
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range" min={0} max={100} step={5}
-                value={netWorthInclusionPct}
-                onChange={(e) => setNetWorthInclusionPct(Number(e.target.value))}
-                className="flex-1 accent-kern-600"
-              />
-              <input
-                type="number" min={0} max={100}
-                value={netWorthInclusionPct}
-                onChange={(e) => setNetWorthInclusionPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
-              />
-              <span className="text-sm text-[var(--ink-3)]">%</span>
-            </div>
-            <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-              Stel in welk percentage van deze asset wordt meegeteld in je netto vermogen en vrijheidsberekeningen.
-            </p>
-            {netWorthInclusionPct < 100 && currentValueNum > 0 && (
-              <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
-                Effectieve waarde: {fc(currentValueNum * netWorthInclusionPct / 100)}
-              </p>
-            )}
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+              placeholder="Spaarrekening"
+            />
           </div>
 
           {/* Subtype dropdown (conditional) */}
@@ -4078,6 +4106,7 @@ export function AssetForm({
                     <p className="mt-1 text-[10px] text-kern-600">Automatisch gesynchroniseerd vanuit holdings</p>
                   )}
                 </div>
+                {showBase('purchase_value') && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                     {assetType === 'eigen_huis' ? 'Aankoopprijs' : assetType === 'vordering' ? 'Oorspronkelijke hoofdsom' : 'Aankoopwaarde'}
@@ -4089,6 +4118,7 @@ export function AssetForm({
                     error={fieldErrors.purchaseValue ?? null}
                   />
                 </div>
+                )}
               </div>
 
               {visibleFields.includes('woz_value') && (
@@ -4106,7 +4136,22 @@ export function AssetForm({
                 </p>
               )}
 
-              <div className={`grid ${assetType === 'eigen_huis' ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
+              {assetType === 'retirement' && (
+                <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
+                  Vraag je actuele pensioenoverzicht op (DigiD vereist) en werk je waarde hier bij.{' '}
+                  <a
+                    href="https://www.mijnpensioenoverzicht.nl/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-[var(--ink-2)] underline underline-offset-4 hover:text-[var(--ink)]"
+                  >
+                    Open mijnpensioenoverzicht.nl
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                  </a>
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
                 {!(visibleFields.includes('depreciation_rate') && depreciationRate && Number(depreciationRate) > 0) && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{assetReturnLabel(assetType)} (% p.j.)</label>
@@ -4146,7 +4191,7 @@ export function AssetForm({
                   )}
                 </div>
                 )}
-                {assetType !== 'eigen_huis' && (
+                {assetType !== 'eigen_huis' && showBase('monthly_contribution') && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                       {assetType === 'levensverzekering' ? 'Premie p/m' : assetType === 'vordering' ? 'Aflossing p/m' : 'Inleg p/m'}
@@ -4159,29 +4204,9 @@ export function AssetForm({
                     />
                   </div>
                 )}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aankoopdatum</label>
-                  {/* `max` is de zichtbare grens; de echte controle staat in
-                      handleSave + POST /api/assets (een `max`-attribuut is een
-                      suggestie die een geplakte waarde niet tegenhoudt). */}
-                  <input
-                    type="date"
-                    value={purchaseDate}
-                    onChange={(e) => onFieldChange('purchaseDate', setPurchaseDate)(e.target.value)}
-                    max={todayIso()}
-                    ref={purchaseDateRef}
-                    aria-invalid={fieldErrors.purchaseDate ? true : undefined}
-                    className={`w-full rounded-[var(--r)] border px-3 py-2 text-sm ${
-                      fieldErrors.purchaseDate ? 'border-negative bg-negative/5 text-negative' : 'border-[var(--border-ed)]'
-                    }`}
-                  />
-                  {fieldErrors.purchaseDate && (
-                    <p role="alert" className="mt-1 text-[11px] leading-snug text-negative">{fieldErrors.purchaseDate}</p>
-                  )}
-                </div>
               </div>
 
-              {assetType !== 'eigen_huis' && (
+              {assetType !== 'eigen_huis' && showBase('institution') && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                     {assetType === 'levensverzekering' ? 'Verzekeraar' : assetType === 'vordering' ? 'Debiteur / Tegenpartij' : 'Instelling'}
@@ -4197,200 +4222,12 @@ export function AssetForm({
             </>
           )}
 
-          {/* Budget tracking toggle (cash only, hidden when budgetteren module is off) */}
-          {assetType === 'cash' && budgetingActive && (
-            <>
-              <label className="flex items-start gap-3 rounded-[var(--r)] border border-positive/30 bg-positive/5 p-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={hasBudgetTracking}
-                  onChange={(e) => {
-                    const wantsToDisable = !e.target.checked && hasBudgetTracking
-                    // If disabling and this is the last tracking account, show confirmation
-                    if (wantsToDisable && otherTrackingCount === 0) {
-                      setShowBudgetConfirm(true)
-                      return
-                    }
-                    setShowBudgetConfirm(false)
-                    setHasBudgetTracking(e.target.checked)
-                  }}
-                  className="mt-0.5 border-[var(--border-md)]"
-                />
-                <div>
-                  <span className="text-sm font-medium text-[var(--ink)]">Budgetten & transacties</span>
-                  <p className="text-xs text-[var(--ink-3)]">
-                    Schakel in om transacties te importeren, budgetcategorieën te koppelen, en cashflow te voorspellen.
-                  </p>
-                </div>
-              </label>
-
-              {/* Confirmation warning when disabling last budget tracking account */}
-              {showBudgetConfirm && (
-                <div className="rounded-[var(--r)] border border-amber-300 bg-amber-50 p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                    <div>
-                      <p className="text-sm font-medium text-amber-800">
-                        Weet je het zeker? Dit is je laatste rekening met budgetteren.
-                      </p>
-                      <p className="mt-1 text-xs text-amber-700">
-                        Als je dit uitschakelt, worden budgetfuncties in de hele app gedeactiveerd. Je kunt dit altijd weer inschakelen.
-                      </p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setHasBudgetTracking(false)
-                            setShowBudgetConfirm(false)
-                          }}
-                          className="rounded-[var(--r)] bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
-                        >
-                          Ja, uitschakelen
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowBudgetConfirm(false)}
-                          className="rounded-[var(--r)] border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
-                        >
-                          Annuleer
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Holdings tracking toggle (investment, crypto, savings, retirement) */}
-          {['investment', 'crypto', 'savings', 'retirement'].includes(assetType) && (
-            <>
-              <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={hasHoldingsTracking}
-                  onChange={(e) => {
-                    setHasHoldingsTracking(e.target.checked)
-                  }}
-                  className="mt-0.5 border-[var(--border-md)]"
-                />
-                <div>
-                  <span className="text-sm font-medium text-[var(--ink)]">Holdings bijhouden</span>
-                  <p className="text-xs text-[var(--ink-3)]">
-                    Schakel in om individuele posities, transacties en portfolio-allocatie bij te houden.
-                  </p>
-                </div>
-              </label>
-
-              {/* Warning when disabling with active holdings */}
-              {!hasHoldingsTracking && isEdit && asset?.has_holdings_tracking && hasActiveHoldings && (
-                <div className="rounded-[var(--r)] border border-amber-300 bg-amber-50 p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                    <div>
-                      <p className="text-sm font-medium text-amber-800">
-                        Er zijn {holdingsCount} actieve holding{holdingsCount !== 1 ? 's' : ''} gekoppeld.
-                      </p>
-                      <p className="mt-1 text-xs text-amber-700">
-                        Deze worden niet verwijderd maar verschijnen niet meer op de centrale holdings pagina.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Externe koppeling sectie (R2) — alleen voor crypto, en alleen
-              wanneer we een bestaand asset bewerken: een connection vereist
-              een persistente asset-ID die we via de POST kunnen meegeven. */}
-          {isEdit && asset && assetType === 'crypto' && (
-            <AssetEditConnectionSection
-              assetId={asset.id}
-              assetName={asset.name}
-              initialConnection={initialConnection}
-            />
-          )}
-
-          {/* Broker-koppeling sectie — alleen voor investment-assets, en alleen
-              bij bewerken van een bestaand asset (een koppeling vereist een
-              persistente asset-ID). Trading 212 (sync) of CSV-import. */}
-          {isEdit && asset && assetType === 'investment' && (
-            <AssetEditBrokerSection
-              assetId={asset.id}
-              assetName={asset.name}
-              initialConnection={initialBrokerConnection}
-            />
-          )}
-
-          {/* Hypotheekplanner-app toggle (eigen_huis only) — patroon analoog aan budget/holdings hierboven. */}
-          {assetType === 'eigen_huis' && (
-            <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hasWoonbalansTracking}
-                onChange={(e) => setHasWoonbalansTracking(e.target.checked)}
-                className="mt-0.5 border-[var(--border-md)]"
-              />
-              <div>
-                <span className="text-sm font-medium text-[var(--ink)]">Hypotheekplanner</span>
-                <p className="text-xs text-[var(--ink-3)]">
-                  Schakel in om je equity-opbouw, oversluit-scenario&apos;s en hypotheek-vs-beleggen te zien.
-                </p>
-              </div>
-            </label>
-          )}
-
-          {/* Verhuurrendement-app toggle (real_estate only) — patroon analoog aan budget/holdings hierboven. */}
-          {assetType === 'real_estate' && (
-            <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hasRentalTracking}
-                onChange={(e) => setHasRentalTracking(e.target.checked)}
-                className="mt-0.5 border-[var(--border-md)]"
-              />
-              <div>
-                <span className="text-sm font-medium text-[var(--ink)]">Verhuurrendement</span>
-                <p className="text-xs text-[var(--ink-3)]">
-                  Schakel in om netto rendement, cashflow en bezetting per object te zien.
-                </p>
-              </div>
-            </label>
-          )}
-
           {/* Type-specific fields */}
-          {visibleFields.length > 0 && visibleFields.some((f) => f !== 'subtype') && (
+          {(kernFields.length > 0 || subtype === 'dga_lening') && (
             <div className="space-y-3 rounded-[var(--r)] border border-kern-100 bg-kern-50/30 p-3">
               <p className="text-xs font-semibold text-kern-700/60 uppercase">Details</p>
               <div className="grid grid-cols-2 gap-3">
-                {visibleFields.includes('risk_profile') && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Risicoprofiel</label>
-                    <select
-                      value={riskProfile}
-                      onChange={(e) => setRiskProfile(e.target.value)}
-                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                    >
-                      <option value="">-</option>
-                      {Object.entries(RISK_PROFILE_LABELS).map(([k, l]) => (
-                        <option key={k} value={k}>{l}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                {visibleFields.includes('ticker_symbol') && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / ISIN</label>
-                    <input
-                      value={tickerSymbol}
-                      onChange={(e) => setTickerSymbol(e.target.value)}
-                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                      placeholder="VWRL, IWDA..."
-                    />
-                  </div>
-                )}
-                {visibleFields.includes('is_liquid') && (
+                {inKern('is_liquid') && (
                   <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
                     <input
                       type="checkbox"
@@ -4401,9 +4238,15 @@ export function AssetForm({
                     Direct opneembaar
                   </label>
                 )}
-                {visibleFields.includes('lock_end_date') && !isLiquid && (
+                {showLockEndDate && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Vastgezet tot</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                      {assetType === 'levensverzekering'
+                        ? 'Einddatum polis'
+                        : assetType === 'vordering'
+                          ? 'Einddatum lening'
+                          : 'Vastgezet tot'}
+                    </label>
                     <input
                       type="date"
                       value={lockEndDate}
@@ -4412,67 +4255,7 @@ export function AssetForm({
                     />
                   </div>
                 )}
-                {visibleFields.includes('tax_benefit') && (
-                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-                    <input
-                      type="checkbox"
-                      checked={taxBenefit}
-                      onChange={(e) => setTaxBenefit(e.target.checked)}
-                      className="border-[var(--border-md)]"
-                    />
-                    Fiscaal voordeel
-                  </label>
-                )}
-                {visibleFields.includes('retirement_provider_type') && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Pensioenuitvoerder</label>
-                    <select
-                      value={retirementProviderType}
-                      onChange={(e) => setRetirementProviderType(e.target.value)}
-                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                    >
-                      <option value="">-</option>
-                      {Object.entries(RETIREMENT_PROVIDER_LABELS).map(([k, l]) => (
-                        <option key={k} value={k}>{l}</option>
-                      ))}
-                    </select>
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
-                      Vraag je actuele pensioenoverzicht op (DigiD vereist) en update je waarde handmatig.{' '}
-                      <a
-                        href="https://www.mijnpensioenoverzicht.nl/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 font-medium text-[var(--ink-2)] underline underline-offset-4 hover:text-[var(--ink)]"
-                      >
-                        Open mijnpensioenoverzicht.nl
-                        <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                      </a>
-                    </p>
-                  </div>
-                )}
-                {visibleFields.includes('address_postcode') && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Postcode</label>
-                    <input
-                      value={addressPostcode}
-                      onChange={(e) => setAddressPostcode(e.target.value)}
-                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                      placeholder="1234 AB"
-                    />
-                  </div>
-                )}
-                {visibleFields.includes('address_house_number') && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huisnummer</label>
-                    <input
-                      value={addressHouseNumber}
-                      onChange={(e) => setAddressHouseNumber(e.target.value)}
-                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                      placeholder="42"
-                    />
-                  </div>
-                )}
-                {visibleFields.includes('rental_income') && (
+                {inKern('rental_income') && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huurinkomsten p/m</label>
                     <input
@@ -4483,7 +4266,7 @@ export function AssetForm({
                     />
                   </div>
                 )}
-                {visibleFields.includes('woz_value') && (
+                {inKern('woz_value') && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">WOZ-waarde</label>
                     <input
@@ -4506,7 +4289,7 @@ export function AssetForm({
                     </p>
                   </div>
                 )}
-                {visibleFields.includes('depreciation_rate') && (
+                {inKern('depreciation_rate') && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Afschrijving (% p.j.)</label>
                     <input
@@ -4518,26 +4301,38 @@ export function AssetForm({
                     />
                   </div>
                 )}
-                {visibleFields.includes('expiry_date') && (
+                {inKern('ownership_percentage') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Einddatum polis</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Belang (%)</label>
                     <input
-                      type="date"
-                      value={expiryDate}
-                      onChange={(e) => setExpiryDate(e.target.value)}
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.01"
+                      value={ownershipPercentage}
+                      onChange={(e) => setOwnershipPercentage(e.target.value)}
+                      data-testid="asset-ownership-percentage"
                       className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
+                    <p className="mt-1 text-[10px] leading-tight text-[var(--ink-4)]">
+                      Jouw deel van de aandelen, zodat Box 2 alleen dat deel belast. Laat je dit leeg, dan rekent Box 2 met 100%.
+                    </p>
                   </div>
                 )}
-                {visibleFields.includes('beneficiary') && (
+                {inKern('annual_dividend') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Begunstigde</label>
-                    <input
-                      value={beneficiary}
-                      onChange={(e) => setBeneficiary(e.target.value)}
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Dividend per jaar</label>
+                    {/* Via AmountInput, net als elk ander bedrag hier: een
+                        number-veld leest "12.500" als 12,5. */}
+                    <AmountInput
+                      value={annualDividend}
+                      onChange={setAnnualDividend}
+                      data-testid="asset-annual-dividend"
                       className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                      placeholder="Bijv. partner, kinderen"
                     />
+                    <p className="mt-1 text-[10px] leading-tight text-[var(--ink-4)]">
+                      Wat de BV je per jaar uitkeert; daarover rekent Box 2 de heffing. Laat je dit leeg, dan toont Box 2 &ldquo;nog niet ingevuld&rdquo;.
+                    </p>
                   </div>
                 )}
                 {/* DGA-lening: link to deelneming + warning */}
@@ -4581,34 +4376,298 @@ export function AssetForm({
             </div>
           )}
 
-          {/* ── Verkoopstrategie in prognose ──
-              Stelt assets.sale_config in: of/wanneer de horizon-prognose dit
-              bezit verkoopt. Velden gedeeld met stap 4 van de plan-review
-              (components/core/sale-config-fields.tsx). */}
-          {showSaleConfig && (
-            <SaleConfigFields draft={saleDraft} onChange={setSaleDraft} activeDebts={activeDebts}>
-              {/* Vrijheidstijd-context bij de waarde — "geld levert tijd op". */}
-              {dailyExpenses > 0 && currentValueNum > 0 && (
-                <p className="text-[11px] text-[var(--ink-3)]">
-                  Deze waarde van <span className="font-medium text-[var(--ink-2)]">{fc(currentValueNum)}</span> staat voor{' '}
-                  <span className="font-medium text-horizon-700">
-                    {formatFreedomTimeString(calculateFreedomTime(currentValueNum, dailyExpenses), 'long')}
-                  </span>{' '}
-                  vrijheid.
-                </p>
+          {/* ── Hoe telt dit mee: alles wat de cijfers van deze bezitting verandert ── */}
+          <FormInklapblok titel="Hoe telt dit mee" samenvatting={teltMeeSamenvatting} data-testid="asset-telt-mee">
+              {/* Huishouden */}
+              {/* Alleen met een huishouden valt er iets te kiezen. Een bezitting
+                  die al gedeeld is blijft zichtbaar, zodat hij terug te zetten is. */}
+              {(hasHousehold || ownership === 'shared') && (
+                <OwnershipToggle
+                  value={ownership}
+                  onChange={setOwnership}
+                  hasHousehold={hasHousehold}
+                />
               )}
-            </SaleConfigFields>
-          )}
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-            />
-          </div>
+              {/* Netto vermogen inclusie — logisch onder huishouden */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                  Neem dit % mee in netto vermogen en berekeningen naar de horizon
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range" min={0} max={100} step={5}
+                    value={netWorthInclusionPct}
+                    onChange={(e) => setNetWorthInclusionPct(Number(e.target.value))}
+                    className="flex-1 accent-kern-600"
+                  />
+                  <input
+                    type="number" min={0} max={100}
+                    value={netWorthInclusionPct}
+                    onChange={(e) => setNetWorthInclusionPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                    className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
+                  />
+                  <span className="text-sm text-[var(--ink-3)]">%</span>
+                </div>
+                <p className="mt-1 text-[10px] text-[var(--ink-3)]">
+                  Stel in welk percentage van deze asset wordt meegeteld in je netto vermogen en vrijheidsberekeningen.
+                </p>
+                {netWorthInclusionPct < 100 && currentValueNum > 0 && (
+                  <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
+                    Effectieve waarde: {fc(currentValueNum * netWorthInclusionPct / 100)}
+                  </p>
+                )}
+              </div>
+
+              {inMeer('risk_profile') && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Risicoprofiel</label>
+                    <select
+                      value={riskProfile}
+                      onChange={(e) => setRiskProfile(e.target.value)}
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                    >
+                      <option value="">-</option>
+                      {Object.entries(RISK_PROFILE_LABELS).map(([k, l]) => (
+                        <option key={k} value={k}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+              {/* ── Verkoopstrategie in prognose ──
+                  Stelt assets.sale_config in: of/wanneer de horizon-prognose dit
+                  bezit verkoopt. Velden gedeeld met stap 4 van de plan-review
+                  (components/core/sale-config-fields.tsx). */}
+              {showSaleConfig && (
+                <SaleConfigFields draft={saleDraft} onChange={setSaleDraft} activeDebts={activeDebts}>
+                  {/* Vrijheidstijd-context bij de waarde — "geld levert tijd op". */}
+                  {dailyExpenses > 0 && currentValueNum > 0 && (
+                    <p className="text-[11px] text-[var(--ink-3)]">
+                      Deze waarde van <span className="font-medium text-[var(--ink-2)]">{fc(currentValueNum)}</span> staat voor{' '}
+                      <span className="font-medium text-horizon-700">
+                        {formatFreedomTimeString(calculateFreedomTime(currentValueNum, dailyExpenses), 'long')}
+                      </span>{' '}
+                      vrijheid.
+                    </p>
+                  )}
+                </SaleConfigFields>
+              )}
+
+          </FormInklapblok>
+
+          {/* ── Meer gegevens en koppelingen: zelden gewijzigd ── */}
+          <FormInklapblok titel={assetGegevensTitel(assetType, budgetingActive)} samenvatting={gegevensSamenvatting} data-testid="asset-meer-instellingen">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
+                  <select
+                    value={assetType}
+                    onChange={(e) => handleTypeChange(e.target.value as AssetType)}
+                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                  >
+                    {Object.entries(ASSET_TYPE_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                {inMeer('address_postcode') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Postcode</label>
+                    <input
+                      value={addressPostcode}
+                      onChange={(e) => setAddressPostcode(e.target.value)}
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                      placeholder="1234 AB"
+                    />
+                  </div>
+                )}
+                {inMeer('address_house_number') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huisnummer</label>
+                    <input
+                      value={addressHouseNumber}
+                      onChange={(e) => setAddressHouseNumber(e.target.value)}
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                      placeholder="42"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Externe koppeling sectie (R2) — alleen voor crypto, en alleen
+                  wanneer we een bestaand asset bewerken: een connection vereist
+                  een persistente asset-ID die we via de POST kunnen meegeven. */}
+              {isEdit && asset && assetType === 'crypto' && (
+                <AssetEditConnectionSection
+                  assetId={asset.id}
+                  assetName={asset.name}
+                  initialConnection={initialConnection}
+                />
+              )}
+
+              {/* Broker-koppeling sectie — alleen voor investment-assets, en alleen
+                  bij bewerken van een bestaand asset (een koppeling vereist een
+                  persistente asset-ID). Trading 212 (sync) of CSV-import. */}
+              {isEdit && asset && assetType === 'investment' && (
+                <AssetEditBrokerSection
+                  assetId={asset.id}
+                  assetName={asset.name}
+                  initialConnection={initialBrokerConnection}
+                />
+              )}
+
+              {/* Budget tracking toggle (cash only, hidden when budgetteren module is off) */}
+              {assetType === 'cash' && budgetingActive && (
+                <>
+                  <label className="flex items-start gap-3 rounded-[var(--r)] border border-positive/30 bg-positive/5 p-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hasBudgetTracking}
+                      onChange={(e) => {
+                        const wantsToDisable = !e.target.checked && hasBudgetTracking
+                        // If disabling and this is the last tracking account, show confirmation
+                        if (wantsToDisable && otherTrackingCount === 0) {
+                          setShowBudgetConfirm(true)
+                          return
+                        }
+                        setShowBudgetConfirm(false)
+                        setHasBudgetTracking(e.target.checked)
+                      }}
+                      className="mt-0.5 border-[var(--border-md)]"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-[var(--ink)]">Budgetten & transacties</span>
+                      <p className="text-xs text-[var(--ink-3)]">
+                        Schakel in om transacties te importeren, budgetcategorieën te koppelen, en cashflow te voorspellen.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Confirmation warning when disabling last budget tracking account */}
+                  {showBudgetConfirm && (
+                    <div className="rounded-[var(--r)] border border-amber-300 bg-amber-50 p-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        <div>
+                          <p className="text-sm font-medium text-amber-800">
+                            Weet je het zeker? Dit is je laatste rekening met budgetteren.
+                          </p>
+                          <p className="mt-1 text-xs text-amber-700">
+                            Als je dit uitschakelt, worden budgetfuncties in de hele app gedeactiveerd. Je kunt dit altijd weer inschakelen.
+                          </p>
+                          <div className="mt-3 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHasBudgetTracking(false)
+                                setShowBudgetConfirm(false)
+                              }}
+                              className="rounded-[var(--r)] bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+                            >
+                              Ja, uitschakelen
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowBudgetConfirm(false)}
+                              className="rounded-[var(--r)] border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                            >
+                              Annuleer
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Holdings tracking toggle (investment, crypto, savings, retirement) */}
+              {['investment', 'crypto', 'savings', 'retirement'].includes(assetType) && (
+                <>
+                  <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hasHoldingsTracking}
+                      onChange={(e) => {
+                        setHasHoldingsTracking(e.target.checked)
+                      }}
+                      className="mt-0.5 border-[var(--border-md)]"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-[var(--ink)]">Holdings bijhouden</span>
+                      <p className="text-xs text-[var(--ink-3)]">
+                        Schakel in om individuele posities, transacties en portfolio-allocatie bij te houden.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Warning when disabling with active holdings */}
+                  {!hasHoldingsTracking && isEdit && asset?.has_holdings_tracking && hasActiveHoldings && (
+                    <div className="rounded-[var(--r)] border border-amber-300 bg-amber-50 p-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        <div>
+                          <p className="text-sm font-medium text-amber-800">
+                            Er zijn {holdingsCount} actieve holding{holdingsCount !== 1 ? 's' : ''} gekoppeld.
+                          </p>
+                          <p className="mt-1 text-xs text-amber-700">
+                            Deze worden niet verwijderd maar verschijnen niet meer op de centrale holdings pagina.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Hypotheekplanner-app toggle (eigen_huis only) — patroon analoog aan budget/holdings hierboven. */}
+              {assetType === 'eigen_huis' && (
+                <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasWoonbalansTracking}
+                    onChange={(e) => setHasWoonbalansTracking(e.target.checked)}
+                    className="mt-0.5 border-[var(--border-md)]"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-[var(--ink)]">Hypotheekplanner</span>
+                    <p className="text-xs text-[var(--ink-3)]">
+                      Schakel in om je equity-opbouw, oversluit-scenario&apos;s en hypotheek-vs-beleggen te zien.
+                    </p>
+                  </div>
+                </label>
+              )}
+
+              {/* Verhuurrendement-app toggle (real_estate only) — patroon analoog aan budget/holdings hierboven. */}
+              {assetType === 'real_estate' && (
+                <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasRentalTracking}
+                    onChange={(e) => setHasRentalTracking(e.target.checked)}
+                    className="mt-0.5 border-[var(--border-md)]"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-[var(--ink)]">Verhuurrendement</span>
+                    <p className="text-xs text-[var(--ink-3)]">
+                      Schakel in om netto rendement, cashflow en bezetting per object te zien.
+                    </p>
+                  </div>
+                </label>
+              )}
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                />
+              </div>
+          </FormInklapblok>
         </div>
 
         {validationError && (

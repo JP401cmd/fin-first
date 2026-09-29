@@ -45,6 +45,7 @@ import {
   resolveDebtTermBasis,
 } from '@/lib/debt-term-basis'
 import { getDebtTrajectoryTips } from '@/lib/chart-tips'
+import { hvbRestLooptijdMaanden } from '@/lib/debt-remaining-term'
 
 export function DebtDetailModal({
   debt,
@@ -78,6 +79,8 @@ export function DebtDetailModal({
   embedded?: boolean
 }) {
   const [showHvB, setShowHvB] = useState(false)
+  // Stabiele "nu" voor de restlooptijd van hypotheek-vs-beleggen (render-purity).
+  const [hvbNow] = useState(() => new Date())
   // Grondslag van `end_date`: aflostijd, schuldenvrij-jaar en het geschatte
   // maandbedrag rusten er alle drie op. `null` ⇒ de gebruiker vulde de
   // einddatum zelf in en het getal is een gegeven, geen aanname.
@@ -537,7 +540,9 @@ export function DebtDetailModal({
             hypotheekBalance={balance}
             rente={Number(debt.interest_rate)}
             repaymentType={hvbRepaymentType}
-            restLooptijd={proj.monthsToPayoff > 0 ? proj.monthsToPayoff : 360}
+            // Zelfde afleiding als de dashboard-samenvatting. `monthsToPayoff` is
+            // `Infinity` bij een schuld zonder maandbedrag, en dat is ook > 0.
+            restLooptijd={hvbRestLooptijdMaanden(debt, hvbNow)}
             isTaxDeductible={debt.is_tax_deductible ?? false}
             marginaalTarief={deriveMarginaalTarief()}
             inflatie={INFLATION}

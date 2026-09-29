@@ -12,6 +12,7 @@ import {
 } from '@/lib/hypotheek-vs-beleggen'
 import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import type { Debt } from '@/lib/debt-data'
+import { hvbRestLooptijdMaanden } from '@/lib/debt-remaining-term'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
@@ -104,19 +105,11 @@ function mapRepaymentType(
 }
 
 /**
- * Estimate remaining loan term in months from the debt's end_date.
- * Falls back to 360 months (30 years) when no end date is available.
+ * Remaining loan term in months. Consumes the shared derivation so this
+ * surface, the dashboard summary and the debt pane agree on the same debt.
  */
 function estimateRestLooptijd(debt: Debt): number {
-  if (debt.end_date) {
-    const end = new Date(debt.end_date)
-    const now = new Date()
-    const months = Math.round(
-      (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44),
-    )
-    return Math.max(1, months)
-  }
-  return 360
+  return hvbRestLooptijdMaanden(debt, new Date())
 }
 
 /** Human-readable label for the recommendation. */

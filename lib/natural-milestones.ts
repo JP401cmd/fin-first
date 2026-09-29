@@ -231,9 +231,9 @@ function deriveAssetMilestones(assets: Asset[], dob: string | null): NaturalMile
   const activeAssets = assets.filter(a => a.is_active)
 
   for (const asset of activeAssets) {
-    // Levensverzekering: expiry_date = polis-uitkering
-    if (asset.asset_type === 'levensverzekering' && asset.expiry_date) {
-      const age = dateToAge(dob, asset.expiry_date)
+    // Levensverzekering: lock_end_date = polis-uitkering
+    if (asset.asset_type === 'levensverzekering' && asset.lock_end_date) {
+      const age = dateToAge(dob, asset.lock_end_date)
       if (age != null && Number.isFinite(age)) {
         out.push({
           id: `nat-asset-expiry-${asset.id}`,
@@ -241,7 +241,7 @@ function deriveAssetMilestones(assets: Asset[], dob: string | null): NaturalMile
           category: 'asset',
           name: `${asset.name || 'Polis'} keert uit`,
           target_age: age,
-          target_date: asset.expiry_date,
+          target_date: asset.lock_end_date,
           icon: 'Shield',
           sourceId: asset.id,
           amount: Number(asset.current_value),

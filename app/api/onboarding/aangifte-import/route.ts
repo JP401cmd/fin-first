@@ -540,6 +540,7 @@ async function runImportWritePhase({
         depreciation_rate: draft.depreciation_rate,
         address_postcode: draft.address_postcode,
         address_house_number: draft.address_house_number,
+        ownership_percentage: draft.ownership_percentage,
         ownership: draft.ownership,
         net_worth_inclusion_pct: draft.net_worth_inclusion_pct,
         // Provenance — the whole point of this endpoint.

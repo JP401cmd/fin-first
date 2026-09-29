@@ -20,6 +20,7 @@ import type { DebtKpiContext } from './debt-kpi'
 import { KPI_GEEN_EIGEN_RENDEMENT, type KpiPair, type KpiValue } from './asset-kpi'
 import { formatCurrency } from './format'
 import { debtRemainingMonths } from './debt-remaining-term'
+import { debtHasPaymentPlan } from './debt-form-layout'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -446,9 +447,9 @@ function aggLevensverzekering(assets: Asset[], ctx: AssetKpiContext): KpiPair {
   // KPI 1 — gewogen gem. resterende looptijd
   const now = ctx.now ?? new Date()
   const items = assets
-    .filter((a) => a.expiry_date)
+    .filter((a) => a.lock_end_date)
     .map((a) => ({
-      value: diffYearsApprox(now, new Date(a.expiry_date!)),
+      value: diffYearsApprox(now, new Date(a.lock_end_date!)),
       weight: Number(a.current_value),
     }))
     .filter((i) => i.value > 0)
@@ -616,7 +617,7 @@ function aggBelastingschuld(debts: Debt[]): KpiPair {
   }
 
   // KPI 2 — "X met / Y zonder regeling"
-  const withPlan = debts.filter((d) => d.has_payment_plan).length
+  const withPlan = debts.filter((d) => debtHasPaymentPlan(d)).length
   const withoutPlan = debts.length - withPlan
   let secondary: KpiValue | undefined
   if (withPlan > 0 && withoutPlan > 0) {
