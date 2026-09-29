@@ -317,6 +317,52 @@ describe('toetsAiTekst', () => {
     expect(toetsAiTekst('De grens gaat naar 60.000 euro.', grond).ok).toBe(true)
   })
 
+  it('G3 (hertoets): elk toplevel en de verhulde vormen vallen af, een gewone zin niet', () => {
+    for (const tekst of [
+      'Alles staat op mijnbank.io.',
+      'Kijk op bit.ly/abc.',
+      'Zie voorbeeld.be voor meer.',
+      'Zie voorbeeld[.]nl voor meer.',
+      'Zie voorbeeld (.) nl voor meer.',
+      'Zie voorbeeld . nl voor meer.',
+      'Zie voorbeeld punt nl voor meer.',
+      'Mail info at voorbeeld dot nl.',
+    ]) {
+      expect(toetsAiTekst(tekst, grond), tekst).toEqual({ ok: false, reden: 'link' })
+    }
+    // Het einde van een zin, een afkorting en het woord "punt" zijn geen domein.
+    for (const tekst of [
+      'De grens verschuift. Dit geldt voor spaargeld.',
+      'Dit geldt o.a. voor spaargeld.',
+      'Het belangrijkste punt is de grens van het heffingsvrij vermogen.',
+      'Op dit punt verandert er niets.',
+    ]) {
+      expect(toetsAiTekst(tekst, grond).ok, tekst).toBe(true)
+    }
+  })
+
+  it('compliance: geen voorspelling en geen stellige uitkomst voor de lezer (reden voorspelling)', () => {
+    for (const tekst of [
+      'De rente zal de komende maanden verder stijgen.',
+      'De huizenprijzen gaan volgend jaar omhoog.',
+      'Dit levert je onder de streep meer op.',
+      'Zo bespaar je belasting.',
+      'Je betaalt hierdoor minder belasting.',
+      'Je krijgt straks meer toeslag.',
+      'Dit is een gegarandeerd voordeel.',
+    ]) {
+      expect(toetsAiTekst(tekst, grond), tekst).toEqual({ ok: false, reden: 'voorspelling' })
+    }
+    // Beschrijven wat er verandert en voor wie dat geldt, mag.
+    for (const tekst of [
+      'Het heffingsvrij vermogen gaat omhoog naar 60.000 euro.',
+      'Dit geldt voor wie spaargeld boven de grens heeft.',
+      'De regeling verandert voor mensen met een koopwoning.',
+    ]) {
+      expect(toetsAiTekst(tekst, grond).ok, tekst).toBe(true)
+    }
+  })
+
   it('G6: "kies" en een zin die met "Doe" begint vallen af, net als de prompt zegt', () => {
     expect(toetsAiTekst('Kies wat bij je past.', grond)).toEqual({ ok: false, reden: 'wft' })
     expect(toetsAiTekst('Doe dit op tijd.', grond)).toEqual({ ok: false, reden: 'wft' })

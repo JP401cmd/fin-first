@@ -394,14 +394,44 @@ export function valideerAiUitvoer(
 
 // ── K4/K9: de guards per tekst ───────────────────────────────────────────────
 
-export type AfwijsReden = 'lengte' | 'getal' | 'datum' | 'wft' | 'metafoor' | 'naam' | 'link'
+export type AfwijsReden = 'lengte' | 'getal' | 'datum' | 'wft' | 'voorspelling' | 'metafoor' | 'naam' | 'link'
 
 /**
  * G3: geen link, domeinnaam of e-mailadres in een AI-tekst. Een bronkop of
  * samenvatting van derden kan een instructie of URL dragen; het model mag die
  * nooit doorgeven — de link naar de bron zet de server zelf uit de bronrij.
  */
-export const LINK: readonly RegExp[] = [/https?:/i, /\bwww\./i, /\b[\w-]+\.(nl|com|eu|org|net)\b/i, /@/]
+export const LINK: readonly RegExp[] = [
+  /https?:/i,
+  /\bwww\./i,
+  /@/,
+  // Elke domeinvorm, niet alleen vijf toplevels (hertoets 29-09: .io, .be, .de en
+  // verkorters kwamen door). Zonder spatie rond de punt, zodat het einde van een
+  // zin ("rente. De") en een bedrag ("12.500") niet meetellen: vóór de punt
+  // minstens twee tekens, erna alleen letters.
+  /\b[a-z0-9-]{2,}\.[a-z]{2,24}\b/i,
+  // Verhulde vormen: "voorbeeld[.]nl", "voorbeeld (.) nl", "voorbeeld . nl",
+  // "voorbeeld punt nl", "info at voorbeeld dot nl". "punt" en "dot" zijn gewone
+  // woorden, dus alleen vóór een bekend toplevel.
+  /\b[a-z0-9-]{2,}\s*(\[\.\]|\(\.\))\s*[a-z]{2,24}\b/i,
+  /\b[a-z0-9-]{2,}\s+(\.|punt|dot)\s+(nl|com|eu|org|net|be|de|io|info|app)\b/i,
+]
+
+/**
+ * Compliance-toets 29-09 (Notion · Juridische toetsen, kaart 1E): geen
+ * voorspelling over rente, koersen, prijzen of rendement, en geen stellige
+ * uitspraak over wat iets de lezer oplevert of kost. De Krant rekent dat niet
+ * uit, dus het model mag het niet beweren.
+ */
+export const AI_VOORSPELLING: readonly RegExp[] = [
+  // Alleen marktgrootheden: een besloten regelwijziging ("het heffingsvrij
+  // vermogen gaat omhoog naar …") is een feit uit de bron, geen voorspelling.
+  /\b(rente\w*|koers\w*|prijs|prijzen|\w*prijzen|rendement\w*|inflatie|beurs\w*|markt\w*)\b[^.!?]{0,40}\b(zal|zullen|gaat|gaan)\b[^.!?]{0,40}\b(stijgen|dalen|omhoog|omlaag|toenemen|afnemen|oplopen|zakken)\b/i,
+  /\bgegarandeerd\b/i,
+  /\b(levert|leveren)\s+(je|jou)\b[^.!?]{0,40}\bop\b/i,
+  /\b(bespaar|bespaart)\s+(je|jij)\b/i,
+  /\bje\s+(betaalt|krijgt|ontvangt|houdt)\b[^.!?]{0,30}\b(meer|minder)\b/i,
+]
 
 /**
  * G6: de prompt verbiedt "kies" en "doe"; de Wft-lijst vangt "kies" alleen als
@@ -442,6 +472,7 @@ export function toetsAiTekst(tekst: string, grond: string): { ok: true; tekst: s
   const schoon = tekst.replace(/\s+/g, ' ').trim()
   if (schoon.length === 0 || schoon.length > AI_TEKST_MAX_TEKENS || telZinnen(schoon) > AI_TEKST_MAX_ZINNEN) return { ok: false, reden: 'lengte' }
   if (vindWftOvertreding(schoon) || AI_EXTRA_AANSPORING.some((re) => re.test(schoon))) return { ok: false, reden: 'wft' }
+  if (AI_VOORSPELLING.some((re) => re.test(schoon))) return { ok: false, reden: 'voorspelling' }
   if (LINK.some((re) => re.test(schoon))) return { ok: false, reden: 'link' }
   if (KOOPMETAFOOR.some((re) => re.test(schoon))) return { ok: false, reden: 'metafoor' }
   if (ASSISTENTNAAM.test(schoon)) return { ok: false, reden: 'naam' }

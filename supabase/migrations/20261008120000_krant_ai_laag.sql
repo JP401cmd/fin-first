@@ -13,8 +13,8 @@
 -- ── Lineage ───────────────────────────────────────────────────────────────────
 -- Bouwt op 20261004120000_krant_tijdlijn_beta (bron 'tijdlijn', vorm 'raakt',
 -- krant_editie_items.tijdlijn, de partiële unieke index lezer + artikel). Die
--- migratie is op 29-09-2026 NOG NIET toegepast: deze moet er in dezelfde
--- release ná komen (volgorde op tijdstempel). Raakt verder alleen
+-- migratie staat sinds 29-09-2026 in productie; deze komt erna (volgorde op
+-- tijdstempel). Raakt verder alleen
 -- public.news_editions en public.app_settings (alleen LEZEN).
 --
 -- ── Wat er verandert ──────────────────────────────────────────────────────────
@@ -368,7 +368,13 @@ begin
         'bron', x.a ->> 'sourceName',
         'url', x.a ->> 'sourceUrl',
         'gepubliceerd', x.a ->> 'date',
-        'samenvatting', nullif(x.a ->> 'summary', '')
+        -- De oude samenvatting is door het model geschreven, met het profiel van
+        -- de lezer in context. Draagt ze een bedrag of spreekt ze de lezer aan,
+        -- dan vervalt ze: zo'n tekst is nooit getoetst (security-hertoets 29-09).
+        'samenvatting', case
+          when (x.a ->> 'summary') ~* '(€|\m(je|jouw|jij|uw)\M)' then null
+          else nullif(x.a ->> 'summary', '')
+        end
       ),
       r.gemaakt
     from jsonb_array_elements(r.items) with ordinality as x(a, nr);

@@ -80,6 +80,11 @@ describe('migratie krant_ai_laag — de inhoud van K7/K8', () => {
     expect(code).toMatch(/'tijdlijn', true, null, ref,/)
   })
 
+  it('hertoets: een oude samenvatting met een bedrag of een aanspreekvorm vervalt', () => {
+    // De oude samenvatting is modeltekst met het profiel van de lezer in context.
+    expect(code).toMatch(/when \(x\.a ->> 'summary'\) ~\* '\(€\|\\m\(je\|jouw\|jij\|uw\)\\m\)' then null/)
+  })
+
   it('R2: de oude personalImpact gaat NERGENS mee — niet als AI-tekst, niet in de momentopname', () => {
     expect(code).not.toContain('personalimpact')
     const snapshot = code.slice(code.indexOf('jsonb_build_object('), code.indexOf('r.gemaakt\n    from jsonb_array_elements'))

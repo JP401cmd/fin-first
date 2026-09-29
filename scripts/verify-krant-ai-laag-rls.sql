@@ -86,11 +86,12 @@ DO $$ DECLARE n int; t text; a uuid := current_setting('leaktest.a')::uuid; b uu
   EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE '5 OK 42501'; END;
 END $$;
 
--- 6 anon: 42501 (verwacht) of 0 rijen zonder fout
+-- 6 anon: alleen 42501. Anon heeft op beide tabellen geen enkel recht (stap 0c),
+-- dus "0 rijen zonder fout" kan hier niet voorkomen en telt als een afwijking.
 RESET ROLE;
 SET LOCAL ROLE anon;
 SELECT set_config('request.jwt.claims', '{"role":"anon"}', true), set_config('request.jwt.claim.sub', '', true);
-DO $ DECLARE n int; BEGIN
+DO $$ DECLARE n int; BEGIN
   BEGIN SELECT count(*) INTO n FROM public.krant_editie_items WHERE ai_tekst IS NOT NULL;
         RAISE EXCEPTION '6a anon kreeg SELECT op krant_editie_items terug (% rijen)', n;
   EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE '6a OK 42501 (revoke all, bedoeld)'; END;
@@ -139,6 +140,29 @@ DO $$ DECLARE a uuid := current_setting('leaktest.a')::uuid; ea uuid := current_
           VALUES (a, '2026-W40', 'tijdlijn', true, ref, 0, 0, 0, 'ai-oud', '{}', true);
         RAISE EXCEPTION '8 dezelfde oud_ref twee keer toegelaten';
   EXCEPTION WHEN unique_violation THEN RAISE NOTICE '8 OK 23505 — omzetting herhaalbaar'; END;
+END $$;
+
+-- 9 de omzetting zelf (K7): wat de migratie uit de vorige Krant met AI heeft
+-- overgezet, draagt alleen 'ai-oud'-berichten, zonder AI-tekst, zonder artikel,
+-- zonder de oude impactzin, en zonder een samenvatting met een bedrag of een
+-- aanspreekvorm (security-hertoets 29-09). De proefrij van stap 8 telt niet mee.
+DO $$ DECLARE fout int; n_edities int; n_items int; BEGIN
+  SELECT count(*) INTO fout
+    FROM public.krant_editie_items i
+    JOIN public.krant_edities e ON e.id = i.editie_id
+   WHERE e.oud_ref IS NOT NULL
+     AND e.oud_ref NOT LIKE '%:' || md5('leaktest')
+     AND (i.vorm <> 'ai-oud'
+          OR i.ai_tekst IS NOT NULL
+          OR i.ai_toegevoegd
+          OR i.article_id IS NOT NULL
+          OR i.snapshot ? 'personalImpact'
+          OR coalesce(i.snapshot ->> 'samenvatting', '') ~* '(€|\m(je|jouw|jij|uw)\M)');
+  IF fout > 0 THEN RAISE EXCEPTION '9 % omgezette berichten wijken af (vorm, AI-tekst, artikel, impactzin of persoonlijke samenvatting)', fout; END IF;
+  SELECT count(*) INTO n_edities FROM public.krant_edities e WHERE e.oud_ref IS NOT NULL AND e.oud_ref NOT LIKE '%:' || md5('leaktest');
+  SELECT count(*) INTO n_items FROM public.krant_editie_items i JOIN public.krant_edities e ON e.id = i.editie_id
+   WHERE e.oud_ref IS NOT NULL AND e.oud_ref NOT LIKE '%:' || md5('leaktest');
+  RAISE NOTICE '9 OK omzetting: % edities, % berichten, alle ai-oud zonder AI-tekst of persoonlijke tekst', n_edities, n_items;
 END $$;
 RESET ROLE;
 ROLLBACK;
