@@ -15,7 +15,7 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import type { SourceArticle } from '@/lib/news-sources'
 
-const NEWS_CATEGORIES = [
+export const NEWS_CATEGORIES = [
   'fiscaal',
   'rente',
   'woningmarkt',
@@ -41,7 +41,7 @@ const gekozenLinksSchema = z.object({
 
 // ── Schema for article categorization ───────────────────────────────
 
-const categorizedArticleSchema = z.object({
+export const categorizedArticleSchema = z.object({
   items: z.array(
     z.object({
       index: z.number().describe('Index van het artikel in de input-lijst'),
@@ -134,30 +134,12 @@ ${links.map((l, i) => `[${i}] ${l.tekst}${l.fragment && l.fragment !== l.tekst ?
   }
 }
 
-// ── Categorize and summarize a batch of articles ────────────────────
+// ── Categorisatie: prompt en schema gedeeld met de inhaalslag ─────
+// De cron en de handmatige categorisatie-inhaalslag (scripts/krant/
+// categorisatie-inhaalslag.ts) gebruiken letterlijk deze prompt en dit schema;
+// er is geen tweede formulering.
 
-/**
- * Uses AI to assign a category and improved Dutch summary to each article.
- * Designed for RSS articles that arrive without a category.
- * Processes all articles in a single AI call for efficiency.
- * Returns an empty map on failure — never throws.
- *
- * @param articles  Array of SourceArticle to categorize
- * @param model     AI model instance from getModel()
- */
-export async function categorizeArticles(
-  articles: SourceArticle[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  model: any,
-): Promise<Map<number, { category: string; summary: string; potentialImpact: string }>> {
-  const result = new Map<number, { category: string; summary: string; potentialImpact: string }>()
-  if (articles.length === 0) return result
-
-  try {
-    const { object } = await generateObject({
-      model,
-      schema: categorizedArticleSchema,
-      system: `Je bent een nieuwscategoriseerder voor TriFinity, een Nederlandse personal finance app.
+export const CATEGORISATIE_SYSTEM_PROMPT = `Je bent een nieuwscategoriseerder voor TriFinity, een Nederlandse personal finance app.
 
 Categorieen:
 - fiscaal: Belastingwijzigingen, box 1/2/3, toeslagen, aftrekposten
@@ -182,10 +164,40 @@ Regels:
 - Schrijf een verbeterde samenvatting in 2-3 zinnen, gericht op relevantie voor Nederlandse consumenten
 - De samenvatting moet in het Nederlands zijn
 - Focus op: wat is het nieuws, en waarom is het relevant voor persoonlijke financien
-- potentialImpact: kort en bondig, relateer aan specifieke app-functies. "Geen directe impact" als niet relevant`,
-      prompt: `Categoriseer en vat de volgende ${articles.length} nieuwsartikelen samen:
+- potentialImpact: kort en bondig, relateer aan specifieke app-functies. "Geen directe impact" als niet relevant`
 
-${articles.map((a, i) => `[${i}] Titel: ${a.title}\nBron: ${a.sourceName}\nOriginele samenvatting: ${a.summary || '(geen)'}`).join('\n\n')}`,
+/** De gebruikersprompt voor één brok artikelen (index = positie in de brok). */
+export function bouwCategorisatiePrompt(articles: readonly SourceArticle[]): string {
+  return `Categoriseer en vat de volgende ${articles.length} nieuwsartikelen samen:
+
+${articles.map((a, i) => `[${i}] Titel: ${a.title}\nBron: ${a.sourceName}\nOriginele samenvatting: ${a.summary || '(geen)'}`).join('\n\n')}`
+}
+
+// ── Categorize and summarize a batch of articles ────────────────────
+
+/**
+ * Uses AI to assign a category and improved Dutch summary to each article.
+ * Designed for RSS articles that arrive without a category.
+ * Processes all articles in a single AI call for efficiency.
+ * Returns an empty map on failure — never throws.
+ *
+ * @param articles  Array of SourceArticle to categorize
+ * @param model     AI model instance from getModel()
+ */
+export async function categorizeArticles(
+  articles: SourceArticle[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  model: any,
+): Promise<Map<number, { category: string; summary: string; potentialImpact: string }>> {
+  const result = new Map<number, { category: string; summary: string; potentialImpact: string }>()
+  if (articles.length === 0) return result
+
+  try {
+    const { object } = await generateObject({
+      model,
+      schema: categorizedArticleSchema,
+      system: CATEGORISATIE_SYSTEM_PROMPT,
+      prompt: bouwCategorisatiePrompt(articles),
     })
 
     for (const item of object.items) {

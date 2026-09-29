@@ -158,6 +158,12 @@ export interface DuidingOpties {
   /** Geen nieuwe rij meer oppakken na dit budget (ms sinds de start). Zonder: alleen de batch-cap. */
   tijdBudgetMs?: number
   now?: Date
+  /**
+   * Ook zonder model de versie-bump doen (ochtendroutine: de sessie duidt, de
+   * cron niet). Standaard uit: zonder model en zonder sessie zou een bump alle
+   * oude duidingen wissen terwijl niemand ze opnieuw duidt.
+   */
+  versieBumpZonderModel?: boolean
 }
 
 /**
@@ -552,6 +558,51 @@ async function duidEen(
 }
 
 /**
+ * Lees de wachtrij en doe daarna de versie-bump (in die volgorde, zie hieronder).
+ * Werpt bij een DB-fout; de aanroeper vangt.
+ */
+async function leesWachtrijEnBump(supabase: SupabaseClient, maxPerRun: number): Promise<WachtendArtikel[]> {
+  // LEZEN VÓÓR SCHRIJVEN — de volgorde is een veiligheidsmaatregel, geen
+  // smaak (security-review 1F fase 2, bevinding 1). De versie-bump hieronder
+  // raakt alleen kolommen die er altijd al waren en SLAAGT dus ook wanneer
+  // de nieuwe kolommen van fase 1 nog ontbreken; de select erboven faalt dan
+  // met 42703 en wordt door de buitenste catch weggeslikt. Stond de bump
+  // eerst, dan wiste een deploy-vóór-DDL in de eerste run alle bestaande
+  // duidingen onomkeerbaar en deed daarna stil niets meer. Nu faalt de run
+  // vóórdat er iets vernietigd is.
+  const { data, error } = await supabase
+    .from('news_articles')
+    .select(WACHTEND_ARTIKEL_KOLOMMEN)
+    // Legacy (vóór ADR 0176): geen eigen fragment, dus geen grondslag die
+    // geen modeltekst is. Die rijen worden bij de release gewist (B29) en
+    // mogen tot dan niet geduid worden.
+    .not('bron_soort', 'is', null)
+    .in('duiding_status', [...WACHTENDE_STATUSSEN])
+    .lt('duiding_pogingen', DUIDING_MAX_POGINGEN)
+    .order('fetched_at', { ascending: false })
+    .limit(Math.max(0, maxPerRun))
+  if (error) throw error
+
+  // Versie-bump: oudere duidingen én afwijzingen opnieuw laten duiden
+  // (herleiden, niet ophogen) — een bump is meestal een controle-fix, dus
+  // ook wat v1 afwees krijgt een nieuwe kans. Pogingen en fout gaan mee
+  // terug naar nul, anders valt een rij die op poging 3 slaagde buiten de
+  // selectie (`< DUIDING_MAX_POGINGEN`). 'teruggetrokken' blijft staan:
+  // dat is een beheerbesluit. De gebumpte rijen komen de VOLGENDE run aan
+  // de beurt: de selectie hierboven las alleen 'wacht'/'mislukt', en die
+  // twee verzamelingen zijn disjunct met de 'geduid'/'afgewezen' die de
+  // bump raakt. Dat volgt het bestaande contract "wat niet past, blijft
+  // wacht" en kost hoogstens één dag vertraging bij een bump.
+  const { error: bumpError } = await supabase
+    .from('news_articles')
+    .update({ duiding_status: 'wacht', duiding_pogingen: 0, duiding_fout: null, duiding: null })
+    .in('duiding_status', ['geduid', 'afgewezen'])
+    .lt('duiding_versie', DUIDING_VERSIE)
+  if (bumpError) throw bumpError
+  return (data ?? []) as unknown as WachtendArtikel[]
+}
+
+/**
  * Duid de wachtende artikelen, tot `maxPerRun`. Geeft altijd een summary terug;
  * werpt nooit. Zonder model: niets doen, alleen de wachtrij tellen.
  */
@@ -564,46 +615,15 @@ export async function duidWachtendeArtikelen(
   const summary: DuidingSummary = { ...LEGE_DUIDING_SUMMARY }
 
   try {
+    if (!model && opties.versieBumpZonderModel) {
+      // Ochtendroutine: geen model, wel de bump, zodat een controle-fix ook dan
+      // alle oude duidingen terug op 'wacht' zet voor de sessie. Zelfde volgorde:
+      // eerst de select (faalt vóór er iets gewist is), dan de bump.
+      await leesWachtrijEnBump(supabase, 0)
+    }
     if (model) {
-      // LEZEN VÓÓR SCHRIJVEN — de volgorde is een veiligheidsmaatregel, geen
-      // smaak (security-review 1F fase 2, bevinding 1). De versie-bump hieronder
-      // raakt alleen kolommen die er altijd al waren en SLAAGT dus ook wanneer
-      // de nieuwe kolommen van fase 1 nog ontbreken; de select erboven faalt dan
-      // met 42703 en wordt door de buitenste catch weggeslikt. Stond de bump
-      // eerst, dan wiste een deploy-vóór-DDL in de eerste run alle bestaande
-      // duidingen onomkeerbaar en deed daarna stil niets meer. Nu faalt de run
-      // vóórdat er iets vernietigd is.
-      const { data, error } = await supabase
-        .from('news_articles')
-        .select(WACHTEND_ARTIKEL_KOLOMMEN)
-        // Legacy (vóór ADR 0176): geen eigen fragment, dus geen grondslag die
-        // geen modeltekst is. Die rijen worden bij de release gewist (B29) en
-        // mogen tot dan niet geduid worden.
-        .not('bron_soort', 'is', null)
-        .in('duiding_status', [...WACHTENDE_STATUSSEN])
-        .lt('duiding_pogingen', DUIDING_MAX_POGINGEN)
-        .order('fetched_at', { ascending: false })
-        .limit(Math.max(0, opties.maxPerRun))
-      if (error) throw error
+      const artikelen = await leesWachtrijEnBump(supabase, opties.maxPerRun)
 
-      // Versie-bump: oudere duidingen én afwijzingen opnieuw laten duiden
-      // (herleiden, niet ophogen) — een bump is meestal een controle-fix, dus
-      // ook wat v1 afwees krijgt een nieuwe kans. Pogingen en fout gaan mee
-      // terug naar nul, anders valt een rij die op poging 3 slaagde buiten de
-      // selectie (`< DUIDING_MAX_POGINGEN`). 'teruggetrokken' blijft staan:
-      // dat is een beheerbesluit. De gebumpte rijen komen de VOLGENDE run aan
-      // de beurt: de selectie hierboven las alleen 'wacht'/'mislukt', en die
-      // twee verzamelingen zijn disjunct met de 'geduid'/'afgewezen' die de
-      // bump raakt. Dat volgt het bestaande contract "wat niet past, blijft
-      // wacht" en kost hoogstens één dag vertraging bij een bump.
-      const { error: bumpError } = await supabase
-        .from('news_articles')
-        .update({ duiding_status: 'wacht', duiding_pogingen: 0, duiding_fout: null, duiding: null })
-        .in('duiding_status', ['geduid', 'afgewezen'])
-        .lt('duiding_versie', DUIDING_VERSIE)
-      if (bumpError) throw bumpError
-
-      const artikelen = (data ?? []) as unknown as WachtendArtikel[]
       const start = Date.now()
       const deadline = opties.tijdBudgetMs === undefined ? Number.POSITIVE_INFINITY : start + opties.tijdBudgetMs
       let cursor = 0
