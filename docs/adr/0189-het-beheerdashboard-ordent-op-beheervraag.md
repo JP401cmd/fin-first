@@ -86,7 +86,8 @@ Vier dingen maakten een gewoon "statusbord" onbetrouwbaar:
     mis" niet: of een fout één of veertig gebruikers raakt, is precies wat de
     beheerder moet weten, en "< 5" zou die vraag onbeantwoord laten. Er gaat geen
     identiteit mee, het scherm is alleen voor de beheerrol, en `/beheer/errors` toont
-    met de foutmelding en de URL al meer dan een aantal.
+    met de foutmelding en de URL al meer dan een aantal. De eigenaar heeft deze keuze
+    op 29 sep 2026 bevestigd, met "< 5" als afgewezen alternatief.
 13. **Instellingen uit de omgeving tellen alleen op productie.** `CRON_SECRET`, de
     e-mailprovider en het meldkanaal zijn instellingen van de server waarop het
     scherm draait. Op een ontwikkel- of voorbeeldomgeving zeggen ze niets over
@@ -145,7 +146,11 @@ Vier dingen maakten een gewoon "statusbord" onbetrouwbaar:
   tijdstip van nu telt nog steeds als mislukte AI-aanroep. Het slot hoort op de tabel:
   een policy die de servercategorieën weigert en een kolomrecht zonder `created_at`.
   Dat is een eigen schemawijziging. Hetzelfde geldt voor `bank_sync_log`, dat alleen de
-  server zou moeten schrijven.
+  server zou moeten schrijven. Daar gaat de code voor: de banksynchronisatie schrijft
+  haar logregels nu met de sessie van de gebruiker, dus een dichte policy zonder die
+  omzetting laat het logboek leeglopen. De eigenaar heeft dit op 29 sep 2026 op de
+  backlog gezet (kaart 23 voor de policies, kaart 24 voor de omzetting die eraan
+  voorafgaat); het is geen geaccepteerd risico.
 - Er is geen begrenzing per gebruiker op het aantal foutregels. Wie veel regels
   instuurt, kan echte fouten uit het leesvenster van het foutenlogboek drukken; het
   dashboard zegt dan wel dat het venster is afgekapt.
