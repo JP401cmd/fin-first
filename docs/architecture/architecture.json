@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T07:23:33.252Z",
+  "generatedAt": "2026-09-29T13:29:59.134Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.15"
+    "version": "0.92.19"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -193,7 +193,7 @@
     "routesProduction": 90,
     "api": 342,
     "tables": 105,
-    "migrations": 269,
+    "migrations": 270,
     "integrations": 25,
     "components": 1251,
     "providers": 19,
@@ -8879,7 +8879,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 269
+    "migrationCount": 270
   },
   "tablesByDomain": [
     {
@@ -19145,6 +19145,18 @@
       ],
       "summary": "Na een week meten had geen enkele geduide Krant-duiding een rekenend mechanisme. Tarieven, grenzen en percentages staan zelden in een nieuwsbericht; ze staan in wetteksten, pdf's en sleuteltabellen. Besluit B34 (27 sep): rekenende berichten komen uit een gecureerde kalender van r",
       "file": "docs/adr/0185-de-regelkalender-als-tweeling-van-de-fiscale-wijzigingslog.md"
+    },
+    {
+      "id": "0186-model-per-ai-feature",
+      "title": "Model per AI-feature, effort standaard laag, prompt-caching op de duiding",
+      "status": "aanvaard",
+      "date": "2026-09-29",
+      "elements": [
+        "t-aigateway",
+        "as-nieuws"
+      ],
+      "summary": "Tot nu toe kende de app één globaal Anthropic-model (`ai_model_anthropic` = Sonnet 4.5) voor élke feature. De meting over 14 dagen (tot 29 sep 2026): de nieuws-cron (`nieuws_duiding` + `nieuws_ingest`) droeg ≈ $15 van de ≈ $16. Twee derde daarvan was input van de duiding: ≈ 10.00",
+      "file": "docs/adr/0186-model-per-ai-feature.md"
     }
   ],
   "churn": {
@@ -19156,7 +19168,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 66
+        "commits": 67
       },
       {
         "path": "app/(app)/toekomst",
@@ -19204,7 +19216,7 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3876,
+        "loc": 3959,
         "commits": 21
       },
       {
@@ -19286,6 +19298,13 @@
         "color": "amber"
       },
       {
+        "id": "categorie-schrijver",
+        "name": "categorie-schrijver",
+        "description": "Schrijft handmatige Krant-categorisaties (rubriek, samenvatting, impact) voor rijen die door een storing zonder rubriek bleven, voor de skill categorisatie-inhaalslag. Krijgt een cat-batch-bestand (systeemprompt van de cron + per artikel een prompt met een openbaar bronfragment) en een deel van de ids, en schrijft per id één object in het schema naar een eigen uitvoerbestand. Heeft bewust ALLEEN Read en Write: de bronfragmenten zijn onbetrouwbare tekst van derden en kunnen instructies bevatten, dus deze agent mag niets uitvoeren, geen database raken en niets ophalen. Alleen te gebruiken vanuit de skill categorisatie-inhaalslag (of /krant-ochtend).",
+        "model": "sonnet",
+        "color": "cyan"
+      },
+      {
         "id": "code-review",
         "name": "code-review",
         "description": "Use this agent when you need a thorough code review of recently written code, when you want to ensure code quality meets the highest standards, when checking for technical debt, security vulnerabilities, or performance issues, or when you need to run quality checks like linting and type checking.",
@@ -19305,6 +19324,13 @@
         "description": "Use this agent for a deep second opinion before a critical or hard-to-reverse decision, and for research that reaches beyond the codebase — comparing solution approaches, library/API research via the web, multi-source verification of assumptions. It complements the specialists, it does not replace them: bug investigation → bug-reporter, security audit → security-specialist, quick codebase lookup → Explore, solution design → architect. Pipelines may also dispatch it explicitly for deep pre-work analysis (e.g. understanding current behaviour before extending a feature).",
         "model": "opus",
         "color": "purple"
+      },
+      {
+        "id": "duiding-schrijver",
+        "name": "duiding-schrijver",
+        "description": "Schrijft handmatige Krant-duidingen voor de skill duiding-inhaalslag. Krijgt een batch-bestand (systeemprompt + per artikel een prompt met een openbaar bronfragment) en een deel van de ids, en schrijft per id één duiding in het modelschema naar een eigen uitvoerbestand. Heeft bewust ALLEEN Read en Write: de bronfragmenten zijn onbetrouwbare tekst van derden en kunnen instructies bevatten, dus deze agent mag niets uitvoeren, geen database raken en niets ophalen. Alleen te gebruiken vanuit de skill duiding-inhaalslag.",
+        "model": "opus",
+        "color": "cyan"
       },
       {
         "id": "frontend-ui-builder",
@@ -19581,6 +19607,12 @@
         ]
       },
       {
+        "id": "categorisatie-inhaalslag",
+        "name": "categorisatie-inhaalslag",
+        "description": "Gebruik om Krant-artikelen zonder rubriek (category null, meestal na een storing van de categorisatie in de nieuws-ingest-cron) vanuit een Claude-sessie te categoriseren in plaats van via de API. Onderdeel van /krant-ochtend. Exporteert de open rijen met exact de cron-prompt, laat de agent categorie-schrijver het werk doen, toetst tegen de actuele rij (schema, lengte, link- en geheim-toets) en schrijft pas na akkoord.",
+        "steps": []
+      },
+      {
         "id": "change-request",
         "name": "change-request",
         "description": "Gebruik bij elke wijziging aan de draaiende omgeving die een PR-diff niet laat zien — een cron erbij of eraf, een env-var of secret, third-party-config (Supabase, Vercel, mailprovider, bankprovider), of een handmatige actie op productie. Vier vragen vooraf en één aantekening in het beheerders-runbook. Niet voor migraties (schemawijziging), een gewone deploy (release) of een nieuwe verwerker (verwerkersregister).",
@@ -19608,6 +19640,12 @@
         "id": "datalek-72u",
         "name": "datalek-72u",
         "description": "Gebruik bij elk vermoeden van een datalek — een signaal dat persoonsgegevens gezien, gewijzigd of meegenomen kunnen zijn door iemand die dat niet mocht. Ingangen; een melding van buiten (support-mail), een incident uit het incidentprotocol, verdachte toegang in logs, of een kwijtgeraakt apparaat. Beoordeelt, damt in en meldt binnen 72 uur bij de AP; legt óók niet-gemelde lekken vast in het meldregister.",
+        "steps": []
+      },
+      {
+        "id": "duiding-inhaalslag",
+        "name": "duiding-inhaalslag",
+        "description": "Gebruik wanneer de duidingswachtrij van de Krant achterloopt — na een DUIDING_VERSIE-bump, een providerstoring, of als de weekmeting een week op \"voorlopig\" zet — en de achterstand vanuit een Claude-sessie moet worden ingehaald in plaats van via de API. Exporteert wachtende artikelen met exact de prompt van de cron, laat de sessie de duiding schrijven, toetst die met dezelfde controles tegen de actuele rij, en schrijft pas na akkoord.",
         "steps": []
       },
       {
@@ -19792,6 +19830,52 @@
             ]
           }
         ]
+      },
+      {
+        "id": "krant-ochtend",
+        "name": "krant-ochtend",
+        "description": "De dagelijkse Krant-ochtendroutine vanuit een Claude-sessie. Controleert alle Krant-jobs (nieuws-ingest, duidingswachtrij, rijen zonder rubriek, weekjob + weekmeting), vraagt één gebundeld akkoord, voert dan uit wat nodig is (categorisatie-inhaalslag → duiding-inhaalslag → weekjob) en schrijft tot slot de hartslag, waardoor de nieuws-ingest-cron 48 uur lang zelf niet duidt. Gebruik elke ochtend na 08:00 (NL) met \"/krant-ochtend\", of als de eigenaar vraagt \"moet er iets gebeuren aan de Krant?\".",
+        "steps": [
+          {
+            "index": 0,
+            "title": "Werkplek",
+            "agents": []
+          },
+          {
+            "index": 1,
+            "title": "Status (alleen lezen)",
+            "agents": []
+          },
+          {
+            "index": 2,
+            "title": "Eén akkoord",
+            "agents": []
+          },
+          {
+            "index": 3,
+            "title": "Uitvoeren (in deze volgorde)",
+            "agents": [
+              "categorie-schrijver",
+              "duiding-schrijver"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Hartslag",
+            "agents": []
+          },
+          {
+            "index": 5,
+            "title": "Rapport aan de eigenaar",
+            "agents": []
+          }
+        ]
+      },
+      {
+        "id": "krant-weekjob",
+        "name": "krant-weekjob",
+        "description": "Gebruik om de wekelijkse Krant-cron (/api/krant/cron — schaduweditie per lezer + de weekmeting op /beheer/nieuws) vanuit een Claude-sessie te draaien, zonder CRON_SECRET en zonder Vercel. Nodig als de maandagrun ontbrak of op het tijdbudget afbrak, of om een week opnieuw te meten nadat er ná de meting nog geduid is. Onderdeel van /krant-ochtend.",
+        "steps": []
       },
       {
         "id": "legal-response",
@@ -20425,15 +20509,15 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-28",
+    "previousDate": "2026-09-29",
     "hasChanges": true,
     "sections": [
       {
         "label": "API-routes",
         "added": [
-          "/api/admin/krant-weekmeting",
           "/api/krant/bezwaar",
           "/api/krant/tijdlijn",
+          "/api/krant/tijdlijn/cron",
           "/api/krant/tijdlijn/gelezen",
           "/api/krant/tijdlijn/vernieuwen",
           "/api/krant/variant"
@@ -20441,9 +20525,16 @@
         "removed": []
       },
       {
+        "label": "Integraties",
+        "added": [
+          "OpenRouter"
+        ],
+        "removed": []
+      },
+      {
         "label": "Componenten (aantal)",
         "added": [
-          "+8"
+          "+6"
         ],
         "removed": []
       }
@@ -20929,13 +21020,6 @@
     {
       "date": "2026-09-27",
       "api": 335,
-      "components": 1243,
-      "tables": 105,
-      "routesProduction": 90
-    },
-    {
-      "date": "2026-09-28",
-      "api": 336,
       "components": 1243,
       "tables": 105,
       "routesProduction": 90

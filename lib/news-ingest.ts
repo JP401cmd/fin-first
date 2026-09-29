@@ -35,7 +35,7 @@
 //    hetzelfde tijdbudget haalt de backfill de pagina op voor bestaande rijen
 //    die nog nooit geprobeerd zijn; die rij gaat per rij terug naar de
 //    duidingswachtrij (geen globale DUIDING_VERSIE-bump).
-// 4+5. Per brok van 10: categorisatie (optioneel model) en METEEN de upsert
+// 4+5. Per brok van 20: categorisatie (optioneel model) en METEEN de upsert
 //    met `onConflict: 'source_url'` (= de unieke index), `ignoreDuplicates`
 //    + `.select('id')`: `inserted` telt de rijen die de database TERUGGAF, niet
 //    de aanroepen (vóór ADR 0176 telde een no-op mee). Tijdbudget: na
@@ -102,12 +102,12 @@ export const BRON_KOP_MAX_TEKENS = 300
  */
 const IN_BROK = 40
 /**
- * Artikelen per categorisatie-call (en per schrijfbrok). 10 i.p.v. 20 sinds
- * 29 sep: de duur volgt vooral de uitvoertokens (20 samenvattingen = 48–75 s),
- * dus kleinere brokken vullen het budget fijner en de ongemeten eerste golf
- * loopt hoogstens half zo ver uit. Het aantal gelijktijdige calls blijft 2.
+ * Artikelen per categorisatie-call (en per schrijfbrok). Besluit eigenaar
+ * 29 sep: 20 (niet 10). De toets op de verwachte eindtijd (langste gemeten
+ * brok) bewaakt het budget; de ongemeten eerste golf kan bij 20 tot ~75 s
+ * duren, wat binnen RUN_TIJDBUDGET_MS past.
  */
-export const CATEGORISATIE_BROK = 10
+export const CATEGORISATIE_BROK = 20
 /** Gelijktijdige categorisatie-calls; meer raakt rate-limits. */
 const CATEGORISATIE_PARALLEL = 2
 /**
@@ -207,6 +207,11 @@ export interface IngestOpties {
   /** Model voor de duidingsstap (`getModel(service, 'nieuws_duiding')`); null = alleen wachtrij tellen. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   duidingModel?: any | null
+  /**
+   * Versie-bump ook zonder duidingsmodel (ochtendroutine, zie
+   * `DuidingOpties.versieBumpZonderModel`). Alleen zetten als een sessie duidt.
+   */
+  duidingVersieBumpZonderModel?: boolean
   /** Batch-cap van de duidingsstap in deze run. */
   duidingMaxPerRun?: number
   /** Tijdbudget van de duidingsstap (ms); daarna pakt geen werker een nieuwe rij. */
@@ -1075,6 +1080,7 @@ export async function runNewsIngest(
     duiding = await duidWachtendeArtikelen(supabase, opties.duidingModel ?? null, {
       maxPerRun: opties.duidingMaxPerRun,
       tijdBudgetMs: begrensDuidingBudget(opties.duidingTijdBudgetMs, RUN_TIJDBUDGET_MS - (klok() - runStartMs)),
+      ...(opties.duidingVersieBumpZonderModel ? { versieBumpZonderModel: true } : {}),
     })
   }
 

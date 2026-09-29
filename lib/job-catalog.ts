@@ -48,6 +48,11 @@ export interface JobCatalogEntry {
    * een kwartier-sweep, niet meer bij een dagelijkse.
    */
   maxAgeHours: number | null
+  /**
+   * true = geen Vercel-cron; draait vanuit een Claude-sessie. De drift-check
+   * (`detectScheduleDrift`) zoekt deze taak dan niet in vercel.json.
+   */
+  handmatig?: true
 }
 
 export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
@@ -75,7 +80,8 @@ export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
     label: 'Nieuws-ingest',
     schedule: 'Dagelijks 05:00 UTC',
     path: '/api/news-ingest/cron',
-    description: 'RSS- en webbronnen ophalen, AI-categoriseren en opslaan.',
+    description:
+      'RSS- en webbronnen ophalen, AI-categoriseren, opslaan en duiden. Is de ochtendsessie (krant-ochtend) jonger dan 48 uur, dan laat hij het duiden aan die sessie over.',
     maxAgeHours: 26,
   },
   'krant-weekmeting': {
@@ -181,6 +187,19 @@ export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
       'Ververst de tijdlijn van elke lezer die de bèta "tijdlijn zonder AI" aan heeft (Krant 1C, B31/B38): nieuwe relevante berichten bovenaan, niets eraf, een artikel hoogstens één keer; ruimt berichten ouder dan 120 dagen op. Zolang de bèta dicht is alleen voor superadmins. Summary = tellingen, geen inhoud.',
     // Dagelijks plus de dag-jitter van Vercel.
     maxAgeHours: 26,
+  },
+  'krant-ochtend': {
+    key: 'krant-ochtend',
+    label: 'Krant — ochtendsessie',
+    // Geen Vercel-cron: de eigenaar draait elke ochtend /krant-ochtend in een
+    // Claude-sessie. De rij is de hartslag (lib/krant/ochtend-hartslag.ts).
+    schedule: 'Handmatig, elke ochtend (Claude-sessie)',
+    path: 'scripts/krant/ochtend.ts',
+    handmatig: true,
+    description:
+      'Een Claude-sessie controleert de Krant-jobs en doet de duiding. Zolang deze hartslag jonger is dan 48 uur, laat de nieuws-ingest de duiding liggen; daarna doet de cron die weer zelf via de API (vangnet).',
+    // Niet bewaken: een gemiste sessie is geen storing, want de cron neemt het na 48 uur over.
+    maxAgeHours: null,
   },
 }
 

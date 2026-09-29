@@ -142,6 +142,26 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'De Wft/AVG-poort vóór elke publieke uiting, AI-wijziging en SEO-pagina: inzicht mag, vergunningsplichtig advies niet — plus de claimlijst, en altijd een beslisbare uitkomst (goedkeuren · aanpassen · afwijzen).',
   },
+  'duiding-inhaalslag': {
+    kind: 'tooling',
+    tagline:
+      'De achterstand in de Krant-duiding inhalen vanuit een sessie in plaats van via de API: exact de prompt van de cron exporteren, de duiding in de sessie schrijven, met dezelfde controles tegen de actuele rij toetsen, en pas na akkoord alleen het geduide deel schrijven.',
+  },
+  'categorisatie-inhaalslag': {
+    kind: 'tooling',
+    tagline:
+      'Krant-artikelen die door een storing zonder rubriek bleven, categoriseren vanuit een sessie: exact de cron-prompt exporteren, de agent categorie-schrijver laten schrijven, toetsen tegen de actuele rij (schema, lengte, link en geheim), en pas na akkoord alleen de cron-kolommen vullen.',
+  },
+  'krant-weekjob': {
+    kind: 'tooling',
+    tagline:
+      'De wekelijkse Krant-cron (schaduweditie + weekmeting) vanuit een sessie draaien: de échte route lokaal, zonder AI, als de maandagrun ontbrak of een week opnieuw gemeten moet worden.',
+  },
+  'krant-ochtend': {
+    kind: 'tooling',
+    tagline:
+      'De dagelijkse Krant-routine: alle jobs controleren, één akkoord, dan duiden (en rijen zonder rubriek inhalen) en zo nodig de weekjob draaien; de hartslag laat de ingest-cron 48 uur lang niet zelf duiden.',
+  },
   'fiscale-wijzigingslog': {
     kind: 'tooling',
     tagline:
@@ -277,6 +297,16 @@ export const AGENT_CURATION: Record<string, AgentCuration> = {
     groupId: 'ai',
     rol: 'De AI-plumbing — Vercel AI SDK, providers, tools, schemas, context-builders en de guardrails.',
     inzet: 'Voor nieuwe AI-routes, tools, structured outputs of provider/config-wijzigingen.',
+  },
+  'duiding-schrijver': {
+    groupId: 'ai',
+    rol: 'Schrijft handmatige Krant-duidingen voor de inhaalslag, met alleen Read en Write, omdat de bronfragmenten onbetrouwbare tekst van derden zijn.',
+    inzet: 'Alleen vanuit de skill duiding-inhaalslag, per deel van een batch met een eigen uitvoerbestand.',
+  },
+  'categorie-schrijver': {
+    groupId: 'ai',
+    rol: 'Schrijft handmatige Krant-categorisaties (rubriek, samenvatting, impact) met de cron-prompt voor rijen die door een storing zonder rubriek bleven. Alleen Read en Write, omdat de bronfragmenten onbetrouwbare tekst van derden zijn.',
+    inzet: 'Alleen vanuit de skill categorisatie-inhaalslag of /krant-ochtend, met een eigen uitvoerbestand.',
   },
   'ai-specialist-prompt-dna': {
     groupId: 'ai',

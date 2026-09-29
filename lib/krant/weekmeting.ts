@@ -13,12 +13,14 @@
 //      meetmoment; er is geen teller die wordt opgehoogd. Uitzondering:
 //      `backfillResterend` is de stand van de hele tabel op het meetmoment.
 //   2. Alleen tellingen (ADR 0146). Geen artikeltekst, geen URL, geen user_id.
-//      Lege edities alleen als TOTAAL plus de verdeling van de testaccounts
-//      (fictieve persona's, ongedrukt). De verdeling per profieltype van echte
-//      lezers staat bewust NIET in dit record: de editie-summary publiceert
-//      haar al k=5-onderdrukt, en twee correct onderdrukte tabellen over een
-//      net iets andere populatie (een herhaalde run) geven samen de ongedrukte
-//      cel van het verschil prijs (security-run 29 sep, 🟡-1).
+//      Lege edities als totaal, per profieltype voor echte lezers
+//      k=5-onderdrukt (`onderdrukPerProfieltype`, hetzelfde algoritme als de
+//      weekcron) en ongedrukt voor de testaccounts (fictieve persona's).
+//      Besluit eigenaar 29 sep: de verdeling van echte lezers staat wél in dit
+//      record. Het restrisico uit de security-run (twee correct onderdrukte
+//      tabellen over een net iets andere populatie — editie-summary en dit
+//      record bij een herhaalde run — geven samen de cel van het verschil
+//      prijs) is bewust aanvaard.
 //   3. Een drempel is een WAARSCHUWING in het record, geen fout. De runner
 //      schrijft het record dan als `partial` (ADR 0178: zichtbaar op
 //      /beheer/jobs, geen melding) — een poort die elke week alarmeert, wordt
@@ -33,7 +35,7 @@
 import { amsterdamDateString, amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { doelgroepAfwijzingen, type WeekMeting } from './duiding-beheer'
 import { isMechanismeId } from './mechanismen'
-import { telProfieltype, type ProfieltypeTelling } from './meting'
+import { onderdrukPerProfieltype, telProfieltype, type OnderdrukteTelling, type ProfieltypeTelling } from './meting'
 
 export const WEEKMETING_VERSIE = 1
 
@@ -47,6 +49,20 @@ export type WeekmetingBronsoort = (typeof WEEKMETING_BRONSOORTEN)[number]
  * ~300 artikelen (1 pp ≈ 3 artikelen).
  */
 export const SAMENVATTING_DALING_PP = 5
+
+/**
+ * Aandeel van de binnengekomen artikelen dat nog in de duidingswachtrij mag
+ * staan voordat de week "voorlopig" heet. Daarboven zeggen de dekkingscijfers
+ * (rekenend, samenvatting) iets over de wachtrij, niet over de duiding: na
+ * een duidingsbump (zoals v3 op 27 sep) staat een hele week weer op `wacht`
+ * en duidt de ingest nieuwste eerst, dus een afgesloten week komt als laatste.
+ */
+export const WACHTRIJ_VOORLOPIG_AANDEEL = 0.1
+
+/** Staat meer dan `WACHTRIJ_VOORLOPIG_AANDEEL` van de week nog op `wacht`? */
+export function isVoorlopig(artikelen: { binnen: number; wacht: number }): boolean {
+  return artikelen.binnen > 0 && artikelen.wacht / artikelen.binnen > WACHTRIJ_VOORLOPIG_AANDEEL
+}
 
 // ── Weekgrenzen ──────────────────────────────────────────────────────────────
 
@@ -191,6 +207,8 @@ export interface WeekmetingRecord {
     metMechanisme: number
     rekenend: number
     metThema: number
+    /** Door een handmatige inhaalslag geduid — geen meting van het productiemodel. Optioneel voor oude records. */
+    handmatig?: number
     metSamenvatting: number
     /** metSamenvatting / geduid (0–1), of null bij 0 geduid. */
     aandeelSamenvatting: number | null
@@ -201,15 +219,17 @@ export interface WeekmetingRecord {
   poort: { g1: number; g2: number; g3: number; g4: number; g5: number; g6: number; groen: number; gedegradeerd: number }
   perBronsoort: Record<WeekmetingBronsoort | 'onbekend', BronsoortDekking>
   artikelpaginas: { gelezen: number; terugval: number; geenHtml: number; backfillResterend: number | null }
-  /**
-   * Lege edities van de editieweek: alleen totalen plus de testaccounts. De
-   * verdeling van echte lezers staat in de editie-summary (zie de kop).
-   */
+  /** Lege edities van de editieweek (zie de kop voor de onderdrukking). */
   verversingen: {
     edities: number
     leeg: number
     /** De editierun liep niet volledig: de tellingen zijn een ondergrens. */
     onvolledig: boolean
+    /**
+     * Echte lezers, k=5-onderdrukt tegen hun eigen totaal. Optioneel: records
+     * van vóór 29 sep dragen dit veld niet.
+     */
+    perProfieltype?: Record<string, OnderdrukteTelling>
     /** De vijf persona's: fictief, dus ongedrukt. */
     testaccounts: Record<string, ProfieltypeTelling>
   }
@@ -264,21 +284,38 @@ export function bepaalWaarschuwingen(r: Omit<WeekmetingRecord, 'waarschuwingen'>
   if (r.artikelen.foutGetalRekenend > 0) {
     uit.push({ code: 'fout-getal', tekst: `${r.artikelen.foutGetalRekenend} duiding(en) teruggetrokken om een fout getal bij een rekenend mechanisme` })
   }
-  if (p.g1 > 0) uit.push({ code: 'g1', tekst: `G1: ${p.g1} samenvatting(en) gedegradeerd om een ongegrond getal of een verwijzing` })
-  if (p.g2 > 0) uit.push({ code: 'g2', tekst: `G2: ${p.g2} samenvatting(en) gedegradeerd om een datum` })
-  if (p.g3 > 0) uit.push({ code: 'g3', tekst: `G3: ${p.g3} samenvatting(en) gedegradeerd om meta-commentaar` })
-  if (r.artikelen.geduid > 0 && r.artikelen.rekenend === 0) {
+  // G1–G3 zijn de tekstpoort die iets tegenhield: een telling in `poort`, geen
+  // waarschuwing (besluit eigenaar 29 sep).
+  // Staat de week nog grotendeels in de duidingswachtrij, dan zeggen
+  // "0 rekenend" en een gedaalde samenvatting niets over de duiding. Dan één
+  // waarschuwing "voorlopig" in hun plaats; een herhaalde run later in de week
+  // meet dezelfde week opnieuw en wint in de weekreeks.
+  const voorlopig = isVoorlopig(r.artikelen)
+  if (voorlopig) {
+    uit.push({
+      code: 'voorlopig',
+      tekst: `Voorlopig: ${r.artikelen.wacht} van ${r.artikelen.binnen} artikelen staan nog in de duidingswachtrij`,
+    })
+  }
+  if (!voorlopig && r.artikelen.geduid > 0 && r.artikelen.rekenend === 0) {
     uit.push({ code: 'nul-rekenend', tekst: 'Geen enkel geduid artikel met een rekenend mechanisme deze week' })
   }
   const nu = r.artikelen.aandeelSamenvatting
   const toen = r.vorigeWeek?.aandeelSamenvatting ?? null
-  if (nu !== null && toen !== null && (toen - nu) * 100 >= SAMENVATTING_DALING_PP) {
+  if (!voorlopig && nu !== null && toen !== null && (toen - nu) * 100 >= SAMENVATTING_DALING_PP) {
     uit.push({
       code: 'samenvatting-daalt',
       tekst: `Aandeel met samenvatting daalde van ${Math.round(toen * 100)}% naar ${Math.round(nu * 100)}%`,
     })
   }
   if (r.artikelen.binnen === 0) uit.push({ code: 'geen-artikelen', tekst: 'Geen enkel artikel binnengekomen deze week' })
+  const handmatig = r.artikelen.handmatig ?? 0
+  if (handmatig > 0) {
+    uit.push({
+      code: 'handmatig-geduid',
+      tekst: `${handmatig} van ${r.artikelen.geduid} duidingen komen uit een handmatige inhaalslag: geen meting van het productiemodel`,
+    })
+  }
   if (r.verversingen.onvolledig) {
     uit.push({ code: 'editierun-onvolledig', tekst: 'De editierun liep niet volledig: de lege edities zijn een ondergrens' })
   }
@@ -322,8 +359,11 @@ export function bouwWeekmeting(inv: WeekmetingInvoer): WeekmetingRecord {
 
   // Lege verversingen: één geldende editie per lezer (dubbelen van een
   // gelijktijdige run tellen één keer — dezelfde check-then-act als de cron).
-  // Echte lezers alleen in het totaal; testaccounts per profieltype.
+  // Echte lezers per profieltype k=5-onderdrukt tegen hun eigen totaal;
+  // testaccounts ongedrukt.
   const testaccounts: Record<string, ProfieltypeTelling> = {}
+  const perTypeRuw: Record<string, ProfieltypeTelling> = {}
+  const totaalEcht: ProfieltypeTelling = { edities: 0, leeg: 0 }
   const lezers = new Set<string>()
   let edities = 0
   let leeg = 0
@@ -332,7 +372,13 @@ export function bouwWeekmeting(inv: WeekmetingInvoer): WeekmetingRecord {
     lezers.add(e.user_id)
     edities++
     if (e.leeg) leeg++
-    if (inv.testaccountIds.has(e.user_id)) telProfieltype(testaccounts, e.profiel_type, e.leeg)
+    if (inv.testaccountIds.has(e.user_id)) {
+      telProfieltype(testaccounts, e.profiel_type, e.leeg)
+    } else {
+      telProfieltype(perTypeRuw, e.profiel_type, e.leeg)
+      totaalEcht.edities++
+      if (e.leeg) totaalEcht.leeg++
+    }
   }
 
   const perFeature: WeekmetingRecord['tokens']['perFeature'] = {}
@@ -364,6 +410,7 @@ export function bouwWeekmeting(inv: WeekmetingInvoer): WeekmetingRecord {
       metMechanisme: w?.metMechanisme ?? 0,
       rekenend: w?.rekenend ?? 0,
       metThema: w?.metThema ?? 0,
+      handmatig: w?.handmatig ?? 0,
       metSamenvatting,
       aandeelSamenvatting: aandeel(metSamenvatting, geduid),
       aandeelThema: aandeel(w?.metThema ?? 0, geduid),
@@ -376,6 +423,7 @@ export function bouwWeekmeting(inv: WeekmetingInvoer): WeekmetingRecord {
       edities,
       leeg,
       onvolledig: inv.editieOnvolledig,
+      perProfieltype: onderdrukPerProfieltype(perTypeRuw, totaalEcht),
       testaccounts,
     },
     tokens: { perFeature, totaal },

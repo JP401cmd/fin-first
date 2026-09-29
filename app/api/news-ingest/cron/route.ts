@@ -5,6 +5,7 @@ import { getModel } from '@/lib/ai/config'
 import { bepaalIngestUitkomst, runNewsIngest, DETAIL_TIJDBUDGET_MS } from '@/lib/news-ingest'
 import { DUIDING_MAX_PER_RUN_CRON, DUIDING_TIJDBUDGET_MS_CRON } from '@/lib/krant/duiding'
 import { recordJobRun } from '@/lib/job-runs'
+import { leesOchtendHartslag } from '@/lib/krant/ochtend-hartslag'
 
 // De duidingsstap (ADR 0171) doet tot DUIDING_MAX_PER_RUN_CRON modelcalls van
 // 3–5 s; dat past niet in de standaardduur. Zelfde conventie als
@@ -108,19 +109,30 @@ export async function GET(request: Request) {
       // AI model not configured — proceed without enrichment
     }
 
+    // Ochtendroutine (ADR 0171-aanvulling 29 sep): heeft een Claude-sessie de
+    // afgelopen 48 uur de Krant bijgewerkt, dan laat de cron de duiding aan die
+    // sessie over (wel de versie-bump, zodat een controle-fix ook dan doorwerkt).
+    // Linkkeuze en categorisatie blijven hier: de linkkeuze kan alleen tijdens
+    // het ophalen, en de live /nieuws-editie leest de summary van de
+    // categorisatie. Ouder of onleesbaar = vangnet, alles via de API.
+    const ochtend = await leesOchtendHartslag(service, new Date())
+
     // Eigen feature-sleutel voor de duiding: aparte kostenpost op
     // /beheer/ai-verbruik, zelfde kill-switch en token-logging (ADR 0171).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let duidingModel: any = null
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      duidingModel = await getModel(service as any, 'nieuws_duiding', { userId: null })
-    } catch {
-      // Zonder model wordt alleen de wachtrij geteld — de ingest draait door
+    if (!ochtend.vers) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        duidingModel = await getModel(service as any, 'nieuws_duiding', { userId: null })
+      } catch {
+        // Zonder model wordt alleen de wachtrij geteld — de ingest draait door
+      }
     }
 
     const { summary, health } = await runNewsIngest(service, model, {
       duidingModel,
+      duidingVersieBumpZonderModel: ochtend.vers,
       duidingMaxPerRun: DUIDING_MAX_PER_RUN_CRON,
       // Krant 1F fase 3 zette een detailstap (25 s) vóór de categorisatie; zonder
       // deze aftrek telden de budgetten op tot ~300 s = maxDuration, en een trage
@@ -136,7 +148,7 @@ export async function GET(request: Request) {
     // alarmeert bewust niet (zie recordJobRun); de reden gaat mee in de
     // summary, zodat /beheer/jobs kan laten zien WELKE stap wat verloor.
     const { status, verlies } = bepaalIngestUitkomst(summary, health)
-    const gemeld = { ...summary, verlies }
+    const gemeld = { ...summary, verlies, ochtend: { hartslag: ochtend.laatste, uitbesteed: ochtend.vers } }
 
     await recordJobRun(service, { job: 'news-ingest', status, startedAt, summary: gemeld })
 

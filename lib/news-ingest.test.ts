@@ -511,6 +511,16 @@ describe('runNewsIngest — bewaren op tijd, geen grens op aantal (ADR 0171)', (
   })
 })
 
+describe('runNewsIngest — ochtendroutine: versie-bump zonder model (29 sep)', () => {
+  it('geeft versieBumpZonderModel alleen door als de route erom vraagt', async () => {
+    const { client } = maakClient()
+    await runNewsIngest(client as never, MODEL, { now: NU, duidingModel: null, duidingMaxPerRun: 60, duidingVersieBumpZonderModel: true })
+    expect(vi.mocked(duidWachtendeArtikelen).mock.calls.at(-1)?.[2]).toMatchObject({ versieBumpZonderModel: true })
+    await runNewsIngest(client as never, MODEL, { now: NU, duidingModel: null, duidingMaxPerRun: 60 })
+    expect(vi.mocked(duidWachtendeArtikelen).mock.calls.at(-1)?.[2]).not.toHaveProperty('versieBumpZonderModel')
+  })
+})
+
 describe('runNewsIngest — categorisatie per brok, met tijdbudget (H1)', () => {
   // Bewust buiten DETAIL_HOSTS (/nl-nl/nieuws/): deze suite toetst de categorisatie, niet de detailcap.
   const veelLinks = (n: number) =>
@@ -537,15 +547,13 @@ describe('runNewsIngest — categorisatie per brok, met tijdbudget (H1)', () => 
     expect(rijen.every((r) => r.category === 'macro')).toBe(true)
 
     // De volgende run pakt het restant op; wat al staat, is al bekend (sleutel = server).
+    // Met brokken van 20 (besluit eigenaar 29 sep) past het restant van 10 in één brok.
+    expect(CATEGORISATIE_BROK).toBe(20)
     tijd = 0
     const twee = await runNewsIngest(client as never, MODEL, { now: NU, klok, categorisatieTijdBudgetMs: 90_000 })
-    expect(twee.summary.inserted).toBe(2 * CATEGORISATIE_BROK)
-    expect(twee.summary.alBekend).toBe(2 * CATEGORISATIE_BROK)
-    expect(rijen).toHaveLength(4 * CATEGORISATIE_BROK)
-    tijd = 0
-    const drie = await runNewsIngest(client as never, MODEL, { now: NU, klok, categorisatieTijdBudgetMs: 90_000 })
-    expect(drie.summary.inserted).toBe(50 - 4 * CATEGORISATIE_BROK)
-    expect(drie.summary.uitgesteld).toBe(0)
+    expect(twee.summary.inserted).toBe(10)
+    expect(twee.summary.alBekend).toBe(40)
+    expect(twee.summary.uitgesteld).toBe(0)
     expect(rijen).toHaveLength(50)
   })
 
@@ -622,11 +630,10 @@ describe('runNewsIngest — categorisatie per brok, met tijdbudget (H1)', () => 
     })
     const { client } = maakClient()
     const { summary } = await runNewsIngest(client as never, MODEL, { now: NU, klok: () => tijd, categorisatieTijdBudgetMs: 75_000 })
-    // Golven van twee brokken op 0, 20 en 40 s (40 + 20 ≤ 75); de golf op 60 s
-    // past niet meer (60 + 20 > 75). Zes brokken dus, de rest uitgesteld.
-    expect(vi.mocked(categorizeArticles)).toHaveBeenCalledTimes(6)
-    expect(summary.inserted).toBe(6 * CATEGORISATIE_BROK)
-    expect(summary.uitgesteld).toBe(100 - 6 * CATEGORISATIE_BROK)
+    // Vijf brokken van 20 in golven op 0, 20 en 40 s (40 + 20 ≤ 75): alles past.
+    expect(vi.mocked(categorizeArticles)).toHaveBeenCalledTimes(5)
+    expect(summary.inserted).toBe(100)
+    expect(summary.uitgesteld).toBe(0)
   })
 
   it('een budget van 0 laat toch het eerste brok door: elke run legt iets vast', async () => {

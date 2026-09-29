@@ -37,6 +37,7 @@ import {
   duidingV1Schema,
   DUIDING_STATUSSEN,
   GRONDSLAG_SOORTEN,
+  HANDMATIG_MODEL_ID,
   TERUGTREK_REDENEN,
   type DuidingStatus,
   type TerugtrekReden,
@@ -213,7 +214,9 @@ export const METING_KOLOMMEN =
   'kop_bron:duiding->meta->>kopBron, modeltekst:duiding->meta->>modeltekst, ' +
   // Alleen het EERSTE thema-id, nooit het citaat: "met thema" is een telling,
   // en de meting leest geen tekst (route.test.ts bewaakt de kolomlijst).
-  'eerste_thema:duiding->themas->0->>thema'
+  'eerste_thema:duiding->themas->0->>thema, ' +
+  // De herkomst: een handmatige inhaalslag is geen modelmeting (ADR 0171).
+  'model:duiding->meta->>model'
 
 export interface MetingRij {
   id: string
@@ -237,6 +240,8 @@ export interface MetingRij {
   modeltekst: string | null
   /** `duiding->themas->0->>thema` (v3) — gezet zodra de duiding minstens één gegrond thema heeft. */
   eerste_thema?: string | null
+  /** `duiding->meta->>model` — welk model (of `HANDMATIG_MODEL_ID`) de duiding schreef. */
+  model?: string | null
 }
 
 /**
@@ -314,6 +319,12 @@ export interface WeekMeting {
   metModeltekst: number
   /** Geduid met minstens één gegrond thema (v3, B35) — de dekking van de tweede route naar "voor wie". */
   metThema: number
+  /**
+   * Geduid door een handmatige inhaalslag (`meta.model = HANDMATIG_MODEL_ID`).
+   * Die tellen mee in de dekking — het zijn echte duidingen door dezelfde poort
+   * — maar zijn geen meting van het productiemodel (ADR 0171).
+   */
+  handmatig: number
   teruggetrokken: Record<TerugtrekReden, number>
   teruggetrokkenTotaal: number
   /** De poortmaat: teruggetrokken om een fout getal bij een rekenend mechanisme. */
@@ -351,6 +362,7 @@ function legeWeek(week: string): WeekMeting {
     kopNietVanBron: 0,
     metModeltekst: 0,
     metThema: 0,
+    handmatig: 0,
     teruggetrokken: { 'fout-getal': 0, 'verkeerde-doelgroep': 0, 'verkeerd-mechanisme': 0, anders: 0 },
     teruggetrokkenTotaal: 0,
     foutGetalRekenend: 0,
@@ -432,6 +444,7 @@ export function bouwDuidingMeting(rijen: readonly MetingRij[]): WeekMeting[] {
     if (r.kop_bron !== null && r.kop_bron !== 'bron') w.kopNietVanBron++
     if (r.modeltekst !== null && r.modeltekst !== 'false') w.metModeltekst++
     if (r.eerste_thema) w.metThema++
+    if (r.model === HANDMATIG_MODEL_ID) w.handmatig++
     if (r.poort_status === 'gedegradeerd') {
       w.poort.gedegradeerd++
       const reden = r.poort_reden ?? 'onbekend'

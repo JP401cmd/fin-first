@@ -59,7 +59,7 @@ export function detectScheduleDrift(
   const cronPaths = new Set(crons.map((c) => c.path))
   return {
     unknownCrons: crons.filter((c) => !jobPaths.has(c.path)),
-    unscheduledJobs: jobs.filter((j) => !cronPaths.has(j.path)),
+    unscheduledJobs: jobs.filter((j) => !j.handmatig && !cronPaths.has(j.path)),
   }
 }
 

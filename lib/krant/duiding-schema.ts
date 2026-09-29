@@ -48,6 +48,14 @@ import { THEMA_IDS, THEMA_CITAAT_MAX, THEMA_MAX } from './themas'
  */
 export const DUIDING_VERSIE = 3
 
+/**
+ * `meta.model` van een duiding die een Claude-sessie handmatig schreef (de
+ * inhaalslag, lib/krant/duiding-inhaalslag.ts). Hier en niet in de
+ * inhaalslag-module: de meting (client-veilig) moet hem kennen zonder de
+ * AI-SDK mee te importeren.
+ */
+export const HANDMATIG_MODEL_ID = 'claude-code-handmatig'
+
 export const DUIDING_SOORTEN = [
   'besloten',
   'voorstel',

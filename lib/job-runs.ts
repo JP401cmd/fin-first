@@ -35,6 +35,7 @@ export type JobKey =
   | 'alerts-sweep'
   | 'krant-editie'
   | 'krant-tijdlijn'
+  | 'krant-ochtend'
 
 /**
  * Schrijf één uitvoering van een achtergrondtaak weg in `job_runs`.

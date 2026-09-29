@@ -495,6 +495,8 @@ export default async function BeheerJobsPage() {
                     {job.schedule} ·{' '}
                     {cron ? (
                       <span className="normal-case tracking-normal">{cron} (UTC)</span>
+                    ) : job.handmatig ? (
+                      <span className="normal-case tracking-normal">geen Vercel-cron</span>
                     ) : (
                       <span className="normal-case tracking-normal text-negative">niet ingepland</span>
                     )}{' '}

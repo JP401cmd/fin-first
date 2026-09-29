@@ -158,6 +158,12 @@ export interface DuidingOpties {
   /** Geen nieuwe rij meer oppakken na dit budget (ms sinds de start). Zonder: alleen de batch-cap. */
   tijdBudgetMs?: number
   now?: Date
+  /**
+   * Ook zonder model de versie-bump doen (ochtendroutine: de sessie duidt, de
+   * cron niet). Standaard uit: zonder model en zonder sessie zou een bump alle
+   * oude duidingen wissen terwijl niemand ze opnieuw duidt.
+   */
+  versieBumpZonderModel?: boolean
 }
 
 /**
@@ -379,9 +385,72 @@ export async function herstelParameterOmhulsel({ text }: { text: string }): Prom
   return veranderd && Object.keys(schoon).length > 0 ? JSON.stringify(schoon) : null
 }
 
-// ── Runner ───────────────────────────────────────────────────────────────────
+// ── Voorbereiding en schrijven (gedeeld met de handmatige inhaalslag) ────────
+//
+// De cron (`duidEen`) en `scripts/krant/duiding-inhaalslag.ts` delen deze
+// helpers. Alleen de BRON van de modeluitvoer verschilt: `generateObject` of
+// een duiding die een Claude-sessie handmatig schreef. Grondslag, meta,
+// controles en de geconditioneerde schrijfactie zijn dus letterlijk dezelfde
+// code — een handmatige duiding kan de poort niet omzeilen.
 
-const WACHTENDE_STATUSSEN = ['wacht', 'mislukt'] as const
+export const WACHTENDE_STATUSSEN = ['wacht', 'mislukt'] as const
+
+export interface DuidingVoorbereiding {
+  /** De grondslagtekst (eigen kop + fragment), exact zoals de controles hem zien. */
+  tekst: string
+  meta: DuidingMetaZonderPoort
+  controleBron: ControleBron
+}
+
+/**
+ * Grondslag, meta en controlebron voor één artikel. Null als het artikel
+ * geen eigen grondslag heeft (kop én fragment leeg) — dan valt er niets te
+ * duiden en blijft de rij 'wacht'.
+ */
+export function bereidDuidingVoor(artikel: WachtendArtikel, modelId: string): DuidingVoorbereiding | null {
+  const grondslag = bepaalGrondslag(artikel)
+  if (!grondslag) return null
+  const { tekst, soort } = grondslag
+  // De grondslagTEKST zelf staat al in `news_articles.bron_fragment`; we
+  // bewaren alleen haar vingerafdruk, zodat achteraf na te lopen is of een
+  // duiding bij de huidige kolominhoud hoort (keuze 4: geen tweede kopie).
+  return {
+    tekst,
+    meta: {
+      grondslag: soort,
+      grondslagSha256: createHash('sha256').update(tekst, 'utf8').digest('hex'),
+      tekens: tekst.length,
+      model: modelId,
+      kopBron: 'bron',
+      modeltekst: false,
+    },
+    controleBron: { tekst, published_at: artikel.published_at, published_bron: artikel.published_bron },
+  }
+}
+
+/**
+ * Schrijf de uitkomst van één duiding, geconditioneerd op `id` + een wachtende
+ * status. Een schrijffout werpt; `false` betekent dat een parallelle run (de
+ * cron, of een tweede inhaalslag) deze rij al afhandelde.
+ */
+export async function schrijfDuidingUitkomst(
+  supabase: SupabaseClient,
+  artikelId: string,
+  velden: Record<string, unknown>,
+  pogingen: number,
+  now: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('news_articles')
+    .update({ ...velden, duiding_pogingen: pogingen, geduid_at: now })
+    .eq('id', artikelId)
+    .in('duiding_status', [...WACHTENDE_STATUSSEN])
+    .select('id')
+  if (error) throw error
+  return (data?.length ?? 0) > 0
+}
+
+// ── Runner ───────────────────────────────────────────────────────────────────
 
 async function duidEen(
   supabase: SupabaseClient,
@@ -399,42 +468,17 @@ async function duidEen(
    * schrijffout werpt (de werker telt 'mislukt'); nul geraakte rijen betekent
    * dat een parallelle run deze rij al afhandelde — dan telt hij hier niet.
    */
-  const schrijf = async (
+  const schrijf = (
     velden: Record<string, unknown>,
     /** Alleen de providerstoring wijkt af: die laat de teller staan (`isProviderStoring`). */
     opts: { pogingen?: number } = {},
-  ): Promise<boolean> => {
-    const { data, error } = await supabase
-      .from('news_articles')
-      .update({ ...velden, duiding_pogingen: opts.pogingen ?? pogingen, geduid_at: now })
-      .eq('id', artikel.id)
-      .in('duiding_status', [...WACHTENDE_STATUSSEN])
-      .select('id')
-    if (error) throw error
-    return (data?.length ?? 0) > 0
-  }
+  ): Promise<boolean> => schrijfDuidingUitkomst(supabase, artikel.id, velden, opts.pogingen ?? pogingen, now)
   const uitkomstVan = (geschreven: boolean, anders: 'geduid' | 'afgewezen' | 'mislukt') =>
     geschreven ? anders : 'overgeslagen'
 
-  const grondslag = bepaalGrondslag(artikel)
-  if (!grondslag) return 'overgeslagen'
-  const { tekst, soort } = grondslag
-  // De grondslagTEKST zelf staat al in `news_articles.bron_fragment`; we
-  // bewaren alleen haar vingerafdruk, zodat achteraf na te lopen is of een
-  // duiding bij de huidige kolominhoud hoort (keuze 4: geen tweede kopie).
-  const meta: DuidingMetaZonderPoort = {
-    grondslag: soort,
-    grondslagSha256: createHash('sha256').update(tekst, 'utf8').digest('hex'),
-    tekens: tekst.length,
-    model: modelId,
-    kopBron: 'bron',
-    modeltekst: false,
-  }
-  const controleBron: ControleBron = {
-    tekst,
-    published_at: artikel.published_at,
-    published_bron: artikel.published_bron,
-  }
+  const voorbereiding = bereidDuidingVoor(artikel, modelId)
+  if (!voorbereiding) return 'overgeslagen'
+  const { tekst, meta, controleBron } = voorbereiding
 
   let uitvoer: unknown
   try {
@@ -524,6 +568,51 @@ async function duidEen(
 }
 
 /**
+ * Lees de wachtrij en doe daarna de versie-bump (in die volgorde, zie hieronder).
+ * Werpt bij een DB-fout; de aanroeper vangt.
+ */
+async function leesWachtrijEnBump(supabase: SupabaseClient, maxPerRun: number): Promise<WachtendArtikel[]> {
+  // LEZEN VÓÓR SCHRIJVEN — de volgorde is een veiligheidsmaatregel, geen
+  // smaak (security-review 1F fase 2, bevinding 1). De versie-bump hieronder
+  // raakt alleen kolommen die er altijd al waren en SLAAGT dus ook wanneer
+  // de nieuwe kolommen van fase 1 nog ontbreken; de select erboven faalt dan
+  // met 42703 en wordt door de buitenste catch weggeslikt. Stond de bump
+  // eerst, dan wiste een deploy-vóór-DDL in de eerste run alle bestaande
+  // duidingen onomkeerbaar en deed daarna stil niets meer. Nu faalt de run
+  // vóórdat er iets vernietigd is.
+  const { data, error } = await supabase
+    .from('news_articles')
+    .select(WACHTEND_ARTIKEL_KOLOMMEN)
+    // Legacy (vóór ADR 0176): geen eigen fragment, dus geen grondslag die
+    // geen modeltekst is. Die rijen worden bij de release gewist (B29) en
+    // mogen tot dan niet geduid worden.
+    .not('bron_soort', 'is', null)
+    .in('duiding_status', [...WACHTENDE_STATUSSEN])
+    .lt('duiding_pogingen', DUIDING_MAX_POGINGEN)
+    .order('fetched_at', { ascending: false })
+    .limit(Math.max(0, maxPerRun))
+  if (error) throw error
+
+  // Versie-bump: oudere duidingen én afwijzingen opnieuw laten duiden
+  // (herleiden, niet ophogen) — een bump is meestal een controle-fix, dus
+  // ook wat v1 afwees krijgt een nieuwe kans. Pogingen en fout gaan mee
+  // terug naar nul, anders valt een rij die op poging 3 slaagde buiten de
+  // selectie (`< DUIDING_MAX_POGINGEN`). 'teruggetrokken' blijft staan:
+  // dat is een beheerbesluit. De gebumpte rijen komen de VOLGENDE run aan
+  // de beurt: de selectie hierboven las alleen 'wacht'/'mislukt', en die
+  // twee verzamelingen zijn disjunct met de 'geduid'/'afgewezen' die de
+  // bump raakt. Dat volgt het bestaande contract "wat niet past, blijft
+  // wacht" en kost hoogstens één dag vertraging bij een bump.
+  const { error: bumpError } = await supabase
+    .from('news_articles')
+    .update({ duiding_status: 'wacht', duiding_pogingen: 0, duiding_fout: null, duiding: null })
+    .in('duiding_status', ['geduid', 'afgewezen'])
+    .lt('duiding_versie', DUIDING_VERSIE)
+  if (bumpError) throw bumpError
+  return (data ?? []) as unknown as WachtendArtikel[]
+}
+
+/**
  * Duid de wachtende artikelen, tot `maxPerRun`. Geeft altijd een summary terug;
  * werpt nooit. Zonder model: niets doen, alleen de wachtrij tellen.
  */
@@ -536,46 +625,15 @@ export async function duidWachtendeArtikelen(
   const summary: DuidingSummary = { ...LEGE_DUIDING_SUMMARY }
 
   try {
+    if (!model && opties.versieBumpZonderModel) {
+      // Ochtendroutine: geen model, wel de bump, zodat een controle-fix ook dan
+      // alle oude duidingen terug op 'wacht' zet voor de sessie. Zelfde volgorde:
+      // eerst de select (faalt vóór er iets gewist is), dan de bump.
+      await leesWachtrijEnBump(supabase, 0)
+    }
     if (model) {
-      // LEZEN VÓÓR SCHRIJVEN — de volgorde is een veiligheidsmaatregel, geen
-      // smaak (security-review 1F fase 2, bevinding 1). De versie-bump hieronder
-      // raakt alleen kolommen die er altijd al waren en SLAAGT dus ook wanneer
-      // de nieuwe kolommen van fase 1 nog ontbreken; de select erboven faalt dan
-      // met 42703 en wordt door de buitenste catch weggeslikt. Stond de bump
-      // eerst, dan wiste een deploy-vóór-DDL in de eerste run alle bestaande
-      // duidingen onomkeerbaar en deed daarna stil niets meer. Nu faalt de run
-      // vóórdat er iets vernietigd is.
-      const { data, error } = await supabase
-        .from('news_articles')
-        .select(WACHTEND_ARTIKEL_KOLOMMEN)
-        // Legacy (vóór ADR 0176): geen eigen fragment, dus geen grondslag die
-        // geen modeltekst is. Die rijen worden bij de release gewist (B29) en
-        // mogen tot dan niet geduid worden.
-        .not('bron_soort', 'is', null)
-        .in('duiding_status', [...WACHTENDE_STATUSSEN])
-        .lt('duiding_pogingen', DUIDING_MAX_POGINGEN)
-        .order('fetched_at', { ascending: false })
-        .limit(Math.max(0, opties.maxPerRun))
-      if (error) throw error
+      const artikelen = await leesWachtrijEnBump(supabase, opties.maxPerRun)
 
-      // Versie-bump: oudere duidingen én afwijzingen opnieuw laten duiden
-      // (herleiden, niet ophogen) — een bump is meestal een controle-fix, dus
-      // ook wat v1 afwees krijgt een nieuwe kans. Pogingen en fout gaan mee
-      // terug naar nul, anders valt een rij die op poging 3 slaagde buiten de
-      // selectie (`< DUIDING_MAX_POGINGEN`). 'teruggetrokken' blijft staan:
-      // dat is een beheerbesluit. De gebumpte rijen komen de VOLGENDE run aan
-      // de beurt: de selectie hierboven las alleen 'wacht'/'mislukt', en die
-      // twee verzamelingen zijn disjunct met de 'geduid'/'afgewezen' die de
-      // bump raakt. Dat volgt het bestaande contract "wat niet past, blijft
-      // wacht" en kost hoogstens één dag vertraging bij een bump.
-      const { error: bumpError } = await supabase
-        .from('news_articles')
-        .update({ duiding_status: 'wacht', duiding_pogingen: 0, duiding_fout: null, duiding: null })
-        .in('duiding_status', ['geduid', 'afgewezen'])
-        .lt('duiding_versie', DUIDING_VERSIE)
-      if (bumpError) throw bumpError
-
-      const artikelen = (data ?? []) as unknown as WachtendArtikel[]
       const start = Date.now()
       const deadline = opties.tijdBudgetMs === undefined ? Number.POSITIVE_INFINITY : start + opties.tijdBudgetMs
       let cursor = 0

@@ -495,6 +495,36 @@ describe('duidWachtendeArtikelen — de stap in de schaduw', () => {
     expect(selectie).toBeGreaterThanOrEqual(0)
     expect(bump).toBeGreaterThan(selectie)
   })
+
+  // Ochtendroutine (ADR 0171, 29 sep): de sessie duidt, de cron niet. Een
+  // DUIDING_VERSIE-bump moet dan toch de oude duidingen terug op wacht zetten.
+  describe('zonder model', () => {
+    const bumpVan = (queries: ReturnType<typeof maakClient>['queries']) =>
+      updates(queries).filter((u) => u.velden.duiding_status === 'wacht')
+
+    it('standaard: geen bump (storing zonder sessie wist niets)', async () => {
+      const { client, queries } = maakClient([])
+      await duidWachtendeArtikelen(client as never, null, { maxPerRun: 60 })
+      expect(bumpVan(queries)).toHaveLength(0)
+    })
+
+    it('versieBumpZonderModel: wél de bump, na de selectie, en geen modelcall', async () => {
+      const { client, queries } = maakClient([artikel()])
+      const s = await duidWachtendeArtikelen(client as never, null, { maxPerRun: 60, versieBumpZonderModel: true })
+      expect(bumpVan(queries)).toHaveLength(1)
+      const selectie = queries.findIndex((q) => q.stappen.some((st) => st.m === 'not' && st.args[0] === 'bron_soort'))
+      const bump = queries.findIndex((q) => q.stappen.some((st) => st.m === 'update'))
+      expect(bump).toBeGreaterThan(selectie)
+      expect(generateObjectMock).not.toHaveBeenCalled()
+      expect(s.geduid + s.afgewezen + s.mislukt).toBe(0)
+    })
+
+    it('versieBumpZonderModel met kapotte selectie: niets gewist', async () => {
+      const { client, queries } = maakClient([], { selectFout: true })
+      await duidWachtendeArtikelen(client as never, null, { maxPerRun: 60, versieBumpZonderModel: true })
+      expect(updates(queries)).toHaveLength(0)
+    })
+  })
 })
 
 describe('de duidingsprompt volgt de catalogi', () => {

@@ -97,6 +97,89 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.19',
+    date: '2026-09-29',
+    title: 'Het nieuws achter de schermen',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Andere werkwijze bij het duiden van het nieuws',
+            description:
+              'We duiden de nieuwsberichten voortaan op een andere manier achter de schermen. Geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.92.18',
+    date: '2026-09-29',
+    title: 'Fin op een nieuwer model',
+    sections: [
+      {
+        module: 'Fin',
+        color: 'blue',
+        items: [
+          {
+            title: 'Fin draait op een nieuwer taalmodel',
+            description:
+              'De gesprekken met Fin en de andere hulp van Fin lopen nu via een nieuwere versie van het taalmodel.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Het nieuws verwerken kost minder',
+            description:
+              'Het ophalen en duiden van het nieuws gebeurt zuiniger, met dezelfde controles als altijd. Voor jou geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.92.17',
+    date: '2026-09-29',
+    title: 'Achterstand in het nieuws inhalen',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Een achterstand in de nieuwe Krant is sneller in te halen',
+            description:
+              'Loopt de duiding van het nieuws achter, dan kunnen we die nu gericht inhalen, met dezelfde controles als altijd. Voor jou geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.92.16',
+    date: '2026-09-29',
+    title: 'De weekmeting van de Krant bijgesteld',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De weekmeting ziet wat nog in de rij staat',
+            description:
+              'Een week die nog grotendeels op verwerking wacht, heet nu voorlopig in plaats van mislukt. Voor jou geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.15',
     date: '2026-09-29',
     title: 'De nieuwe Krant, achter de schermen',

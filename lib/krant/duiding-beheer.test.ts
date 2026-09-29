@@ -24,9 +24,10 @@ import {
   doelgroepAfwijzingen,
   type MetingRij,
 } from './duiding-beheer'
+import { METING_KOLOMMEN } from './duiding-beheer'
 import { POORT_CODE } from './duiding-controles'
 import { GELDIGE_UITVOER } from './duiding.fixture'
-import { DUIDING_VERSIE, type DuidingV1 } from './duiding-schema'
+import { DUIDING_VERSIE, HANDMATIG_MODEL_ID, type DuidingV1 } from './duiding-schema'
 import { MECHANISMEN, MECHANISME_IDS } from './mechanismen'
 
 const ID = '3e2f9e8d-568a-4199-bf7e-f2f7e5b7091e'
@@ -198,6 +199,21 @@ function rij(over: Partial<MetingRij>): MetingRij {
 describe('bouwDuidingMeting', () => {
   it('lege invoer → geen weken', () => {
     expect(bouwDuidingMeting([])).toEqual([])
+  })
+
+  it('telt handmatig geduide artikelen apart (meta.model), alleen onder de geduide', () => {
+    const [w] = bouwDuidingMeting([
+      rij({ model: HANDMATIG_MODEL_ID }),
+      rij({ model: HANDMATIG_MODEL_ID, duiding_status: 'teruggetrokken', teruggetrokken_reden: 'anders' }),
+      rij({ model: 'claude-sonnet' }),
+      rij({ model: HANDMATIG_MODEL_ID, duiding_status: 'wacht' }),
+    ])
+    expect(w.geduid).toBe(3)
+    expect(w.handmatig).toBe(2)
+  })
+
+  it('de meting leest de herkomst uit de meta, nooit tekst', () => {
+    expect(METING_KOLOMMEN).toContain('model:duiding->meta->>model')
   })
 
   it("telt 'met thema' op het eerste thema-id, zonder de citaten te lezen (v3)", () => {
