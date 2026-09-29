@@ -151,6 +151,65 @@ describe('buildAssetDraft', () => {
     expect(draft.expected_return).toBe(TYPICAL_RETURNS.crypto)
     expect(draft.monthly_contribution).toBe(0)
   })
+
+  it('deelneming: belang (%) landt in ownership_percentage, niet als tekst in notes', () => {
+    // Box 2 leest `ownership_percentage`; een waarde in notes rekent nergens mee.
+    const draft = buildAssetDraft({
+      asset_type: 'deelneming',
+      name: 'Holding BV',
+      current_value: 100000,
+      field3: 60,
+    })
+    expect(draft.ownership_percentage).toBe(60)
+    expect(draft.notes).toBeNull()
+  })
+
+  it.each([
+    [100, 100],
+    [0.5, 0.5],
+    [0, null],
+    [101, null],
+    [-5, null],
+  ])('deelneming: belang %s wordt %s (alleen 0 < belang ≤ 100 telt)', (invoer, verwacht) => {
+    const draft = buildAssetDraft({
+      asset_type: 'deelneming',
+      name: 'Holding BV',
+      current_value: 100000,
+      field3: invoer,
+    })
+    expect(draft.ownership_percentage).toBe(verwacht)
+  })
+
+  it('deelneming zonder belang: ownership_percentage blijft leeg', () => {
+    const draft = buildAssetDraft({
+      asset_type: 'deelneming',
+      name: 'Holding BV',
+      current_value: 100000,
+    })
+    expect(draft.ownership_percentage).toBeNull()
+  })
+
+  it('levensverzekering: einddatum landt in lock_end_date, niet als tekst in notes', () => {
+    const draft = buildAssetDraft({
+      asset_type: 'levensverzekering',
+      name: 'Kapitaalverzekering',
+      current_value: 20000,
+      field3: '2036-09-29',
+    })
+    expect(draft.lock_end_date).toBe('2036-09-29')
+    expect(draft.notes).toBeNull()
+  })
+
+  it('levensverzekering: een ongeldige einddatum wordt niet opgeslagen', () => {
+    const draft = buildAssetDraft({
+      asset_type: 'levensverzekering',
+      name: 'Kapitaalverzekering',
+      current_value: 20000,
+      field3: '2036-02-31',
+    })
+    expect(draft.lock_end_date).toBeNull()
+    expect(draft.notes).toBeNull()
+  })
 })
 
 describe('buildDebtDraft', () => {

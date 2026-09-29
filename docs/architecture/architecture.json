@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T20:23:09.160Z",
+  "generatedAt": "2026-09-29T20:11:06.885Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
@@ -193,9 +193,9 @@
     "routesProduction": 91,
     "api": 344,
     "tables": 105,
-    "migrations": 272,
-    "integrations": 25,
-    "components": 1284,
+    "migrations": 271,
+    "integrations": 24,
+    "components": 1289,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8930,7 +8930,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 272
+    "migrationCount": 271
   },
   "tablesByDomain": [
     {
@@ -9488,11 +9488,11 @@
     }
   ],
   "components": {
-    "total": 1284,
+    "total": 1289,
     "groups": [
       {
         "group": "app",
-        "count": 492,
+        "count": 494,
         "items": [
           "aandacht-lijst",
           "aandelen-holdings.config",
@@ -9623,6 +9623,7 @@
           "debt-detail-modal",
           "debt-form",
           "debt-form.berekend-toggle.test",
+          "debt-form.indeling.test",
           "debt-form.min-betaling-sync.test",
           "debt-form.negatieve-invoer.test",
           "debt-pane",
@@ -9674,6 +9675,7 @@
           "floating-nav-button.test",
           "form-error",
           "form-error.test",
+          "form-inklapblok",
           "freedom-card",
           "freedom-card.weinig.test",
           "freedom-days-animation",
@@ -10396,7 +10398,7 @@
       },
       {
         "group": "core",
-        "count": 83,
+        "count": 84,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -10410,6 +10412,7 @@
           "asset-form-iban.test",
           "asset-return-modal",
           "assets-client",
+          "assets-client.indeling.test",
           "assets-client.rendement-leeg.test",
           "box3-comparison",
           "card-kpi-strip",
@@ -10747,7 +10750,7 @@
       },
       {
         "group": "berichten",
-        "count": 20,
+        "count": 22,
         "items": [
           "archive-edition-card",
           "archive-section",
@@ -10767,6 +10770,8 @@
           "nieuws-only-client",
           "nieuws-only-client.test",
           "section-heading",
+          "terug-naar-tijdlijn",
+          "terug-naar-tijdlijn.test",
           "tijdlijn-client",
           "tijdlijn-client.test"
         ]
@@ -10937,10 +10942,6 @@
     },
     {
       "name": "OpenAI",
-      "category": "AI"
-    },
-    {
-      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -19318,20 +19319,6 @@
       ],
       "summary": "De startpagina van beheer is een dashboard dat antwoord geeft op vijf vragen: wat vraagt nu aandacht, hoe staat elk onderdeel ervoor, welke kant gaat het op, wat is er veranderd, en wat kan dit dashboard niet zien. Het leidt alles af uit bestaande bronnen en bestaande grenzen; he",
       "file": "docs/adr/0189-het-beheerdashboard-ordent-op-beheervraag.md"
-    },
-    {
-      "id": "0190-de-krant-met-ai-als-laag-op-de-tijdlijn",
-      "title": "De Krant met AI als laag op de tijdlijn: dezelfde verversing, een toelichting per bericht, terugval per tekst",
-      "status": "voorgesteld",
-      "date": "2026-09-29",
-      "elements": [
-        "as-nieuws",
-        "do-krant",
-        "t-aigateway",
-        "sp-nieuws"
-      ],
-      "summary": "De Krant met AI is sinds Krant 1E geen eigen editie meer. Het is dezelfde tijdlijnverversing als de Krant zonder AI (ADR 0183), met één extra stap tussen de matcher en het schrijven: een model schrijft per bericht een korte toelichting en mag hoogstens drie berichten toevoegen. D",
-      "file": "docs/adr/0190-de-krant-met-ai-als-laag-op-de-tijdlijn.md"
     }
   ],
   "churn": {
@@ -19343,7 +19330,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 71
+        "commits": 69
       },
       {
         "path": "app/(app)/toekomst",
@@ -19386,12 +19373,12 @@
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4878,
+        "loc": 4937,
         "commits": 40
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 4051,
+        "loc": 4080,
         "commits": 28
       },
       {
@@ -19401,7 +19388,7 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3147,
+        "loc": 3148,
         "commits": 66
       },
       {
@@ -20688,18 +20675,11 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "Integraties",
+        "label": "Componenten (aantal)",
         "added": [
-          "OpenRouter"
+          "+3"
         ],
         "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [],
-        "removed": [
-          "-2"
-        ]
       }
     ]
   },
@@ -21190,7 +21170,7 @@
     {
       "date": "2026-09-29",
       "api": 344,
-      "components": 1284,
+      "components": 1289,
       "tables": 105,
       "routesProduction": 91
     }

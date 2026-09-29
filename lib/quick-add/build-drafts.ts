@@ -42,8 +42,9 @@ type DraftOmitKeys = 'id' | 'user_id' | 'sort_order' | 'created_at' | 'updated_a
 type AssetDbMissingKeys =
   | 'expiry_date'
   | 'beneficiary'
+  // Bestaan wél in de database, maar de wizard vraagt er niet naar; ze blijven
+  // uit de draft zodat de insert ze op de kolom-default (NULL) laat.
   | 'kvk_number'
-  | 'ownership_percentage'
   | 'annual_dividend'
   | 'linked_asset_id'
 
@@ -139,10 +140,8 @@ export function buildAssetDraft(input: AssetQuickInput): AssetDraft {
   let rental_income: number | null = null
   let expected_return = TYPICAL_RETURNS[asset_type]
   let purchase_value = current_value
-  // Notes-veld voor type-specifieke info die niet in een eigen kolom past
-  // (bijv. levensverzekering-einddatum, deelneming-belang%). De full form
-  // kan deze later in de juiste (migratie-afhankelijke) kolom zetten.
-  let notes: string | null = null
+  let ownership_percentage: number | null = null
+  let lock_end_date: string | null = null
 
   switch (asset_type) {
     case 'cash':
@@ -167,16 +166,16 @@ export function buildAssetDraft(input: AssetQuickInput): AssetDraft {
       rental_income = asNumber(field3)
       break
     case 'deelneming': {
-      // DB heeft (nog) geen `ownership_percentage` kolom — parkeren in notes
-      // zodat de user de waarde niet kwijt is bij later editen in full form.
+      // Box 2 leest het belang uit deze kolom (app/api/household/box2).
+      // Buiten 0–100 is het geen belang; dan blijft de kolom leeg.
       const pct = asNumber(field3)
-      if (pct != null) notes = `Belang: ${pct}%`
+      ownership_percentage = pct != null && pct > 0 && pct <= 100 ? pct : null
       break
     }
     case 'levensverzekering': {
-      // DB heeft (nog) geen `expiry_date` kolom — parkeren in notes.
+      // De einddatum van de polis staat in `lock_end_date` (ASSET_TYPE_FIELDS).
       const exp = asDateString(field3)
-      if (exp) notes = `Einddatum: ${exp}`
+      if (isValidDateIso(exp)) lock_end_date = exp
       break
     }
     case 'vordering': {
@@ -211,14 +210,14 @@ export function buildAssetDraft(input: AssetQuickInput): AssetDraft {
     monthly_contribution,
     institution,
     account_number: null,
-    notes,
+    notes: null,
     is_active: true,
     // Type-specific fields: laat risico/subtype bewust leeg voor full form.
     subtype: null,
     risk_profile: null,
     tax_benefit: null,
     is_liquid,
-    lock_end_date: null,
+    lock_end_date,
     ticker_symbol: null,
     rental_income,
     woz_value,
@@ -226,6 +225,7 @@ export function buildAssetDraft(input: AssetQuickInput): AssetDraft {
     depreciation_rate,
     address_postcode: null,
     address_house_number: null,
+    ownership_percentage,
     // Household + net worth
     ownership: 'personal',
     household_id: null,

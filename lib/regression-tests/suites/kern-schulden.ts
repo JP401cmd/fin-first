@@ -177,8 +177,11 @@ const tests: TestCase[] = [
       assertIncludes(DEBT_TYPE_FIELDS.belastingschuld, 'tax_year', 'belasting: fiscaal jaar')
       assertIncludes(DEBT_TYPE_FIELDS.belastingschuld, 'has_payment_plan', 'belasting: betalingsregeling')
 
+      // Autolening: alleen de koppeling aan het voertuig
+      assertIncludes(DEBT_TYPE_FIELDS.car_loan, 'linked_asset_id', 'autolening: gekoppeld voertuig')
+      assertEqual(DEBT_TYPE_FIELDS.car_loan.length, 1, 'autolening: verder geen extra velden')
+
       // Simple types: no extra fields
-      assertEqual(DEBT_TYPE_FIELDS.car_loan.length, 0, 'autolening: geen extra velden')
       assertEqual(DEBT_TYPE_FIELDS.payment_plan.length, 0, 'betalingsregeling: geen extra velden')
     },
   },

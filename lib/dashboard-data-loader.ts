@@ -113,6 +113,7 @@ import { loadVrijheidsgetalSnapshot } from '@/lib/goals/vrijheidsgetal-source'
 import { buildGoalMetricSources, loadGoalLinks } from '@/lib/goals/metric-sources'
 import type { GoalType } from '@/lib/goal-data'
 import { type Debt } from '@/lib/debt-data'
+import { hvbRestLooptijdMaanden } from '@/lib/debt-remaining-term'
 import {
   parseHousingStrategy,
   deriveHousingContext,
@@ -2720,7 +2721,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const repaymentType: RepaymentType = rawRepType === 'lineair' ? 'linear'
         : rawRepType === 'aflossingsvrij' ? 'interest_only'
         : 'annuity'
-      const remainingTermMonths = Number((mortgageDebt as { remaining_term_months?: number | null }).remaining_term_months ?? 360)
+      const remainingTermMonths = hvbRestLooptijdMaanden(mortgageDebt as unknown as Debt, now)
 
       if (rente > 0) {
         const HVB_EXTRA_MAAND = 200 // standaard €200/maand extra

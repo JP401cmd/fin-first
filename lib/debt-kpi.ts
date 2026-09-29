@@ -15,6 +15,7 @@ import {
   REPAYMENT_TYPE_LABELS,
 } from './debt-data'
 import { debtRemainingMonths } from './debt-remaining-term'
+import { debtHasPaymentPlan } from './debt-form-layout'
 import { formatCurrency } from './format'
 import type { KpiPair, KpiValue } from './asset-kpi'
 
@@ -144,7 +145,7 @@ function kpiBelastingschuld(debt: Debt, _ctx: DebtKpiContext): KpiPair {
     : undefined
 
   // KPI 2 — heeft betalingsregeling?
-  const secondary: KpiValue = debt.has_payment_plan
+  const secondary: KpiValue = debtHasPaymentPlan(debt)
     ? { value: 'Regeling', tone: 'pos' }
     : { value: 'Geen regeling', tone: 'neg' }
 

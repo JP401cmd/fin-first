@@ -299,7 +299,9 @@ export const DEBT_TYPE_FIELDS: Record<DebtType, string[]> = {
   personal_loan: ['subtype'],
   credit_card: ['subtype', 'credit_limit'],
   revolving_credit: ['subtype', 'credit_limit'],
-  car_loan: [],
+  // De wizard koppelt een autolening aan het voertuig (LINKED_DEBT_SUGGESTIONS);
+  // zonder dit veld bleef die koppeling in het bewerkscherm onzichtbaar vastzitten.
+  car_loan: ['linked_asset_id'],
   payment_plan: [],
   belastingschuld: ['subtype', 'tax_year', 'has_payment_plan'],
   familielening: ['subtype', 'repayment_type', 'has_written_agreement'],

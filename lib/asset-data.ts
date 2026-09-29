@@ -537,7 +537,9 @@ export const ASSET_TYPE_FIELDS: Record<AssetType, string[]> = {
   vehicle: ['subtype', 'depreciation_rate', 'sale_config'],
   physical: ['subtype', 'depreciation_rate', 'sale_config'],
   deelneming: ['subtype', 'institution', 'kvk_number', 'ownership_percentage', 'annual_dividend', 'risk_profile', 'sale_config'],
-  levensverzekering: ['subtype', 'risk_profile', 'is_liquid', 'expiry_date', 'beneficiary'],
+  // De einddatum van de polis staat in `lock_end_date`: `expiry_date` en
+  // `beneficiary` bestaan niet in de database, dus een veld daarop sloeg niets op.
+  levensverzekering: ['subtype', 'risk_profile', 'is_liquid', 'lock_end_date'],
   vordering: ['subtype', 'institution', 'lock_end_date'],
   other: ['sale_config'],
 }
@@ -864,7 +866,7 @@ export const ASSET_QUICK_ADD_FIELD3: Record<AssetType, AssetField3Kind> = {
   crypto: null,
   deelneming: { kind: 'percentage', label: 'Belang (%)', defaultValue: 100 },
   physical: null,
-  levensverzekering: { kind: 'date', label: 'Einddatum' },
+  levensverzekering: { kind: 'date', label: 'Einddatum polis' },
   vordering: { kind: 'percentage', label: 'Rente (%)' },
   other: null,
 }

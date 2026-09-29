@@ -17,7 +17,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, Building2 } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
@@ -39,6 +39,14 @@ import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/compo
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
 import { addMonthsIso } from '@/lib/debt-term-basis'
+import { FormInklapblok, samenvattingVan } from '@/components/app/form-inklapblok'
+import {
+  DEBT_FORM_LAYOUT,
+  debtTeltMeeDelen,
+  paymentPlanToWrite,
+  showsMinimumPayment,
+  subtypeToWrite,
+} from '@/lib/debt-form-layout'
 
 /**
  * Shape die `DebtForm` (in `embedded`-mode) publiceert naar de pane-wrapper.
@@ -165,10 +173,10 @@ export function DebtForm({
   const [nhg, setNhg] = useState(debt?.nhg ?? false)
   const [linkedAssetId, setLinkedAssetId] = useState(debt?.linked_asset_id ?? '')
   const [creditLimit, setCreditLimit] = useState(String(debt?.credit_limit ?? ''))
-  const [draagkrachtmetingDate, setDraagkrachtmetingDate] = useState(debt?.draagkrachtmeting_date ?? '')
+  // Niet meer in het formulier; de opgeslagen waarde gaat ongewijzigd terug.
+  const draagkrachtmetingDate = debt?.draagkrachtmeting_date ?? ''
   // Belastingschuld fields
   const [taxYear, setTaxYear] = useState(String(debt?.tax_year ?? ''))
-  const [hasPaymentPlan, setHasPaymentPlan] = useState(debt?.has_payment_plan ?? false)
   // Familielening fields
   const [hasWrittenAgreement, setHasWrittenAgreement] = useState(debt?.has_written_agreement ?? false)
   // App-koppeling: Hypotheekplanner — alleen relevant voor mortgages. De vlag
@@ -212,7 +220,14 @@ export function DebtForm({
   const [nowMs] = useState(() => Date.now())
 
   const subtypeOptions = DEBT_SUBTYPE_LABELS[debtType]
+  // `visibleFields` = welke kolommen bij het type horen en dus bewaard blijven;
+  // `layout` = waar het formulier ze toont (lib/debt-form-layout.ts). Een veld
+  // dat bij het type hoort maar niet getoond wordt, houdt zijn opgeslagen waarde.
   const visibleFields = DEBT_TYPE_FIELDS[debtType]
+  const layout = DEBT_FORM_LAYOUT[debtType]
+  const inKern = (field: string) => layout.kern.includes(field)
+  const inMeer = (field: string) => layout.meer.includes(field)
+  const showMinimum = showsMinimumPayment(debtType, debt?.minimum_payment, debt?.monthly_payment)
 
   // Type-specifieke velden blijven bij het bewerken van een bestaande schuld
   // in state staan als je het debt_type wisselt (`handleTypeChange` reset
@@ -324,6 +339,31 @@ export function DebtForm({
   }, [endDate, effectiveRepaymentType, useCalculatedBalance, calculatedBalance, currentBalance,
       useCalculatedPayment, calculatedPayment, monthlyPayment, interestRate, nowMs])
 
+  // Samenvattingen die de blokken dicht tonen: wat de cijfers verandert moet
+  // zichtbaar blijven, ook als niemand het blok openklapt. Staat ná de
+  // berekende waarden: de spaarquote-instelling toont alleen bij een saldo en
+  // een betaling boven nul, en de samenvatting volgt die zelfde voorwaarde.
+  const aflossingZichtbaar = (() => {
+    const bal = useCalculatedBalance && calculatedBalance != null ? calculatedBalance : Number(currentBalance)
+    const payment = calculatedPayment ?? Number(monthlyPayment)
+    return bal > 0 && (payment > 0 || useCustomAflossing)
+  })()
+  const teltMeeSamenvatting = samenvattingVan(debtTeltMeeDelen({
+    debtType,
+    netWorthInclusionPct,
+    ownership,
+    partnerSplitPct: ownership === 'shared' && useCustomSplit ? partnerSplitPct : null,
+    isTaxDeductible,
+    includeAflossingInSavings,
+    aflossingZichtbaar,
+  }))
+  const gegevensSamenvatting = samenvattingVan([
+    debtType === 'mortgage' && hasHypotheekplannerTracking && 'hypotheekplanner aan',
+    notes.trim() !== '' && 'met notitie',
+  ])
+  // Alleen een hypotheek heeft een koppeling (de hypotheekplanner) in dit blok.
+  const gegevensTitel = debtType === 'mortgage' ? 'Meer gegevens en koppelingen' : 'Meer gegevens'
+
   function handleTypeChange(type: DebtType) {
     setDebtType(type)
     setSubtype('')
@@ -335,7 +375,6 @@ export function DebtForm({
       if (type === 'belastingschuld') {
         setCreditor('Belastingdienst')
         setInterestRate('4')
-        setHasPaymentPlan(false)
         setTaxYear('')
       }
       // Default for dga_schuld
@@ -444,7 +483,7 @@ export function DebtForm({
       creditor: creditor || null,
       notes: notes || null,
       // Type-specific fields
-      subtype: subtype || null,
+      subtype: subtypeToWrite(debtType, subtype, effectiveRepaymentType),
       repayment_type: effectiveRepaymentType || null,
       is_tax_deductible: visibleFields.includes('is_tax_deductible') ? isTaxDeductible : null,
       fixed_rate_end_date: fixedRateEndDate || null,
@@ -454,7 +493,9 @@ export function DebtForm({
       draagkrachtmeting_date: draagkrachtmetingDate || null,
       // Belastingschuld fields
       tax_year: taxYear ? Number(taxYear) : null,
-      has_payment_plan: debtType === 'belastingschuld' ? hasPaymentPlan : false,
+      // Geen eigen vinkje meer: een maandbedrag boven nul ís de regeling, en een
+      // al opgeslagen regeling blijft staan.
+      has_payment_plan: paymentPlanToWrite(debtType, debt?.has_payment_plan, monthlyPaymentToWrite),
       has_written_agreement: debtType === 'familielening' ? hasWrittenAgreement : false,
       // App-koppeling: Hypotheekplanner-tracking alleen voor mortgages. Voor
       // andere types altijd `false` zodat een type-wissel de vlag schoonveegt.
@@ -549,6 +590,15 @@ export function DebtForm({
     onSaved()
   }
 
+  // "Oorspronkelijk bedrag" staat in het ingeklapte blok. Blokkeert een fout
+  // dáárop het opslaan, klap het blok dan open zodat het veld te zien is.
+  const meerRef = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    if (negativeValueError?.startsWith('Oorspronkelijk bedrag') && meerRef.current) {
+      meerRef.current.open = true
+    }
+  }, [negativeValueError])
+
   // Een fout die pas ná een klik ontstaat (validatie in `handleSave`, of een
   // geweigerde write) staat buiten beeld zolang de gebruiker bovenaan het
   // formulier zit. De live negatief-fout scrollt bewust niet mee: die
@@ -583,132 +633,18 @@ export function DebtForm({
   const formContent = (
       <div className="p-6">
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-                placeholder="Hypotheek"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
-              <select
-                value={debtType}
-                onChange={(e) => handleTypeChange(e.target.value as DebtType)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              >
-                {Object.entries(DEBT_TYPE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Ownership toggle */}
-          <OwnershipToggle
-            value={ownership}
-            onChange={setOwnership}
-            hasHousehold={hasHousehold}
-          />
-
-          {/* Per-debt partner split override (only for shared debts) */}
-          {ownership === 'shared' && hasHousehold && (
-            <div className="space-y-2 rounded-[var(--r)] border border-kern-100 bg-kern-50/30 p-3">
-              <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-                <input
-                  type="checkbox"
-                  checked={useCustomSplit}
-                  onChange={(e) => setUseCustomSplit(e.target.checked)}
-                  className="rounded border-[var(--border-md)]"
-                />
-                Eigen verdeling (afwijkend van huishouden)
-              </label>
-              {useCustomSplit && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Jouw aandeel</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range" min={0} max={100} step={5}
-                      value={partnerSplitPct}
-                      onChange={(e) => setPartnerSplitPct(Number(e.target.value))}
-                      className="flex-1 accent-kern-600"
-                    />
-                    <input
-                      type="number" min={0} max={100}
-                      value={partnerSplitPct}
-                      onChange={(e) => setPartnerSplitPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                      className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
-                    />
-                    <span className="text-sm text-[var(--ink-3)]">%</span>
-                  </div>
-                  <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-                    Jij: {partnerSplitPct}% · Partner: {100 - partnerSplitPct}%
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Netto vermogen inclusie — logisch onder huishouden */}
+          {/* ── Kern: wat de berekeningen voedt ── */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-              Neem dit % mee in netto vermogen en berekeningen naar de horizon
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range" min={0} max={100} step={5}
-                value={netWorthInclusionPct}
-                onChange={(e) => setNetWorthInclusionPct(Number(e.target.value))}
-                className="flex-1 accent-kern-600"
-              />
-              <input
-                type="number" min={0} max={100}
-                value={netWorthInclusionPct}
-                onChange={(e) => setNetWorthInclusionPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
-              />
-              <span className="text-sm text-[var(--ink-3)]">%</span>
-            </div>
-            <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-              Stel in welk percentage van deze schuld wordt meegeteld in je netto vermogen en vrijheidsberekeningen.
-            </p>
-            {netWorthInclusionPct < 100 && Number(currentBalance) > 0 && (
-              <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
-                Effectief saldo: {<MaskedAmount value={Number(currentBalance) * netWorthInclusionPct / 100} tone="kern" />}
-              </p>
-            )}
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+              placeholder="Hypotheek"
+            />
           </div>
 
-          {/* Subtype dropdown (conditional) */}
-          {subtypeOptions && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Subtype</label>
-              <select
-                value={subtype}
-                onChange={(e) => handleSubtypeChange(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              >
-                <option value="">Selecteer subtype...</option>
-                {Object.entries(subtypeOptions).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Oorspronkelijk bedrag</label>
-              <input
-                type="number"
-                value={originalAmount}
-                onChange={(e) => setOriginalAmount(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-            </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidig saldo</label>
               {/* Toggle: berekend vs eigen */}
@@ -731,9 +667,17 @@ export function DebtForm({
                 </div>
               )}
               {useCalculatedBalance && calculatedBalance != null ? (
-                <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
-                  <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{<MaskedAmount value={calculatedBalance} tone="kern" />}</span>
-                </div>
+                <>
+                  <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
+                    <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{<MaskedAmount value={calculatedBalance} tone="kern" />}</span>
+                  </div>
+                  {/* De grondslag staat in het dichte blok "Meer gegevens"; noem
+                      hem hier, anders verandert dit bedrag zonder zichtbare oorzaak. */}
+                  <p className="mt-1 text-[11px] leading-snug text-[var(--ink-3)]" data-testid="debt-saldo-grondslag">
+                    Berekend uit <MaskedAmount value={Number(originalAmount)} tone="kern" /> sinds{' '}
+                    {new Date(startDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
+                  </p>
+                </>
               ) : (
                 <input
                   type="number"
@@ -744,9 +688,6 @@ export function DebtForm({
                 />
               )}
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Rente (% per jaar)</label>
               <input
@@ -764,19 +705,9 @@ export function DebtForm({
                 </p>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Min. betaling p/m</label>
-              <input
-                type="number"
-                value={minimumPayment}
-                onChange={(e) => setMinimumPayment(e.target.value)}
-                data-testid="debt-minimum-payment"
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-              <p className="mt-1 text-[10px] leading-tight text-[var(--ink-4)]">
-                Ondergrens in de strategievergelijking; volgt het maandbedrag zolang ze gelijk zijn.
-              </p>
-            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Maandbedrag</label>
               {/* Toggle: berekend vs eigen */}
@@ -817,18 +748,6 @@ export function DebtForm({
                 />
               )}
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Startdatum</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-            </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Einddatum (optioneel)</label>
               <input
@@ -856,24 +775,31 @@ export function DebtForm({
             )}
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-              {debtType === 'familielening' ? 'Naam uitlener' : 'Kredietverstrekker'}
-            </label>
-            <input
-              value={creditor}
-              onChange={(e) => setCreditor(e.target.value)}
-              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              placeholder={debtType === 'familielening' ? 'Bijv. ouders, oom Jan...' : 'ABN AMRO, ING, DUO...'}
-            />
-          </div>
+          {/* Min. betaling: alleen waar het contractuele minimum iets anders is
+              dan het maandbedrag (lib/debt-form-layout.ts#showsMinimumPayment).
+              Verborgen schuift het bij opslaan nog steeds mee (B-067). */}
+          {showMinimum && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Min. betaling p/m</label>
+              <input
+                type="number"
+                value={minimumPayment}
+                onChange={(e) => setMinimumPayment(e.target.value)}
+                data-testid="debt-minimum-payment"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+              />
+              <p className="mt-1 text-[10px] leading-tight text-[var(--ink-4)]">
+                Ondergrens in de strategievergelijking; volgt het maandbedrag zolang ze gelijk zijn.
+              </p>
+            </div>
+          )}
 
-          {/* Type-specific fields */}
-          {visibleFields.length > 0 && visibleFields.some((f) => f !== 'subtype') && (
+          {/* Type-specifieke kernvelden */}
+          {layout.kern.length > 0 && (
             <div className="space-y-3 rounded-[var(--r)] border border-kern-100 bg-kern-50/30 p-3">
               <p className="text-xs font-semibold text-kern-700/60 uppercase">Details</p>
               <div className="grid grid-cols-2 gap-3">
-                {visibleFields.includes('repayment_type') && (
+                {inKern('repayment_type') && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aflossingstype</label>
                     <select
@@ -888,29 +814,7 @@ export function DebtForm({
                     </select>
                   </div>
                 )}
-                {visibleFields.includes('is_tax_deductible') && (
-                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-                    <input
-                      type="checkbox"
-                      checked={isTaxDeductible}
-                      onChange={(e) => setIsTaxDeductible(e.target.checked)}
-                      className="rounded border-[var(--border-md)]"
-                    />
-                    Hypotheekrenteaftrek
-                  </label>
-                )}
-                {visibleFields.includes('nhg') && (
-                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-                    <input
-                      type="checkbox"
-                      checked={nhg}
-                      onChange={(e) => setNhg(e.target.checked)}
-                      className="rounded border-[var(--border-md)]"
-                    />
-                    NHG
-                  </label>
-                )}
-                {visibleFields.includes('fixed_rate_end_date') && (
+                {inKern('fixed_rate_end_date') && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Rentevast tot</label>
                     <input
@@ -921,7 +825,7 @@ export function DebtForm({
                     />
                   </div>
                 )}
-                {visibleFields.includes('linked_asset_id') && (
+                {inKern('linked_asset_id') && (
                   <div>
                     {/* Label én filter komen uit LINKED_DEBT_SUGGESTIONS i.p.v.
                         uit een debt_type-ternary: die labelde elk niet-DGA-type
@@ -935,6 +839,7 @@ export function DebtForm({
                     <select
                       value={linkedAssetId}
                       onChange={(e) => setLinkedAssetId(e.target.value)}
+                      data-testid="debt-linked-asset"
                       className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     >
                       <option value="">{debtType === 'dga_schuld' ? 'Selecteer deelneming...' : '-'}</option>
@@ -951,7 +856,7 @@ export function DebtForm({
                     )}
                   </div>
                 )}
-                {visibleFields.includes('credit_limit') && (
+                {inKern('credit_limit') && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Kredietlimiet</label>
                     <input
@@ -962,18 +867,7 @@ export function DebtForm({
                     />
                   </div>
                 )}
-                {visibleFields.includes('draagkrachtmeting_date') && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Draagkrachtmeting</label>
-                    <input
-                      type="date"
-                      value={draagkrachtmetingDate}
-                      onChange={(e) => setDraagkrachtmetingDate(e.target.value)}
-                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                    />
-                  </div>
-                )}
-                {visibleFields.includes('tax_year') && (
+                {inKern('tax_year') && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Belastingjaar</label>
                     <input
@@ -987,88 +881,8 @@ export function DebtForm({
                     />
                   </div>
                 )}
-                {visibleFields.includes('has_payment_plan') && (
-                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-                    <input
-                      type="checkbox"
-                      checked={hasPaymentPlan}
-                      onChange={(e) => setHasPaymentPlan(e.target.checked)}
-                      className="rounded border-[var(--border-md)]"
-                    />
-                    Betalingsregeling
-                  </label>
-                )}
-                {visibleFields.includes('has_written_agreement') && (
-                  <div>
-                    <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-                      <input
-                        type="checkbox"
-                        checked={hasWrittenAgreement}
-                        onChange={(e) => setHasWrittenAgreement(e.target.checked)}
-                        className="rounded border-[var(--border-md)]"
-                      />
-                      Schriftelijke overeenkomst
-                    </label>
-                    {!hasWrittenAgreement && (
-                      <p className="mt-1 ml-6 text-[11px] leading-tight text-amber-600">
-                        💡 Een schriftelijke overeenkomst is aan te raden voor fiscale zekerheid.
-                      </p>
-                    )}
-                  </div>
-                )}
               </div>
-              {visibleFields.includes('has_payment_plan') && hasPaymentPlan && (
-                <div className="mt-2 rounded-[var(--r)] border border-kern-200 bg-kern-50/50 p-3">
-                  <p className="mb-2 text-[10px] font-medium uppercase text-kern-600/60">Betalingsregeling details</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Maandelijks bedrag</label>
-                      <input
-                        type="number"
-                        value={monthlyPayment}
-                        onChange={(e) => {
-                          setMinimumPayment(syncedMinimumPayment(monthlyPayment, minimumPayment, e.target.value))
-                          setMonthlyPayment(e.target.value)
-                        }}
-                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Einddatum regeling</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
-          )}
-
-          {/* Hypotheekplanner-app toggle — alleen voor `mortgage`. Aflosstrategie
-              is sinds de v2-refactor globaal en kent geen per-debt opt-in meer
-              (zie `/core/debts` "Schuldenprofiel & Aflosroute"). */}
-          {debtType === 'mortgage' && (
-            <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hasHypotheekplannerTracking}
-                onChange={(e) => setHasHypotheekplannerTracking(e.target.checked)}
-                className="mt-0.5 rounded border-[var(--border-md)]"
-              />
-              <div>
-                <span className="text-sm font-medium text-[var(--ink)]">
-                  Hypotheekplanner
-                </span>
-                <p className="text-xs text-[var(--ink-3)]">
-                  Schakel in om equity-opbouw, oversluit-scenario&apos;s en de
-                  hypotheek-vs-beleggen vergelijking voor deze hypotheek te zien.
-                </p>
-              </div>
-            </label>
           )}
 
           {/* Wet excessief lenen warning for DGA-schuld */}
@@ -1130,88 +944,273 @@ export function DebtForm({
             return null
           })()}
 
-          {/* Aflossing in spaarquote */}
-          {(() => {
-            const bal = useCalculatedBalance && calculatedBalance != null ? calculatedBalance : Number(currentBalance)
-            const rate = Number(interestRate)
-            const payment = calculatedPayment ?? Number(monthlyPayment)
-            const monthlyRente = bal * (rate / 100 / 12)
-            const berekendAflossing = payment > monthlyRente ? Math.max(0, payment - monthlyRente) : 0
-            if (bal <= 0 || (payment <= 0 && !useCustomAflossing)) return null
-            const effectiefAflossing = useCustomAflossing ? (Number(customAflossingAmount) || 0) : berekendAflossing
-            const gewogenAflossing = effectiefAflossing * netWorthInclusionPct / 100
-            return (
+          {/* ── Hoe telt dit mee: alles wat de cijfers van deze schuld verandert ── */}
+          <FormInklapblok titel="Hoe telt dit mee" samenvatting={teltMeeSamenvatting} data-testid="debt-telt-mee">
+              {/* Eigendom: alleen met een huishouden valt er iets te kiezen. Een
+                  schuld die al gedeeld is blijft zichtbaar, zodat hij terug te
+                  zetten is. */}
+              {(hasHousehold || ownership === 'shared') && (
+                <OwnershipToggle
+                  value={ownership}
+                  onChange={setOwnership}
+                  hasHousehold={hasHousehold}
+                />
+              )}
+
+              {/* Per-debt partner split override (only for shared debts) */}
+              {ownership === 'shared' && hasHousehold && (
+                <div className="space-y-2 rounded-[var(--r)] border border-kern-100 bg-kern-50/30 p-3">
+                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
+                    <input
+                      type="checkbox"
+                      checked={useCustomSplit}
+                      onChange={(e) => setUseCustomSplit(e.target.checked)}
+                      className="rounded border-[var(--border-md)]"
+                    />
+                    Eigen verdeling (afwijkend van huishouden)
+                  </label>
+                  {useCustomSplit && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Jouw aandeel</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range" min={0} max={100} step={5}
+                          value={partnerSplitPct}
+                          onChange={(e) => setPartnerSplitPct(Number(e.target.value))}
+                          className="flex-1 accent-kern-600"
+                        />
+                        <input
+                          type="number" min={0} max={100}
+                          value={partnerSplitPct}
+                          onChange={(e) => setPartnerSplitPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                          className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
+                        />
+                        <span className="text-sm text-[var(--ink-3)]">%</span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-[var(--ink-3)]">
+                        Jij: {partnerSplitPct}% · Partner: {100 - partnerSplitPct}%
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Netto vermogen inclusie */}
               <div>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                  Neem dit % mee in netto vermogen en berekeningen naar de horizon
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range" min={0} max={100} step={5}
+                    value={netWorthInclusionPct}
+                    onChange={(e) => setNetWorthInclusionPct(Number(e.target.value))}
+                    className="flex-1 accent-kern-600"
+                  />
+                  <input
+                    type="number" min={0} max={100}
+                    value={netWorthInclusionPct}
+                    onChange={(e) => setNetWorthInclusionPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                    className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
+                  />
+                  <span className="text-sm text-[var(--ink-3)]">%</span>
+                </div>
+                <p className="mt-1 text-[10px] text-[var(--ink-3)]">
+                  Stel in welk percentage van deze schuld wordt meegeteld in je netto vermogen en vrijheidsberekeningen.
+                </p>
+                {netWorthInclusionPct < 100 && Number(currentBalance) > 0 && (
+                  <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
+                    Effectief saldo: {<MaskedAmount value={Number(currentBalance) * netWorthInclusionPct / 100} tone="kern" />}
+                  </p>
+                )}
+              </div>
+
+              {inMeer('is_tax_deductible') && (
+                <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
                   <input
                     type="checkbox"
-                    checked={includeAflossingInSavings}
-                    onChange={(e) => setIncludeAflossingInSavings(e.target.checked)}
-                    className="rounded border-[var(--border-md)] accent-kern-600"
+                    checked={isTaxDeductible}
+                    onChange={(e) => setIsTaxDeductible(e.target.checked)}
+                    className="rounded border-[var(--border-md)]"
                   />
-                  <span className="text-xs font-medium text-[var(--ink-2)]">Aflossing meetellen in spaarquote</span>
+                  Hypotheekrenteaftrek
                 </label>
-                <p className="mt-1 ml-6 text-[10px] text-[var(--ink-3)] leading-relaxed">
-                  Het aflossing-deel van je betaling bouwt vermogen op. Vink aan om dit als besparing mee te tellen in je spaarquote.
-                </p>
-                {includeAflossingInSavings && (
-                  <div className="mt-2 ml-6">
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aflossing per maand</label>
-                    {/* Toggle: berekend vs eigen */}
-                    {berekendAflossing > 0 && (
-                      <div className="mb-1.5 flex rounded-full border border-[var(--border-ed)] p-0.5 text-[10px]">
-                        <button
-                          type="button"
-                          onClick={() => setUseCustomAflossing(false)}
-                          className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${!useCustomAflossing ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
-                        >
-                          Berekend
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setUseCustomAflossing(true)}
-                          className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${useCustomAflossing ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
-                        >
-                          Eigen bedrag
-                        </button>
-                      </div>
-                    )}
-                    {!useCustomAflossing && berekendAflossing > 0 ? (
-                      <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
-                        <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{<MaskedAmount value={berekendAflossing} tone="kern" />}</span>
-                        <span className="text-[10px] text-[var(--ink-4)]">p/m</span>
-                      </div>
-                    ) : (
+              )}
+
+              {/* Aflossing in spaarquote */}
+              {(() => {
+                const bal = useCalculatedBalance && calculatedBalance != null ? calculatedBalance : Number(currentBalance)
+                const rate = Number(interestRate)
+                const payment = calculatedPayment ?? Number(monthlyPayment)
+                const monthlyRente = bal * (rate / 100 / 12)
+                const berekendAflossing = payment > monthlyRente ? Math.max(0, payment - monthlyRente) : 0
+                if (bal <= 0 || (payment <= 0 && !useCustomAflossing)) return null
+                const effectiefAflossing = useCustomAflossing ? (Number(customAflossingAmount) || 0) : berekendAflossing
+                const gewogenAflossing = effectiefAflossing * netWorthInclusionPct / 100
+                return (
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={customAflossingAmount}
-                        onChange={(e) => { setCustomAflossingAmount(e.target.value); setUseCustomAflossing(true) }}
-                        placeholder="0"
-                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                        type="checkbox"
+                        checked={includeAflossingInSavings}
+                        onChange={(e) => setIncludeAflossingInSavings(e.target.checked)}
+                        className="rounded border-[var(--border-md)] accent-kern-600"
                       />
+                      <span className="text-xs font-medium text-[var(--ink-2)]">Aflossing meetellen in spaarquote</span>
+                    </label>
+                    <p className="mt-1 ml-6 text-[10px] text-[var(--ink-3)] leading-relaxed">
+                      Het aflossing-deel van je betaling bouwt vermogen op. Vink aan om dit als besparing mee te tellen in je spaarquote.
+                    </p>
+                    {includeAflossingInSavings && (
+                      <div className="mt-2 ml-6">
+                        <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aflossing per maand</label>
+                        {/* Toggle: berekend vs eigen */}
+                        {berekendAflossing > 0 && (
+                          <div className="mb-1.5 flex rounded-full border border-[var(--border-ed)] p-0.5 text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => setUseCustomAflossing(false)}
+                              className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${!useCustomAflossing ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
+                            >
+                              Berekend
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setUseCustomAflossing(true)}
+                              className={`flex-1 rounded-full px-2 py-0.5 font-medium transition-colors ${useCustomAflossing ? 'bg-kern-500 text-white' : 'text-[var(--ink-3)]'}`}
+                            >
+                              Eigen bedrag
+                            </button>
+                          </div>
+                        )}
+                        {!useCustomAflossing && berekendAflossing > 0 ? (
+                          <div className="flex items-baseline gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
+                            <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{<MaskedAmount value={berekendAflossing} tone="kern" />}</span>
+                            <span className="text-[10px] text-[var(--ink-4)]">p/m</span>
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={customAflossingAmount}
+                            onChange={(e) => { setCustomAflossingAmount(e.target.value); setUseCustomAflossing(true) }}
+                            placeholder="0"
+                            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                          />
+                        )}
+                        {gewogenAflossing > 0 && (
+                          <p className="mt-1.5 font-mono text-[11px] tabular-nums text-positive">
+                            +{<MaskedAmount value={gewogenAflossing} tone="kern" />} p/m in spaarquote{netWorthInclusionPct < 100 ? <>{' '}({netWorthInclusionPct}% van <MaskedAmount value={effectiefAflossing} tone="kern" />)</> : null}
+                          </p>
+                        )}
+                      </div>
                     )}
-                    {gewogenAflossing > 0 && (
-                      <p className="mt-1.5 font-mono text-[11px] tabular-nums text-positive">
-                        +{<MaskedAmount value={gewogenAflossing} tone="kern" />} p/m in spaarquote{netWorthInclusionPct < 100 ? <>{' '}({netWorthInclusionPct}% van <MaskedAmount value={effectiefAflossing} tone="kern" />)</> : null}
-                      </p>
-                    )}
+                  </div>
+                )
+              })()}
+
+          </FormInklapblok>
+
+          {/* ── Meer gegevens en koppelingen: zelden gewijzigd ── */}
+          <FormInklapblok ref={meerRef} titel={gegevensTitel} samenvatting={gegevensSamenvatting} data-testid="debt-meer-instellingen">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
+                  <select
+                    value={debtType}
+                    onChange={(e) => handleTypeChange(e.target.value as DebtType)}
+                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                  >
+                    {Object.entries(DEBT_TYPE_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Subtype dropdown (conditional) */}
+                {subtypeOptions && inMeer('subtype') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Subtype</label>
+                    <select
+                      value={subtype}
+                      onChange={(e) => handleSubtypeChange(e.target.value)}
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                    >
+                      <option value="">Selecteer subtype...</option>
+                      {Object.entries(subtypeOptions).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
                   </div>
                 )}
               </div>
-            )
-          })()}
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Oorspronkelijk bedrag</label>
+                  <input
+                    type="number"
+                    value={originalAmount}
+                    onChange={(e) => setOriginalAmount(e.target.value)}
+                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Startdatum</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                  {debtType === 'familielening' ? 'Naam uitlener' : 'Kredietverstrekker'}
+                </label>
+                <input
+                  value={creditor}
+                  onChange={(e) => setCreditor(e.target.value)}
+                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                  placeholder={debtType === 'familielening' ? 'Bijv. ouders, oom Jan...' : 'ABN AMRO, ING, DUO...'}
+                />
+              </div>
+
+              {/* Hypotheekplanner-app toggle — alleen voor `mortgage`. Aflosstrategie
+                  is sinds de v2-refactor globaal en kent geen per-debt opt-in meer
+                  (zie `/core/debts` "Schuldenprofiel & Aflosroute"). */}
+              {debtType === 'mortgage' && (
+                <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasHypotheekplannerTracking}
+                    onChange={(e) => setHasHypotheekplannerTracking(e.target.checked)}
+                    className="mt-0.5 rounded border-[var(--border-md)]"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-[var(--ink)]">
+                      Hypotheekplanner
+                    </span>
+                    <p className="text-xs text-[var(--ink-3)]">
+                      Schakel in om equity-opbouw, oversluit-scenario&apos;s en de
+                      hypotheek-vs-beleggen vergelijking voor deze hypotheek te zien.
+                    </p>
+                  </div>
+                </label>
+              )}
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                />
+              </div>
+          </FormInklapblok>
         </div>
 
         {/* De negatief-fout wint: die is live (verschijnt tijdens typen) en

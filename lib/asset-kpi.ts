@@ -446,8 +446,8 @@ function kpiDeelneming(asset: Asset, _ctx: AssetKpiContext): KpiPair {
 function kpiLevensverzekering(asset: Asset, ctx: AssetKpiContext): KpiPair {
   // KPI 1 — resterende looptijd
   let primary: KpiValue | undefined
-  if (asset.expiry_date) {
-    const expiry = new Date(asset.expiry_date)
+  if (asset.lock_end_date) {
+    const expiry = new Date(asset.lock_end_date)
     const now = ctx.now ?? new Date()
     const years = Math.floor(diffYearsApprox(now, expiry))
     if (years > 0) {
