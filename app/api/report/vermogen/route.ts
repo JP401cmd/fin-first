@@ -33,6 +33,7 @@ import {
   type DebtType,
 } from '@/lib/debt-data'
 import { debtRemainingMonths } from '@/lib/debt-remaining-term'
+import { debtHasPaymentPlan } from '@/lib/debt-form-layout'
 import type {
   VermogenReportData,
   VermogenAssetCategory,
@@ -144,8 +145,10 @@ function buildAssetItem(a: Asset, linkedAssetsById: Map<string, Asset>): Vermoge
     ownershipPercentage: a.ownership_percentage == null ? null : Number(a.ownership_percentage),
     annualDividend: a.annual_dividend == null ? null : Math.round(Number(a.annual_dividend)),
     depreciationRate: a.depreciation_rate == null ? null : Number(a.depreciation_rate),
-    expiryDate: a.expiry_date ?? null,
-    beneficiary: a.beneficiary ?? null,
+    // De einddatum van een polis staat in `lock_end_date`; `expiry_date` en
+    // `beneficiary` bestaan niet in de database.
+    expiryDate: a.asset_type === 'levensverzekering' ? (a.lock_end_date ?? null) : null,
+    beneficiary: null,
     linkedAssetName,
 
     hasBudgetTracking: a.has_budget_tracking === true,
@@ -189,7 +192,7 @@ function buildDebtItem(d: Debt, referenceDate: Date): VermogenDebtItem {
     isTaxDeductible: d.is_tax_deductible ?? null,
     draagkrachtmetingDate: d.draagkrachtmeting_date ?? null,
     taxYear: d.tax_year ?? null,
-    hasPaymentPlan: d.has_payment_plan === true,
+    hasPaymentPlan: debtHasPaymentPlan(d),
     hasWrittenAgreement: d.has_written_agreement === true,
 
     inclusionPct,

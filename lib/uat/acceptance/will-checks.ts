@@ -57,7 +57,18 @@ import {
 import { standaardImpactContext } from '@/lib/krant/impact'
 import { matchEditie } from '@/lib/krant/matcher'
 import { LEEG_PROFIEL, type NieuwsprofielV1 } from '@/lib/krant/profiel'
-import { AOW_RIJEN, ARTIKELEN as KRANT_ARTIKELEN, NU as KRANT_NU } from '@/lib/krant/editie.fixture'
+import { AOW_RIJEN, ARTIKELEN as KRANT_ARTIKELEN, NU as KRANT_NU, PROFIEL_TESSA } from '@/lib/krant/editie.fixture'
+import {
+  AI_LAAG_MAX_KANDIDATEN,
+  AI_LAAG_MAX_PER_WEEK,
+  AI_LAAG_MAX_TOEVOEGINGEN,
+  bouwAiLaagInvoer,
+  quotumOp,
+  toetsAiTekst,
+  verwerkAiUitvoer,
+  type AiKandidaat,
+} from '@/lib/krant/ai-laag'
+import type { EditieItem } from '@/lib/krant/matcher'
 import { WILL_ACCEPTANCE } from './will'
 import type { AcceptanceCriterion } from './types'
 
@@ -551,7 +562,7 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
       const geheelVariantAiZonderAiBinnenBeta = bepaalKrantBron({ krantAccount: false, variant: 'ai', inBeta: true, aiToegestaan: false })
       return {
         expected:
-          'krantBuitenBeta=wacht; krantBinnenBeta=tijdlijn; geheelGeenVariantBuitenBeta=ai; geheelGeenVariantBinnenBeta=tijdlijn; geheelVariantAiBuitenBeta=ai; geheelVariantAiBinnenBeta=ai; geheelVariantAiZonderAiBinnenBeta=tijdlijn',
+          'krantBuitenBeta=wacht; krantBinnenBeta=tijdlijn; geheelGeenVariantBuitenBeta=oud; geheelGeenVariantBinnenBeta=tijdlijn; geheelVariantAiBuitenBeta=oud; geheelVariantAiBinnenBeta=ai; geheelVariantAiZonderAiBinnenBeta=tijdlijn',
         actual:
           `krantBuitenBeta=${krantBuitenBeta}; krantBinnenBeta=${krantBinnenBeta}; ` +
           `geheelGeenVariantBuitenBeta=${geheelGeenVariantBuitenBeta}; geheelGeenVariantBinnenBeta=${geheelGeenVariantBinnenBeta}; ` +
@@ -646,9 +657,84 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
   {
     workflow: 'WF-WILL-41',
     scenarioId: 'UAT-WILL-41',
-    label: 'De redactieregels van de tijdlijn (echte matchEditie v6 + lib/krant/redactie.ts, ADR 0191)',
+    label: 'De Krant met AI (echte verwerkAiUitvoer): toelichting onder de regel, hoogstens 3 toevoegingen in kandidaatvolgorde',
     run: () => {
       criterion('WF-WILL-41')
+      const a = KRANT_ARTIKELEN[0]
+      const item: EditieItem = {
+        artikelId: a.id, titel: a.title, rubriek: a.category, bron: a.source_name, url: a.source_url, gepubliceerd: a.published_at, gezienOp: null,
+        vorm: 'direct', score: 5, mechanisme: null, impact: null, sjabloonId: 'editie-leeg', variant: 0, slots: {},
+        tekst: 'Voor jou scheelt dit tussen € 120 en € 240 per jaar.', deadline: null, watMist: [], waarom: [], samenvatting: a.duiding!.samenvatting,
+      }
+      const kandidaten = ['k1', 'k2', 'k3', 'k4'].map((id) => ({ ...(KRANT_ARTIKELEN[0] as AiKandidaat), id, title: `Kop ${id}` }))
+      const invoer = bouwAiLaagInvoer([item], kandidaten, PROFIEL_TESSA, 2026, {}, () => 'besloten')
+      const uit = verwerkAiUitvoer({
+        ruw: {
+          toelichtingen: [{ artikelId: a.id, tekst: 'In 2027 gaat de grens naar 60.000 euro.' }],
+          toevoegingen: ['k4', 'k3', 'k2', 'k1'].map((id) => ({ artikelId: id, tekst: 'Dit raakt je situatie.' })),
+        },
+        items: [item],
+        kandidaten,
+        invoer,
+        duidingVan: (id) => (id === a.id ? a.duiding : null),
+      })
+      const toegevoegd = uit.items.filter((i) => i.aiToegevoegd).map((i) => i.artikelId).join(',')
+      return {
+        expected: 'maxKandidaten=12; maxToevoegingen=3; toegevoegd=k1,k2,k3; matcherregelBlijft=true; aiLabelOpToelichting=true',
+        actual:
+          `maxKandidaten=${AI_LAAG_MAX_KANDIDATEN}; maxToevoegingen=${AI_LAAG_MAX_TOEVOEGINGEN}; toegevoegd=${toegevoegd}; ` +
+          `matcherregelBlijft=${uit.items[0].tekst === item.tekst}; aiLabelOpToelichting=${typeof uit.items[0].aiTekst === 'string'}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-42',
+    scenarioId: 'UAT-WILL-42',
+    label: 'Terugval per tekst (echte toetsAiTekst/verwerkAiUitvoer): verzonnen getal, aansporing, metafoor; onbruikbaar antwoord = hele laag',
+    run: () => {
+      criterion('WF-WILL-42')
+      const grond = 'Het heffingsvrij vermogen gaat naar 60.000 euro. Voor jou € 120 tot € 240 per jaar.'
+      const reden = (t: string) => {
+        const r = toetsAiTekst(t, grond)
+        return r.ok ? 'ok' : r.reden
+      }
+      const a = KRANT_ARTIKELEN[0]
+      const item: EditieItem = {
+        artikelId: a.id, titel: a.title, rubriek: a.category, bron: a.source_name, url: a.source_url, gepubliceerd: a.published_at, gezienOp: null,
+        vorm: 'direct', score: 5, mechanisme: null, impact: null, sjabloonId: 'editie-leeg', variant: 0, slots: {},
+        tekst: 'De regel voor jou.', deadline: null, watMist: [], waarom: [], samenvatting: null,
+      }
+      const invoer = bouwAiLaagInvoer([item], [], PROFIEL_TESSA, 2026, {}, () => 'besloten')
+      const verzonnen = verwerkAiUitvoer({ ruw: { toelichtingen: [{ artikelId: a.id, tekst: 'Dit scheelt je € 999.' }] }, items: [item], kandidaten: [], invoer, duidingVan: () => a.duiding })
+      const onbruikbaar = verwerkAiUitvoer({ ruw: 'geen object', items: [item], kandidaten: [], invoer, duidingVan: () => a.duiding })
+      return {
+        expected: 'verzonnenGetal=getal; aansporing=wft; metafoor=metafoor; gegrond=ok; regelBlijftBijVerzonnenGetal=true; onbruikbaarAntwoord=terugvalLaag',
+        actual:
+          `verzonnenGetal=${reden('Dat scheelt € 180.')}; aansporing=${reden('Vraag de toeslag aan.')}; metafoor=${reden('Zo kun je jezelf vrijkopen.')}; ` +
+          `gegrond=${reden('De grens gaat naar 60.000 euro.')}; ` +
+          `regelBlijftBijVerzonnenGetal=${verzonnen.items[0].tekst === item.tekst && verzonnen.items[0].aiTekst === undefined}; ` +
+          `onbruikbaarAntwoord=${onbruikbaar.tellers.terugvalLaag === 1 ? 'terugvalLaag' : 'anders'}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-43',
+    scenarioId: 'UAT-WILL-43',
+    label: 'Quotum van de Krant met AI (echte AI_LAAG_MAX_PER_WEEK + quotumOp)',
+    run: () => {
+      criterion('WF-WILL-43')
+      return {
+        expected: 'AI_LAAG_MAX_PER_WEEK=5; quotumBij4=false; quotumBij5=true',
+        actual: `AI_LAAG_MAX_PER_WEEK=${AI_LAAG_MAX_PER_WEEK}; quotumBij4=${quotumOp(4)}; quotumBij5=${quotumOp(5)}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-44',
+    scenarioId: 'UAT-WILL-44',
+    label: 'De redactieregels van de tijdlijn (echte matchEditie v6 + lib/krant/redactie.ts, ADR 0191)',
+    run: () => {
+      criterion('WF-WILL-44')
       const ctx: MatchContext = {
         now: KRANT_NU,
         gezienArtikelIds: new Set(),
@@ -677,18 +763,18 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
       const huurder: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'huur-sociaal', rubrieken: ['wonen'] }
       const koper: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'koop-met-hypotheek' }
 
-      const basisSectie = art('w41-basis', { themas: huur }, { bron_soort: 'web_pagina', bron_wijziging: 'basis' })
-      const gewijzigd = art('w41-gewijzigd', { themas: huur }, { bron_soort: 'web_pagina', bron_wijziging: 'gewijzigd' })
+      const basisSectie = art('w44-basis', { themas: huur }, { bron_soort: 'web_pagina', bron_wijziging: 'basis' })
+      const gewijzigd = art('w44-gewijzigd', { themas: huur }, { bron_soort: 'web_pagina', bron_wijziging: 'gewijzigd' })
       const t1 = matchEditie(huurder, [basisSectie], ctx)
       const t1b = matchEditie(huurder, [gewijzigd], ctx)
-      const caribisch = art('w41-cn', { themas: [{ thema: 'eigen-woning', citaat: 'hypotheekadviseurs bij het geven van passend advies' }] }, { title: 'Caribisch Nederland: leidraad voor hypotheekadvisering' })
+      const caribisch = art('w44-cn', { themas: [{ thema: 'eigen-woning', citaat: 'hypotheekadviseurs bij het geven van passend advies' }] }, { title: 'Caribisch Nederland: leidraad voor hypotheekadvisering' })
       const t2a = matchEditie(koper, [caribisch], ctx)
-      const terloops = art('w41-terloops', { themas: huur }, { title: 'Huurtoeslag verandert', bron_fragment: 'De huurtoeslag verandert per 1 januari. Ook op Bonaire gelden nieuwe bedragen.' })
-      const blog = art('w41-buffer', { themas: sparen }, { title: 'Blog: betaal jezelf eerst: spaarbuffer' })
+      const terloops = art('w44-terloops', { themas: huur }, { title: 'Huurtoeslag verandert', bron_fragment: 'De huurtoeslag verandert per 1 januari. Ook op Bonaire gelden nieuwe bedragen.' })
+      const blog = art('w44-buffer', { themas: sparen }, { title: 'Blog: betaal jezelf eerst: spaarbuffer' })
       const weinig = matchEditie({ ...LEEG_PROFIEL, spaargeld: 'tot-5k' }, [blog], ctx)
       const veel = matchEditie({ ...LEEG_PROFIEL, spaargeld: '50k-100k' }, [blog], ctx)
-      const cijfer = matchEditie(huurder, [art('w41-cijfer', { soort: 'cijfer', themas: huur, mechanisme: null })], ctx)
-      const gezien = matchEditie(huurder, [art('w41-gezien', { themas: huur }, { published_bron: 'eerste_gezien' })], ctx)
+      const cijfer = matchEditie(huurder, [art('w44-cijfer', { soort: 'cijfer', themas: huur, mechanisme: null })], ctx)
+      const gezien = matchEditie(huurder, [art('w44-gezien', { themas: huur }, { published_bron: 'eerste_gezien' })], ctx)
       return {
         expected:
           'MATCHER_VERSIE=6; basisInTijdlijn=0; gewijzigdInTijdlijn=1; basisInAchtergrond=1; caribischOveral=0; terloopsInTijdlijn=1; bufferWeinigSpaargeld=raakt; bufferVeelSpaargeld=0; cijferZonderRekenregel=0; gezienOp=true; gepubliceerd=null',

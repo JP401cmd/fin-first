@@ -3,6 +3,7 @@ import { maakNepClient } from './nep-client.fixture'
 import { renderSjabloon } from './sjablonen'
 import {
   KATERN_ONDER,
+  TIJDLIJN_ITEM_KOLOMMEN,
   TIJDLIJN_PAGINA,
   codeerCursor,
   decodeerCursor,
@@ -11,6 +12,7 @@ import {
   laadTijdlijn,
   laadTijdlijnPagina,
   rijNaarBericht,
+  zonderAiVan,
   type TijdlijnCursor,
 } from './tijdlijn-lezen'
 
@@ -117,6 +119,8 @@ describe('rijNaarBericht', () => {
       vorm: 'raakt',
       kop: renderSjabloon('raakt-kop', 0),
       tekst: 'De regel voor jou',
+      aiTekst: null,
+      aiToegevoegd: false,
       waarom: ['w1'],
       watMist: ['m1'],
       deadline: null,
@@ -588,5 +592,32 @@ describe('heeftNieuw', () => {
   it('zonder gelezenTot en zonder berichten → false', async () => {
     const nep = maakNepClient({ nieuwsprofiel: [], krant_editie_items: [] })
     expect(await heeftNieuw(nep.client as never, UID)).toBe(false)
+  })
+})
+
+// ── Krant 1E: de AI-laag in de leesvorm ──────────────────────────────────────
+
+describe('de AI-laag lezen (Krant 1E, ADR 0190)', () => {
+  it('de kolomlijst vraagt ai_tekst en ai_toegevoegd op — de eigen rij, geen andere', () => {
+    expect(TIJDLIJN_ITEM_KOLOMMEN).toMatch(/\bai_tekst\b/)
+    expect(TIJDLIJN_ITEM_KOLOMMEN).toMatch(/\bai_toegevoegd\b/)
+    expect(TIJDLIJN_ITEM_KOLOMMEN).toMatch(/krant_edities!inner\(week_key\)/)
+  })
+
+  it('rijNaarBericht: AI-tekst en "door AI toegevoegd" uit de rij; lege AI-tekst telt als geen; vorm ai-oud zonder AI-tekst', () => {
+    const b = rijNaarBericht({ ...basisRij, vorm: 'ai', tekst: '', ai_tekst: 'Toelichting.', ai_toegevoegd: true })
+    expect(b).toMatchObject({ vorm: 'ai', tekst: '', aiTekst: 'Toelichting.', aiToegevoegd: true, kop: null })
+    expect(rijNaarBericht({ ...basisRij, vorm: 'ai-oud', tekst: '', ai_tekst: null })).toMatchObject({ vorm: 'ai-oud', aiTekst: null, kop: null })
+    expect(rijNaarBericht({ ...basisRij, ai_tekst: '' }).aiTekst).toBeNull()
+    expect(rijNaarBericht({ ...basisRij, ai_tekst: null, ai_toegevoegd: null }).aiToegevoegd).toBe(false)
+  })
+
+  it('zonderAiVan: quotum → "quotum"; teruggevallen/geweigerd → "anders"; met-ai/leeg/null → null', () => {
+    expect(zonderAiVan('quotum')).toBe('quotum')
+    expect(zonderAiVan('teruggevallen')).toBe('anders')
+    expect(zonderAiVan('geweigerd')).toBe('anders')
+    expect(zonderAiVan('met-ai')).toBeNull()
+    expect(zonderAiVan('leeg')).toBeNull()
+    expect(zonderAiVan(null)).toBeNull()
   })
 })

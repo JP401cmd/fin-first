@@ -1,12 +1,14 @@
 // ── De twee keuzes van de lezer over zijn Krant (1C fase 2) ──────────────────
 //
-// 1. VARIANT (B40 + besluit 28-09 "terugweg = direct wissen"): een
-//    Geheel-account met AI kan de AI-Krant kiezen in plaats van de tijdlijn.
-//    Dan wordt de tijdlijn DIRECT gewist (`wisTijdlijn`). Terug naar de
-//    tijdlijn = de variant leeg (de standaard, B40); de volgende verversing
-//    begint opnieuw. `krant_variant` schrijft alleen de service-role
-//    (kolomgrant, migratie 20261004120000), dus deze functie is het enige
-//    schrijfpad — altijd met de id uit de sessie.
+// 1. VARIANT (B40; sinds Krant 1E, ADR 0190, K1): een Geheel-account met AI
+//    kan de Krant MET AI kiezen — dezelfde tijdlijn met de AI-laag erop. Die
+//    keuze WIST NIETS MEER (tot 1E wiste 'ai' de tijdlijn direct): de lezer
+//    houdt zijn tijdlijn en de volgende verversing krijgt de laag. Terug naar
+//    zonder AI = de variant leeg (de standaard, B40, K2); ook dat wist niets —
+//    de AI-toelichtingen die al in de tijdlijn staan blijven, als momentopname.
+//    `krant_variant` schrijft alleen de service-role (kolomgrant, migratie
+//    20261004120000), dus deze functie is het enige schrijfpad — altijd met de
+//    id uit de sessie.
 //
 // 2. BEZWAAR tegen verwerking op de achtergrond (grondslag gerechtvaardigd
 //    belang, art. 6 lid 1 sub f; art. 21 AVG — besluit 28-09, grondslag B).
@@ -29,16 +31,13 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isNewsOnly, resolveActiveModules } from '@/lib/modules/resolve'
-import { wisTijdlijn } from './tijdlijn-run'
-import { aiKrantToegestaan, bepaalKrantBron } from './tijdlijn-bron'
+import { aiKrantToegestaan, bepaalKrantBron, leestTijdlijn } from './tijdlijn-bron'
 import { inTijdlijnBeta } from './tijdlijn-beta'
 
 export type GekozenVariant = 'ai' | 'tijdlijn'
 
 export interface VariantUitkomst {
   variant: 'ai' | null
-  /** Aantal gewiste verversingen van de tijdlijn (bij 'ai'). */
-  gewist: number
   /** De banden gingen weg: bezwaar staat en de lezer leest nu geen tijdlijn meer. */
   profielGewist: boolean
 }
@@ -49,11 +48,11 @@ export async function zetKrantVariant(service: SupabaseClient, userId: string, g
     .from('nieuwsprofiel')
     .upsert({ user_id: userId, krant_variant: variant, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
   if (error) throw new Error(`[krant/tijdlijn-keuzes] variant schrijven mislukt: ${error.message}`)
-  const gewist = variant === 'ai' ? await wisTijdlijn(service, userId) : 0
-  // Bezwaar en daarna de AI-Krant kiezen = de banden hebben geen doel meer
-  // (security Y2, 29-09): dezelfde toets als na een bezwaar.
+  // Sinds 1E wist de AI-keuze de tijdlijn niet meer (K1). De banden-toets blijft:
+  // hij toetst de WERKELIJKE bron — met of zonder AI is dat de tijdlijn, en dan
+  // heeft het profiel een doel (security Y2, 29-09).
   const profielGewist = await wisBandenZonderDoel(service, userId)
-  return { variant, gewist, profielGewist }
+  return { variant, profielGewist }
 }
 
 /** De bandvelden van het nieuwsprofiel — wat de afleiding schrijft (profiel-afleiding.ts). */
@@ -99,7 +98,8 @@ export async function zetSchaduwBezwaar(service: SupabaseClient, userId: string,
 /**
  * Wist de banden van het nieuwsprofiel als ze geen doel meer hebben: er staat
  * een bezwaar (geen proefedities meer) EN /nieuws is voor deze lezer niet de
- * tijdlijn — AI-Krant, of 'wacht' / dichte vlag. Toetst de WERKELIJKE bron via
+ * tijdlijn — de oude Krant bij een dichte vlag ('oud'), of 'wacht'. De Krant
+ * met AI (1E) ís de tijdlijn: daar blijft het profiel. Toetst de WERKELIJKE bron via
  * bepaalKrantBron, niet de opgeslagen variant, en draait na beide keuzes,
  * zodat de klikvolgorde (eerst bezwaar, dan AI-Krant) de invariant niet breekt
  * (security Y2, 29-09). Ook zelf ingevulde velden gaan mee (herkomst leeg):
@@ -120,7 +120,7 @@ export async function wisBandenZonderDoel(service: SupabaseClient, userId: strin
     inBeta: inTijdlijnBeta(pr.data.role as string | null),
     aiToegestaan: aiKrantToegestaan(pr.data),
   })
-  if (bron === 'tijdlijn') return false
+  if (leestTijdlijn(bron)) return false
   const leeg = Object.fromEntries(BANDVELDEN.map((v) => [v, null]))
   const { error } = await service
     .from('nieuwsprofiel')

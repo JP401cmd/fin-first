@@ -14,30 +14,42 @@
 // vorige verversing geen artikel is geduid. Zo levert een knop die iemand
 // blijft indrukken geen lege rijen en geen matcherwerk op.
 //
-// Wie: alleen een lezer wiens /nieuws de tijdlijn ís (bepaalKrantBron, B40) en
-// die de module nieuws heeft. Een bezwaar tegen de schaduwrun
-// (profiles.krant_schaduw_bezwaar_at) staat de knop NIET in de weg: dat
-// bezwaar gaat over verwerking op de achtergrond; de knop is het eigen,
-// expliciete verzoek van de lezer.
+// Wie: alleen een lezer wiens /nieuws de tijdlijn ís — met of zonder AI-laag
+// (bepaalKrantBron, B40; leestTijdlijn sinds 1E) — en die de module nieuws
+// heeft. Een bezwaar tegen de schaduwrun (profiles.krant_schaduw_bezwaar_at)
+// staat de knop NIET in de weg: dat bezwaar gaat over verwerking op de
+// achtergrond; de knop is het eigen, expliciete verzoek van de lezer. De
+// AI-LAAG stopt een bezwaar wél (de stap zelf weigert, K-opdracht 1E).
+//
+// De AI-laag (Krant 1E, ADR 0190): de route geeft `aiStap` mee (gemaakt ná de
+// privacy-poort); hij draait alleen als de bron 'ai' is. "Niets nieuws" en de
+// rem van tien minuten gaan eraan vooraf, dus een lege verversing kost nooit
+// een modelcall.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { isNewsOnly, resolveActiveModules } from '@/lib/modules/resolve'
 import { laadKandidaten } from './editie-loader'
 import { ruimTijdlijnOp, ververs } from './tijdlijn-run'
-import { aiKrantToegestaan, bepaalKrantBron } from './tijdlijn-bron'
+import { aiKrantToegestaan, bepaalKrantBron, leestTijdlijn } from './tijdlijn-bron'
 import { inTijdlijnBeta } from './tijdlijn-beta'
+import type { AiUitkomst } from './ai-laag'
+import type { AiStap } from './tijdlijn-ai'
 
 /** Hoogstens één verversing per tien minuten (K-d, 28-09). */
 export const VERNIEUW_INTERVAL_MS = 10 * 60 * 1000
 
 export type VernieuwUitkomst =
-  | { status: 'ververst'; items: number; leeg: boolean }
+  | { status: 'ververst'; items: number; leeg: boolean; ai?: AiUitkomst }
   | { status: 'niets-nieuws' }
   | { status: 'te-snel'; opnieuwVanaf: string }
   | { status: 'geen-tijdlijn' }
 
-export async function verversEigenTijdlijn(service: SupabaseClient, userId: string, opts: { now?: Date } = {}): Promise<VernieuwUitkomst> {
+export async function verversEigenTijdlijn(
+  service: SupabaseClient,
+  userId: string,
+  opts: { now?: Date; aiStap?: AiStap | null } = {},
+): Promise<VernieuwUitkomst> {
   const now = opts.now ?? new Date()
 
   const [profielRes, nieuwsRes, laatsteRes] = await Promise.all([
@@ -65,7 +77,7 @@ export async function verversEigenTijdlijn(service: SupabaseClient, userId: stri
     inBeta: inTijdlijnBeta(profielRes.data.role as string | null),
     aiToegestaan: aiKrantToegestaan(profielRes.data),
   })
-  if (bron !== 'tijdlijn' || !modules.includes('nieuws')) return { status: 'geen-tijdlijn' }
+  if (!leestTijdlijn(bron) || !modules.includes('nieuws')) return { status: 'geen-tijdlijn' }
 
   // De rem is een ATOMAIRE claim op nieuwsprofiel.tijdlijn_vernieuwd_at
   // (eindreview Y3 / security Y1, 29-09): update … where (null of ouder dan
@@ -103,9 +115,11 @@ export async function verversEigenTijdlijn(service: SupabaseClient, userId: stri
 
   const [{ artikelen }, aowRows] = await Promise.all([laadKandidaten(service, now), getAowLeeftijden(service)])
   try {
-    const uitkomst = await ververs(service, { userId, now, aowRows, kandidaten: artikelen })
+    // Alleen de lezer die de Krant MET AI koos (en mag) krijgt de laag (K2).
+    const aiStap = bron === 'ai' ? (opts.aiStap ?? null) : null
+    const uitkomst = await ververs(service, { userId, now, aowRows, kandidaten: artikelen, aiStap })
     await ruimTijdlijnOp(service, userId, now)
-    return { status: 'ververst', items: uitkomst.items, leeg: uitkomst.leeg }
+    return { status: 'ververst', items: uitkomst.items, leeg: uitkomst.leeg, ...(uitkomst.ai ? { ai: uitkomst.ai.uitkomst } : {}) }
   } catch (err) {
     // 23505: de cron (of een tweede klik) was net eerder — de compensatie in
     // schrijfEditie haalde deze verversing weg, er staat niets dubbel.

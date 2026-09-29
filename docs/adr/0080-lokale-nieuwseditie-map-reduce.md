@@ -113,3 +113,27 @@ hier zodat ze een besluit zijn en geen bijvangst.
   geen persoonsgegevens, maar het is interne redactionele metadata die tot nu
   toe server-side bleef en nu voor elke gebruiker met het 'ai'-abonnement
   leesbaar is.
+
+## Aanvulling 29 sep 2026 — de Krant met AI op de tijdlijn (ADR 0190, K6)
+
+Dit besluit wordt aangevuld, niet vervangen. Sinds Krant 1E is de Krant met AI geen eigen
+editie meer maar een laag op de tijdlijn (`lib/krant/tijdlijn-ai.ts`, feature `krant_ai`,
+uitvoergroep `nieuws`). Voor die laag geldt:
+
+- **Geen lokale variant.** De laag heeft geen map-reduce-pad op het apparaat. Staat de groep
+  `nieuws` op lokaal, of de privé-modus aan, dan weigert de privacy-poort de cloud en valt de
+  verversing terug op de tijdlijn **zonder** AI. Er gaat dan niets naar een aanbieder, en er komt
+  geen 403: de lezer vroeg om zijn Krant, niet om AI. Het lokale pad van dit besluit
+  (`/api/local-news-edition`, de browser als auteur) blijft bestaan voor de oude Krant (bron
+  `oud`) zolang die er is.
+- **De poort staat in de route.** De knop (`/api/krant/tijdlijn/vernieuwen`) en de dagcron
+  (`/api/krant/tijdlijn/cron`, per lezer) roepen `isCloudAllowed(…, 'nieuws')` aan vóór de laag
+  bestaat, en geven de uitkomst mee aan `maakAiStap`. Een leesfout telt als "nee".
+- **De cijfer-guardrail is nu symmetrisch.** Wat hier voor het lokale pad gold (§ Besluit: geen
+  grondslag → de zin vervalt, het bericht blijft), geldt voor de laag óók op het cloudpad: elke
+  AI-tekst gaat langs dezelfde nummer-grond (`lib/nummer-grond.ts`, `kaalStreng`), de
+  Wft-woordenlijst en een PII-masker. De asymmetrie uit ADR 0061/0080 (alleen lokaal een guard)
+  is voor de Krant met AI dus opgeheven.
+- **De weekteller.** Het "bewust aanvaarde neveneffect" hierboven (de cloud-teller telt lokale
+  edities mee) geldt niet voor de laag: die telt zijn eigen modelcalls in `krant_edities`
+  (`ai_uitkomst`), los van `news_editions`.

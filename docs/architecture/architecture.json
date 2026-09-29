@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T18:46:16.827Z",
+  "generatedAt": "2026-09-29T20:46:26.696Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.22"
+    "version": "0.92.24"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -193,9 +193,9 @@
     "routesProduction": 91,
     "api": 344,
     "tables": 105,
-    "migrations": 271,
-    "integrations": 24,
-    "components": 1286,
+    "migrations": 272,
+    "integrations": 25,
+    "components": 1287,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8930,7 +8930,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 271
+    "migrationCount": 272
   },
   "tablesByDomain": [
     {
@@ -9488,11 +9488,11 @@
     }
   ],
   "components": {
-    "total": 1286,
+    "total": 1287,
     "groups": [
       {
         "group": "app",
-        "count": 492,
+        "count": 494,
         "items": [
           "aandacht-lijst",
           "aandelen-holdings.config",
@@ -9623,6 +9623,7 @@
           "debt-detail-modal",
           "debt-form",
           "debt-form.berekend-toggle.test",
+          "debt-form.indeling.test",
           "debt-form.min-betaling-sync.test",
           "debt-form.negatieve-invoer.test",
           "debt-pane",
@@ -9674,6 +9675,7 @@
           "floating-nav-button.test",
           "form-error",
           "form-error.test",
+          "form-inklapblok",
           "freedom-card",
           "freedom-card.weinig.test",
           "freedom-days-animation",
@@ -10396,7 +10398,7 @@
       },
       {
         "group": "core",
-        "count": 83,
+        "count": 84,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -10410,6 +10412,7 @@
           "asset-form-iban.test",
           "asset-return-modal",
           "assets-client",
+          "assets-client.indeling.test",
           "assets-client.rendement-leeg.test",
           "box3-comparison",
           "card-kpi-strip",
@@ -10747,7 +10750,7 @@
       },
       {
         "group": "berichten",
-        "count": 22,
+        "count": 20,
         "items": [
           "archive-edition-card",
           "archive-section",
@@ -10767,8 +10770,6 @@
           "nieuws-only-client",
           "nieuws-only-client.test",
           "section-heading",
-          "terug-naar-tijdlijn",
-          "terug-naar-tijdlijn.test",
           "tijdlijn-client",
           "tijdlijn-client.test"
         ]
@@ -10939,6 +10940,10 @@
     },
     {
       "name": "OpenAI",
+      "category": "AI"
+    },
+    {
+      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -19316,6 +19321,20 @@
       ],
       "summary": "De startpagina van beheer is een dashboard dat antwoord geeft op vijf vragen: wat vraagt nu aandacht, hoe staat elk onderdeel ervoor, welke kant gaat het op, wat is er veranderd, en wat kan dit dashboard niet zien. Het leidt alles af uit bestaande bronnen en bestaande grenzen; he",
       "file": "docs/adr/0189-het-beheerdashboard-ordent-op-beheervraag.md"
+    },
+    {
+      "id": "0190-de-krant-met-ai-als-laag-op-de-tijdlijn",
+      "title": "De Krant met AI als laag op de tijdlijn: dezelfde verversing, een toelichting per bericht, terugval per tekst",
+      "status": "voorgesteld",
+      "date": "2026-09-29",
+      "elements": [
+        "as-nieuws",
+        "do-krant",
+        "t-aigateway",
+        "sp-nieuws"
+      ],
+      "summary": "De Krant met AI is sinds Krant 1E geen eigen editie meer. Het is dezelfde tijdlijnverversing als de Krant zonder AI (ADR 0183), met één extra stap tussen de matcher en het schrijven: een model schrijft per bericht een korte toelichting en mag hoogstens drie berichten toevoegen. D",
+      "file": "docs/adr/0190-de-krant-met-ai-als-laag-op-de-tijdlijn.md"
     }
   ],
   "churn": {
@@ -19327,7 +19346,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 68
+        "commits": 71
       },
       {
         "path": "app/(app)/toekomst",
@@ -19339,7 +19358,7 @@
       },
       {
         "path": "app/api/assets",
-        "commits": 16
+        "commits": 17
       },
       {
         "path": "app/api/household",
@@ -19370,13 +19389,13 @@
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4878,
-        "commits": 40
+        "loc": 4937,
+        "commits": 41
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 4028,
-        "commits": 27
+        "loc": 4103,
+        "commits": 29
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -19385,8 +19404,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3147,
-        "commits": 66
+        "loc": 3148,
+        "commits": 67
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -20669,8 +20688,23 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-29",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Integraties",
+        "added": [
+          "OpenRouter"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [],
+        "removed": [
+          "-2"
+        ]
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -21159,7 +21193,7 @@
     {
       "date": "2026-09-29",
       "api": 344,
-      "components": 1286,
+      "components": 1287,
       "tables": 105,
       "routesProduction": 91
     }

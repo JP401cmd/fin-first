@@ -153,6 +153,15 @@ const CreateAssetSchema = z.object({
     .nullish()
     .transform((v) => v ?? null),
 
+  // Deelneming: Box 2 leest belang en dividend. Bij elk ander type genegeerd.
+  ownership_percentage: z.number().finite().gt(0).max(100).nullish().transform((v) => v ?? null),
+  annual_dividend: z.number().finite().min(0).max(100_000_000_000).nullish().transform((v) => v ?? null),
+
+  // Koppeling van een DGA-vordering aan de deelneming. De server toetst
+  // hieronder dat het doel een eigen deelneming is; bij elk ander type of
+  // subtype wordt de waarde genegeerd.
+  linked_asset_id: z.uuid().nullish().transform((v) => v ?? null),
+
   // `household_id` staat hier BEWUST NIET: die bepaalt de server.
   ownership: z.enum(['personal', 'shared']).default('personal'),
   net_worth_inclusion_pct: z.number().int().min(0).max(100).default(100),
@@ -209,6 +218,23 @@ export async function POST(req: Request) {
       }
     }
 
+    // Alleen een DGA-vordering hangt aan een deelneming, en alleen aan een
+    // EIGEN deelneming: de SELECT-policy op `assets` is huishoud-gedeeld, dus
+    // zonder `user_id`-filter zou de deelneming van de partner ook slagen.
+    let linkedAssetId: string | null = null
+    if (body.asset_type === 'vordering' && body.subtype === 'dga_lening' && body.linked_asset_id) {
+      const { data: target, error: targetError } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('id', body.linked_asset_id)
+        .eq('user_id', user.id)
+        .eq('asset_type', 'deelneming')
+        .maybeSingle()
+      if (targetError) return serverError(targetError, 'assets:POST:linked')
+      if (!target) return badRequest('De gekozen deelneming is niet gevonden')
+      linkedAssetId = target.id
+    }
+
     const row = {
       user_id: user.id,
       name: body.name,
@@ -225,6 +251,9 @@ export async function POST(req: Request) {
       tax_benefit: body.tax_benefit,
       is_liquid: body.is_liquid,
       lock_end_date: body.lock_end_date,
+      linked_asset_id: linkedAssetId,
+      ownership_percentage: body.asset_type === 'deelneming' ? body.ownership_percentage : null,
+      annual_dividend: body.asset_type === 'deelneming' ? body.annual_dividend : null,
       ticker_symbol: body.ticker_symbol,
       rental_income: body.rental_income,
       woz_value: body.woz_value,

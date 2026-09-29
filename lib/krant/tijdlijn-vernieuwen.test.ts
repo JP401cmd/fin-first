@@ -89,13 +89,31 @@ beforeEach(() => {
 })
 
 describe('geen-tijdlijn', () => {
-  it('bron ≠ tijdlijn (bewuste keuze "ai", AI toegestaan): geen-tijdlijn, geen kandidaten geladen', async () => {
+  it('bron "ai" (1E): de Krant MET AI is dezelfde tijdlijn — ververst, en de AI-stap gaat mee', async () => {
     beta.open = true
     const nep = maakClient({ nieuwsprofiel: { krant_variant: 'ai' } })
-    const uit = await verversEigenTijdlijn(nep.client as never, UID, { now: NU })
-    expect(uit).toEqual({ status: 'geen-tijdlijn' })
-    expect(mockVervers).not.toHaveBeenCalled()
-    expect(laadKandidaten).not.toHaveBeenCalled()
+    const aiStap = vi.fn()
+    mockVervers.mockResolvedValueOnce({ editieId: 'e1', profielType: 'x', leeg: false, items: 3, ai: { uitkomst: 'met-ai', reden: null, tellers: {} } })
+    const uit = await verversEigenTijdlijn(nep.client as never, UID, { now: NU, aiStap })
+    expect(uit).toEqual({ status: 'ververst', items: 3, leeg: false, ai: 'met-ai' })
+    expect(mockVervers).toHaveBeenCalledTimes(1)
+    expect(mockVervers.mock.calls[0][1]).toMatchObject({ userId: UID, aiStap })
+  })
+
+  it('bron "tijdlijn" (zonder AI): de meegegeven AI-stap wordt NIET doorgegeven (K2 — standaard zonder AI)', async () => {
+    beta.open = true
+    const nep = maakClient({ nieuwsprofiel: { krant_variant: null } })
+    const aiStap = vi.fn()
+    await verversEigenTijdlijn(nep.client as never, UID, { now: NU, aiStap })
+    expect(mockVervers.mock.calls[0][1]).toMatchObject({ aiStap: null })
+  })
+
+  it('variant "ai" zonder AI toegestaan (kill-switch uit): bron valt terug op tijdlijn, geen AI-stap', async () => {
+    beta.open = true
+    const nep = maakClient({ profiel: { ai_enabled: false }, nieuwsprofiel: { krant_variant: 'ai' } })
+    const aiStap = vi.fn()
+    await verversEigenTijdlijn(nep.client as never, UID, { now: NU, aiStap })
+    expect(mockVervers.mock.calls[0][1]).toMatchObject({ aiStap: null })
   })
 
   it('zonder module nieuws: geen-tijdlijn, ook al zou de bronkeuze verder tijdlijn zijn', async () => {
@@ -113,7 +131,7 @@ describe('geen-tijdlijn', () => {
     expect(mockVervers).not.toHaveBeenCalled()
   })
 
-  it('bèta dicht en gewone user: geen-tijdlijn (bepaalKrantBron valt terug op "ai", niet "tijdlijn")', async () => {
+  it('bèta dicht en gewone user: geen-tijdlijn (bepaalKrantBron geeft "oud", de oude Krant)', async () => {
     const nep = maakClient()
     const uit = await verversEigenTijdlijn(nep.client as never, UID, { now: NU })
     expect(uit).toEqual({ status: 'geen-tijdlijn' })

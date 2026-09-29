@@ -73,6 +73,66 @@ describe('editie-schrijver', () => {
     expect(rij.waarom).toEqual(item.waarom)
   })
 
+  // Live-run 29-09: een verversing met AI-tekst onder het ene bericht en niet
+  // onder het andere gaf 23502 op ai_toegevoegd. PostgREST neemt bij een
+  // bulk-insert de VERENIGING van de sleutels als kolomlijst en vult een
+  // ontbrekende sleutel met NULL, niet met de kolomstandaard.
+  describe('één insert, één kolomlijst (Krant 1E)', () => {
+    const sleutels = (rij: Record<string, unknown>) => Object.keys(rij).sort().join(',')
+
+    it('gemengde verversing: elke rij noemt beide AI-kolommen, en ai_toegevoegd is nooit leeg', async () => {
+      const basis = matchEditie(PROFIEL_TESSA, ARTIKELEN, ctx())
+      expect(basis.items.length).toBeGreaterThanOrEqual(2)
+      const items = basis.items.map((item, i) => (i === 0 ? { ...item, aiTekst: 'Dit geldt voor wie spaart.' } : item))
+      const nep = maakNepClient({})
+      await schrijfEditie(nep.client as never, {
+        userId: UID,
+        weekKey: '2026-W40',
+        bron: 'tijdlijn',
+        profiel: PROFIEL_TESSA,
+        uitkomst: { ...basis, items },
+        now: NU,
+        ai: { uitkomst: 'met-ai' },
+      })
+      const rijen = nep.rijen('krant_editie_items')
+      expect(rijen.length).toBe(items.length)
+      expect(new Set(rijen.map(sleutels)).size).toBe(1)
+      for (const rij of rijen) expect(typeof rij.ai_toegevoegd).toBe('boolean')
+      expect(rijen[0]).toMatchObject({ ai_tekst: 'Dit geldt voor wie spaart.', ai_toegevoegd: false })
+      expect(rijen[1]).toMatchObject({ ai_tekst: null, ai_toegevoegd: false })
+    })
+
+    it('een door het model gekozen bericht naast een matcherbericht: zelfde kolomlijst', async () => {
+      const basis = matchEditie(PROFIEL_TESSA, ARTIKELEN, ctx())
+      const eerste = basis.items[0]
+      const toegevoegd = { ...eerste, artikelId: 'door-ai', vorm: 'ai' as const, tekst: '', aiTekst: 'Dit verandert per 1 januari.', aiToegevoegd: true }
+      const nep = maakNepClient({})
+      await schrijfEditie(nep.client as never, {
+        userId: UID,
+        weekKey: '2026-W40',
+        bron: 'tijdlijn',
+        profiel: PROFIEL_TESSA,
+        uitkomst: { ...basis, items: [eerste, toegevoegd] },
+        now: NU,
+        ai: { uitkomst: 'met-ai' },
+      })
+      const rijen = nep.rijen('krant_editie_items')
+      expect(new Set(rijen.map(sleutels)).size).toBe(1)
+      expect(rijen[0]).toMatchObject({ ai_tekst: null, ai_toegevoegd: false })
+      expect(rijen[1]).toMatchObject({ ai_tekst: 'Dit verandert per 1 januari.', ai_toegevoegd: true, vorm: 'ai' })
+    })
+
+    it('zonder AI-laag noemt geen enkele rij de AI-kolommen (de rij van vóór 1E)', async () => {
+      const uitkomst = matchEditie(PROFIEL_TESSA, ARTIKELEN, ctx())
+      const nep = maakNepClient({})
+      await schrijfEditie(nep.client as never, { userId: UID, weekKey: '2026-W40', bron: 'schaduw', profiel: PROFIEL_TESSA, uitkomst, now: NU })
+      for (const rij of nep.rijen('krant_editie_items')) {
+        expect('ai_tekst' in rij).toBe(false)
+        expect('ai_toegevoegd' in rij).toBe(false)
+      }
+    })
+  })
+
   it('geldendeEditieId: alleen de niet-vervangen editie van die week en bron, op de eigen user_id', async () => {
     const nep = maakNepClient({
       krant_edities: [

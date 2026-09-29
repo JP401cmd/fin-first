@@ -1,8 +1,8 @@
 // ── Unified Feature Registry ─────────────────────────────────────────────────
-// 18 consolidated features that replace the old 67-feature + 31-tier system.
+// 19 consolidated features that replace the old 67-feature + 31-tier system.
 // Each feature controls widgets + page sections + old feature IDs.
 //
-// Verdeling: 11 gratis + 1 connected + 6 ai. De tellingen in dit bestand liepen
+// Verdeling: 12 gratis + 1 connected + 6 ai (sinds Krant 1E: + `krant`). De tellingen in dit bestand liepen
 // achter op de inhoud (kop zei 16, de AI-sectie zei 4) — bijgewerkt en hieronder
 // vastgezet door lib/feature-registry.test.ts, zodat het niet opnieuw verschuift.
 
@@ -21,10 +21,10 @@ export interface UnifiedFeature {
   legacyIds: string[]
 }
 
-// ── 16 Unified Features ──────────────────────────────────────────────────────
+// ── 19 Unified Features ──────────────────────────────────────────────────────
 
 export const UNIFIED_FEATURES: UnifiedFeature[] = [
-  // ── GRATIS tier (11 features) ──────────────────────────────────────────────
+  // ── GRATIS tier (12 features) ──────────────────────────────────────────────
 
   {
     id: 'vermogensbeheer',
@@ -141,6 +141,18 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     widgets: [],
     legacyIds: ['data_export'],
   },
+  {
+    // De Krant zonder AI (1C/1E): de persoonlijke tijdlijn met de regel voor jou.
+    // Gratis — de AI-laag is `ai_nieuws`. Module 'wil' is hier alleen de
+    // indeling in dit register; de Krant is een eigen product (ADR 0184).
+    id: 'krant',
+    label: 'De Krant',
+    description: 'Persoonlijke nieuwstijdlijn: wat het nieuws voor jouw situatie betekent, in euro’s',
+    module: 'wil',
+    requiredTier: 'gratis',
+    widgets: [],
+    legacyIds: [],
+  },
 
   // ── CONNECTED tier (1 feature) ─────────────────────────────────────────────
 
@@ -229,9 +241,12 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     legacyIds: [],
   },
   {
+    // Sinds Krant 1E (ADR 0190): de AI-LAAG op de Krant — een toelichting per
+    // bericht en hoogstens drie toegevoegde berichten, na een bewuste keuze. De
+    // Krant zelf is gratis (`krant`, hieronder).
     id: 'ai_nieuws',
-    label: 'AI Nieuws',
-    description: 'Gepersonaliseerd financieel nieuws en inzichten',
+    label: 'Krant met AI',
+    description: 'Een AI-toelichting bij elk bericht in je Krant, als je daarvoor kiest',
     module: 'ai',
     requiredTier: 'ai',
     widgets: [],

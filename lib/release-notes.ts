@@ -97,6 +97,81 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.24',
+    date: '2026-09-29',
+    title: 'De Krant met AI op de tijdlijn staat klaar',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De Krant met AI wordt een toelichting bij je tijdlijn',
+            description:
+              'De Krant met AI is gebouwd als korte toelichting bij de berichten in je tijdlijn. Hij staat nog uit; aan de Krant die je nu leest verandert niets.',
+          },
+          {
+            title: 'Eerdere edities van de Krant met AI zijn bewaard',
+            description:
+              'We hebben je eerdere edities overgezet naar de tijdlijn. Je ziet ze terug zodra de tijdlijn voor je openstaat.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.92.23',
+    date: '2026-09-29',
+    title: 'Rustiger bewerken van bezittingen en schulden',
+    sections: [
+      {
+        module: 'Bezittingen',
+        color: 'amber',
+        items: [
+          {
+            title: 'Minder velden bij het bewerken',
+            description:
+              'Je ziet eerst wat meetelt. De rest staat in twee ingeklapte blokken, met een regel die laat zien wat er is ingesteld.',
+          },
+          {
+            title: 'Belang en dividend van een deelneming',
+            description:
+              'Bij een deelneming vul je nu je belang en het jaarlijkse dividend in. Box 2 rekent daarmee.',
+          },
+          {
+            title: 'Einddatum van een levensverzekering blijft bewaard',
+            description:
+              'De einddatum van een polis werd niet opgeslagen. Dat werkt nu, en de uitkering verschijnt als mijlpaal.',
+          },
+          {
+            title: 'Lening aan je eigen BV onthoudt de koppeling',
+            description: 'Een lening aan je eigen BV onthoudt nu aan welke deelneming hij hangt.',
+          },
+        ],
+      },
+      {
+        module: 'Schulden',
+        color: 'teal',
+        items: [
+          {
+            title: 'Een hypotheek bewerk je met acht velden',
+            description:
+              'Velden die nergens meetellen zijn weg. Wat je zelden wijzigt staat ingeklapt; je gegevens blijven bewaard.',
+          },
+          {
+            title: 'Hypotheek of beleggen rekent met je echte looptijd',
+            description:
+              'De vergelijking ging altijd uit van 30 jaar. Nu volgt de looptijd uit je maandbedrag of einddatum.',
+          },
+          {
+            title: 'Een autolening toont de gekoppelde auto',
+            description: 'Bij een autolening zie en wijzig je nu aan welke auto hij gekoppeld is.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.22',
     date: '2026-09-29',
     title: 'Beheer opent met een dashboard',

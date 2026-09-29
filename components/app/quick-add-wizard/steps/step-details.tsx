@@ -286,6 +286,11 @@ export function StepDetails(props: StepDetailsProps) {
     if (field3Config?.kind === 'percentage') {
       const pct = parseDecimalInput(field3Raw)
       if (pct != null && pct < 0) next.field3 = 'Percentage mag niet negatief zijn'
+      // Een belang ligt tussen 0 en 100%. Zonder deze melding liet de draft een
+      // waarde daarbuiten stil vallen en rekende Box 2 met 100%.
+      else if (isAsset && typeKey === 'deelneming' && pct != null && (pct === 0 || pct > 100)) {
+        next.field3 = 'Vul een belang in tussen 0 en 100%'
+      }
     }
     // Vangnet, geen hoofdroute: het currency-field3 loopt via `<AmountInput>`
     // met `positive-only`, dus een minteken bereikt de draft niet meer (het

@@ -161,9 +161,14 @@ export const SCHULD_ENGINE_CHECKS: SchuldEngineCheck[] = [
     run: () => {
       criterion('WF-SCHULD-01')
       const ltv = ltvKpi(350000, 385000)
+      // Regeling-KPI: de echte kpiBelastingschuld, die sinds 29-09-2026
+      // debtHasPaymentPlan leest (vlag OF maandbedrag > 0). toDebt zet de vlag
+      // op false, net als de seed; het maandbedrag van €150 geeft de regeling.
+      const belasting = toDebt(lisa.debts.find((d) => d.debt_type === 'belastingschuld') as PersonaDebt, 'belasting-id')
+      const regeling = computeDebtKpi(belasting).secondary
       return {
-        expected: 'totaleSchuld=368270; maandlasten=2135; gewogenRente=2.88; categorieen=11; ltvPct=91; ltvTone=neutral',
-        actual: `totaleSchuld=${totalBalance(lisa.debts)}; maandlasten=${totalMonthly(lisa.debts)}; gewogenRente=${fx(weightedRate(lisa.debts), 2)}; categorieen=${categoryCount(lisa.debts)}; ltvPct=${ltv.pct}; ltvTone=${ltv.tone}`,
+        expected: 'totaleSchuld=368270; maandlasten=2135; gewogenRente=2.88; categorieen=11; ltvPct=91; ltvTone=neutral; belastingRegeling=Regeling; belastingRegelingTone=pos',
+        actual: `totaleSchuld=${totalBalance(lisa.debts)}; maandlasten=${totalMonthly(lisa.debts)}; gewogenRente=${fx(weightedRate(lisa.debts), 2)}; categorieen=${categoryCount(lisa.debts)}; ltvPct=${ltv.pct}; ltvTone=${ltv.tone}; belastingRegeling=${regeling?.value ?? 'geen'}; belastingRegelingTone=${regeling?.tone ?? 'none'}`,
       }
     },
   },

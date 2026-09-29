@@ -62,3 +62,17 @@ export function debtRemainingMonths(debt: Debt, now: Date): number | null {
   }
   return null
 }
+
+/** Restlooptijd waarmee hypotheek-vs-beleggen rekent als de schuld er zelf geen geeft: 30 jaar. */
+export const HVB_RESTLOOPTIJD_TERUGVAL_MAANDEN = 360
+
+/**
+ * Restlooptijd (maanden) voor de vergelijking hypotheek-vs-beleggen.
+ *
+ * Volgt dezelfde afleiding als de "resterend"-KPI, zodat de samenvatting op het
+ * dashboard en de schuldkaart over dezelfde looptijd praten. Alleen een schuld
+ * zonder bruikbaar maandbedrag én zonder einddatum valt terug op 30 jaar.
+ */
+export function hvbRestLooptijdMaanden(debt: Debt, now: Date): number {
+  return debtRemainingMonths(debt, now) ?? HVB_RESTLOOPTIJD_TERUGVAL_MAANDEN
+}

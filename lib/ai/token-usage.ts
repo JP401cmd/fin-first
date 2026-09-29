@@ -42,6 +42,7 @@ export const AI_TOKEN_FEATURE_LABELS = {
   nieuws: 'Nieuws (krant)',
   nieuws_ingest: 'Nieuws-ingest (achtergrond)',
   nieuws_duiding: 'Nieuws-duiding (Krant, achtergrond)',
+  krant_ai: 'Krant met AI (toelichting per bericht)',
   pensioen_extractie: 'Pensioen-extractie',
   aangifte_extractie: 'Aangifte-extractie',
   document_extractie: 'Document-extractie',

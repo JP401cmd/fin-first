@@ -14,7 +14,11 @@ const mockGetUser = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn(async () => ({ auth: { getUser: mockGetUser } })) }))
 
 const mockKrantBronVoor = vi.fn()
-vi.mock('@/lib/krant/tijdlijn-bron', () => ({ krantBronVoor: (...a: unknown[]) => mockKrantBronVoor(...a) }))
+// leestTijdlijn blijft de echte (pure) functie: welke bron de tijdlijn leest, is hier juist de toets.
+vi.mock('@/lib/krant/tijdlijn-bron', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/krant/tijdlijn-bron')>()
+  return { ...actual, krantBronVoor: (...a: unknown[]) => mockKrantBronVoor(...a) }
+})
 
 const mockHeeftNieuw = vi.fn()
 const mockLaadTijdlijnPagina = vi.fn()
@@ -78,10 +82,18 @@ describe('bronkeuze', () => {
     expect(mockLaadTijdlijnPagina).not.toHaveBeenCalled()
   })
 
-  it('403 ook voor bron "ai" (bewuste keuze voor de AI-Krant)', async () => {
+  it('200 voor bron "ai" — de Krant met AI leest sinds 1E dezelfde tijdlijn', async () => {
     mockKrantBronVoor.mockResolvedValue({ bron: 'ai', krantAccount: false, variant: 'ai', inBeta: true })
     const res = await GET(req())
+    expect(res.status).toBe(200)
+    expect(mockLaadTijdlijnPagina).toHaveBeenCalledTimes(1)
+  })
+
+  it('403 voor bron "oud" (de oude Krant bij een dichte vlag)', async () => {
+    mockKrantBronVoor.mockResolvedValue({ bron: 'oud', krantAccount: false, variant: null, inBeta: false })
+    const res = await GET(req())
     expect(res.status).toBe(403)
+    expect(mockLaadTijdlijnPagina).not.toHaveBeenCalled()
   })
 })
 

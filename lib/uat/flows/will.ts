@@ -84,8 +84,8 @@ export const WILL_FLOW: UatFlow = {
     // tussen de AI-Krant ('krant', WF-WILL-15) en de tijdlijn zonder AI
     // ('tijdlijn' + subacties); het derde uitkomst-been (KrantWacht voor een
     // Krant-account buiten de bèta) zit als tak in datzelfde WF-WILL-33.
-    { id: 'bronkeuze', scenarioId: 'UAT-WILL-33', label: 'WF-WILL-33 · Server kiest de bron (tijdlijn/AI-Krant/wacht)', kind: 'screen', stage: 3, lane: 'krant' },
-    { id: 'krant', scenarioId: 'UAT-WILL-15', label: 'WF-WILL-15 · AI-Krant openen en lezen (/nieuws, bron=AI)', kind: 'screen', stage: 3, lane: 'krant', subOf: 'bronkeuze' },
+    { id: 'bronkeuze', scenarioId: 'UAT-WILL-33', label: 'WF-WILL-33 · Server kiest de bron (tijdlijn/tijdlijn met AI/oud/wacht)', kind: 'screen', stage: 3, lane: 'krant' },
+    { id: 'krant', scenarioId: 'UAT-WILL-15', label: 'WF-WILL-15 · Oude Krant openen (/nieuws, bron=oud) — uitgefaseerd sinds 1E', kind: 'screen', stage: 3, lane: 'krant', subOf: 'bronkeuze' },
     { id: 'ververs', scenarioId: 'UAT-WILL-16', label: 'WF-WILL-16 · Krant verversen binnen de weeklimiet', kind: 'action', stage: 3, lane: 'krant', subOf: 'krant' },
     { id: 'archief', scenarioId: 'UAT-WILL-17', label: 'WF-WILL-17 · Krantenarchief doorbladeren', kind: 'screen', stage: 3, lane: 'krant', subOf: 'krant' },
     { id: 'artikelbespreek', scenarioId: 'UAT-WILL-18', label: 'WF-WILL-18 · Nieuwsartikel met Fin bespreken', kind: 'action', stage: 3, lane: 'krant', subOf: 'krant' },
@@ -96,9 +96,12 @@ export const WILL_FLOW: UatFlow = {
     { id: 'tijdlijn-ververs', scenarioId: 'UAT-WILL-34', label: 'WF-WILL-34 · Tijdlijn verversen binnen de rem van 10 min', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
     { id: 'tijdlijn-katern', scenarioId: 'UAT-WILL-36', label: 'WF-WILL-36 · Algemeen katern alleen onder 5 berichten', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
     { id: 'tijdlijn-bezwaar', scenarioId: 'UAT-WILL-37', label: 'WF-WILL-37 · Bezwaar maken tegen verwerking (en intrekken)', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
-    { id: 'tijdlijn-naar-ai', scenarioId: 'UAT-WILL-38', label: 'WF-WILL-38 · Naar de AI-Krant wist de tijdlijn; terug kan altijd', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'tijdlijn-naar-ai', scenarioId: 'UAT-WILL-38', label: 'WF-WILL-38 · De Krant met AI kiezen (en terug) wist niets', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'tijdlijn-ai-laag', scenarioId: 'UAT-WILL-41', label: 'WF-WILL-41 · Toelichting per bericht + hoogstens 3 toevoegingen (met AI)', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'tijdlijn-ai-terugval', scenarioId: 'UAT-WILL-42', label: 'WF-WILL-42 · Zonder AI terugvallen (per tekst, per laag, lokaal/privé)', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn-ai-laag' },
+    { id: 'tijdlijn-ai-quotum', scenarioId: 'UAT-WILL-43', label: 'WF-WILL-43 · Hoogstens 5 verversingen met AI per week', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn-ai-laag' },
     { id: 'tijdlijn-oud-nieuws', scenarioId: 'UAT-WILL-40', label: 'WF-WILL-40 · Oud nieuws (publicatie > 45 dagen) telt niet als nieuw', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
-    { id: 'tijdlijn-redactieregels', scenarioId: 'UAT-WILL-41', label: 'WF-WILL-41 · Redactieregels: basis/wijziging, Caribisch NL, spaarbuffer, "gezien op"', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'tijdlijn-redactieregels', scenarioId: 'UAT-WILL-44', label: 'WF-WILL-44 · Redactieregels: basis/wijziging, Caribisch NL, spaarbuffer, "gezien op"', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
     { id: 'nieuwsstip', scenarioId: 'UAT-WILL-39', label: 'WF-WILL-39 · Nieuwsstip in de zijbalk (tijdlijnlezer)', kind: 'screen', stage: 3, lane: 'krant' },
 
     // ── 4 · uitkomst ──────────────────────────────────────────────────────
@@ -163,8 +166,8 @@ export const WILL_FLOW: UatFlow = {
     { from: 'bel', to: 'briefingmelding' },
 
     // krant — bronkeuze splitst naar de AI-Krant of de tijdlijn zonder AI
-    { from: 'bronkeuze', to: 'krant', kind: 'branch', label: 'bron=ai (bewuste keuze, of standaard buiten de bèta)' },
-    { from: 'bronkeuze', to: 'tijdlijn', kind: 'branch', label: 'bron=tijdlijn (standaard binnen de bèta)' },
+    { from: 'bronkeuze', to: 'krant', kind: 'branch', label: 'bron=oud (buiten de bèta; uitgefaseerd sinds 1E)' },
+    { from: 'bronkeuze', to: 'tijdlijn', kind: 'branch', label: 'bron=tijdlijn of ai (binnen de bèta; ai = dezelfde tijdlijn met de AI-laag)' },
     { from: 'krant', to: 'ververs' },
     { from: 'krant', to: 'archief' },
     { from: 'krant', to: 'artikelbespreek' },
@@ -177,8 +180,10 @@ export const WILL_FLOW: UatFlow = {
     { from: 'tijdlijn', to: 'tijdlijn-katern' },
     { from: 'tijdlijn', to: 'tijdlijn-bezwaar' },
     { from: 'tijdlijn', to: 'tijdlijn-naar-ai' },
-    { from: 'tijdlijn-naar-ai', to: 'krant', kind: 'branch', label: '"Liever de Krant met AI" wist de tijdlijn' },
-    { from: 'krant', to: 'tijdlijn', kind: 'branch', label: '"Naar de tijdlijn" (TerugNaarTijdlijn) als de bèta openstaat' },
+    { from: 'tijdlijn-naar-ai', to: 'tijdlijn-ai-laag', kind: 'branch', label: '"Liever de Krant met AI" — de tijdlijn blijft, de volgende verversing krijgt de laag' },
+    { from: 'tijdlijn-ai-laag', to: 'tijdlijn-ai-terugval', kind: 'branch', label: 'guard, modelfout, lokaal/privé of bezwaar' },
+    { from: 'tijdlijn-ai-laag', to: 'tijdlijn-ai-quotum', kind: 'branch', label: '5 calls in 7 dagen' },
+    { from: 'tijdlijn-ai-laag', to: 'tijdlijn', kind: 'branch', label: '"Liever zonder AI" — niets gewist' },
     { from: 'bronkeuze', to: 'nieuwsstip', label: 'de zijbalkstip leest dezelfde bronkeuze via /api/krant/tijdlijn?peek=1' },
 
     // samenvloeien → uitkomst

@@ -1305,3 +1305,12 @@
 ## 2026-09-29
 
 - Geen wijzigingen.
+
+## 2026-09-29
+
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-09-29
+
+- **Integraties** toegevoegd: OpenRouter
+- **Componenten (aantal)** verwijderd: -2
