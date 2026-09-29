@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T13:29:59.134Z",
+  "generatedAt": "2026-09-29T15:39:37.086Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.19"
+    "version": "0.92.20"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -195,7 +195,7 @@
     "tables": 105,
     "migrations": 270,
     "integrations": 25,
-    "components": 1251,
+    "components": 1253,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -9437,7 +9437,7 @@
     }
   ],
   "components": {
-    "total": 1251,
+    "total": 1253,
     "groups": [
       {
         "group": "app",
@@ -10667,7 +10667,7 @@
       },
       {
         "group": "berichten",
-        "count": 20,
+        "count": 22,
         "items": [
           "archive-edition-card",
           "archive-section",
@@ -10675,6 +10675,8 @@
           "berichten-client.density.test",
           "berichten-client.loading-masthead.test",
           "berichten-client.unread-count.test",
+          "krant-bezwaar",
+          "krant-bezwaar.test",
           "krant-testsectie",
           "krant-wacht",
           "krant-wacht.test",
@@ -19168,7 +19170,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 67
+        "commits": 68
       },
       {
         "path": "app/(app)/toekomst",
@@ -19216,8 +19218,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3959,
-        "commits": 21
+        "loc": 3987,
+        "commits": 25
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -20510,35 +20512,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-29",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/krant/bezwaar",
-          "/api/krant/tijdlijn",
-          "/api/krant/tijdlijn/cron",
-          "/api/krant/tijdlijn/gelezen",
-          "/api/krant/tijdlijn/vernieuwen",
-          "/api/krant/variant"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Integraties",
-        "added": [
-          "OpenRouter"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+6"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -21027,7 +21002,7 @@
     {
       "date": "2026-09-29",
       "api": 342,
-      "components": 1251,
+      "components": 1253,
       "tables": 105,
       "routesProduction": 90
     }

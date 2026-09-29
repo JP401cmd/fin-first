@@ -97,6 +97,34 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.20',
+    date: '2026-09-29',
+    title: 'De Krant als tijdlijn staat klaar',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De Krant als persoonlijke tijdlijn is gebouwd',
+            description:
+              'De nieuwe Krant zonder AI staat klaar en staat nog uit. Lees je nu de Krant met AI, dan verandert daar niets aan.',
+          },
+          {
+            title: 'Bezwaar maken kan onderaan je Krant',
+            description:
+              'Voor proefedities leiden we op de achtergrond een nieuwsprofiel af. Onderaan je Krant kun je daar nu bezwaar tegen maken.',
+          },
+          {
+            title: 'De privacyverklaring is bijgewerkt',
+            description:
+              'Versie 2.4 beschrijft je Krant, het nieuwsprofiel dat we daarvoor gebruiken en hoe lang we berichten bewaren.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.19',
     date: '2026-09-29',
     title: 'Het nieuws achter de schermen',

@@ -1274,3 +1274,11 @@
 - **API-routes** toegevoegd: /api/krant/bezwaar, /api/krant/tijdlijn, /api/krant/tijdlijn/cron, /api/krant/tijdlijn/gelezen, /api/krant/tijdlijn/vernieuwen, /api/krant/variant
 - **Integraties** toegevoegd: OpenRouter
 - **Componenten (aantal)** toegevoegd: +6
+
+## 2026-09-29
+
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-09-29
+
+- Geen wijzigingen.
