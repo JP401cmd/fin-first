@@ -22,7 +22,9 @@
  * `VERNIEUW_INTERVAL_MS` (lib/krant/tijdlijn-vernieuwen.ts — de rem van 10
  * minuten), en `TIJDLIJN_PAGINA`/`KATERN_ONDER`/`codeerCursor`/`decodeerCursor`/
  * `WEEK_KEY` (lib/krant/tijdlijn-lezen.ts — paginagrootte, katerndrempel en de
- * cursor-(de)codering).
+ * cursor-(de)codering). SINDS MATCHER v5 (29-09-2026) OOK `voldoetAanLeescontract`/
+ * `NIEUWS_MAX_OUDERDOM_DAGEN`/`MATCHER_VERSIE` (lib/krant/matcher.ts), gedraaid
+ * op de gedeelde, pure fixture lib/krant/editie.fixture.ts (WF-WILL-40).
  *
  * DRIE MIRRORS met bronregel-verwijzing (server-only API-routes met een
  * Supabase-client-parameter — niet importeerbaar in een pure module, spiegelt
@@ -45,6 +47,15 @@ import { buildTipTerugNotifications } from '@/lib/notifications/tip-terug'
 import { bepaalKrantBron } from '@/lib/krant/tijdlijn-bron'
 import { VERNIEUW_INTERVAL_MS } from '@/lib/krant/tijdlijn-vernieuwen'
 import { TIJDLIJN_PAGINA, KATERN_ONDER, WEEK_KEY, codeerCursor, decodeerCursor } from '@/lib/krant/tijdlijn-lezen'
+import {
+  MATCHER_VERSIE,
+  NIEUWS_MAX_OUDERDOM_DAGEN,
+  voldoetAanLeescontract,
+  type KandidaatArtikel,
+  type MatchContext,
+} from '@/lib/krant/matcher'
+import { standaardImpactContext } from '@/lib/krant/impact'
+import { AOW_RIJEN, ARTIKELEN as KRANT_ARTIKELEN, NU as KRANT_NU } from '@/lib/krant/editie.fixture'
 import { WILL_ACCEPTANCE } from './will'
 import type { AcceptanceCriterion } from './types'
 
@@ -590,10 +601,42 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
     label: 'Katerndrempel (echte KATERN_ONDER + de gemirrorde afleiding totaal<KATERN_ONDER)',
     run: () => {
       criterion('WF-WILL-36')
-      const toonKatern = (totaal: number) => totaal < KATERN_ONDER // mirror van tijdlijn-lezen.ts r279
+      const toonKatern = (totaal: number) => totaal < KATERN_ONDER // mirror van tijdlijn-lezen.ts r283
       return {
         expected: 'KATERN_ONDER=5; toonKatern4=true; toonKatern5=false',
         actual: `KATERN_ONDER=${KATERN_ONDER}; toonKatern4=${toonKatern(4)}; toonKatern5=${toonKatern(5)}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-40',
+    scenarioId: 'UAT-WILL-40',
+    label: 'Oud nieuws telt niet als nieuw (echte voldoetAanLeescontract, NIEUWS_MAX_OUDERDOM_DAGEN, matcher v5)',
+    run: () => {
+      criterion('WF-WILL-40')
+      const ctx: MatchContext = {
+        now: KRANT_NU,
+        gezienArtikelIds: new Set(),
+        gedemptRubrieken: new Set(),
+        impact: standaardImpactContext(AOW_RIJEN, KRANT_NU.getUTCFullYear()),
+      }
+      const artikel = (id: string): KandidaatArtikel => {
+        const a = KRANT_ARTIKELEN.find((x) => x.id === id)
+        if (!a) throw new Error(`fixture ${id} ontbreekt`)
+        return a
+      }
+      const dagenTerug = (d: number) => new Date(KRANT_NU.getTime() - d * 24 * 60 * 60 * 1000).toISOString()
+      const vers = artikel('a02-box1-schijf1') // binnen het ophaalvenster, geen deadline
+      const metDeadline = artikel('a08-kinderopvangtoeslag') // deadline in de toekomst
+      return {
+        expected:
+          'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=5; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudMetDeadline=true',
+        actual:
+          `NIEUWS_MAX_OUDERDOM_DAGEN=${NIEUWS_MAX_OUDERDOM_DAGEN}; MATCHER_VERSIE=${MATCHER_VERSIE}; ` +
+          `gepubliceerd46=${voldoetAanLeescontract({ ...vers, published_at: dagenTerug(46) }, ctx)}; ` +
+          `gepubliceerd44=${voldoetAanLeescontract({ ...vers, published_at: dagenTerug(44) }, ctx)}; ` +
+          `zonderPublicatiedatum=${voldoetAanLeescontract({ ...vers, published_at: null }, ctx)}; ` +
+          `oudMetDeadline=${voldoetAanLeescontract({ ...metDeadline, published_at: dagenTerug(200) }, ctx)}`,
       }
     },
   },

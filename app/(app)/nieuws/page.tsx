@@ -4,6 +4,7 @@ import { NieuwsOnlyClient } from '@/components/berichten/nieuws-only-client'
 import { TijdlijnClient } from '@/components/berichten/tijdlijn-client'
 import { KrantWacht } from '@/components/berichten/krant-wacht'
 import { TerugNaarTijdlijn } from '@/components/berichten/terug-naar-tijdlijn'
+import { KrantBezwaar } from '@/components/berichten/krant-bezwaar'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { magTesteditieZien } from '@/lib/krant/testeditie-toegang'
@@ -61,7 +62,10 @@ export default async function NieuwsOnlyPage() {
   // lib/krant/testeditie-toegang.ts). Server-side beslist, zodat een gewone
   // lezer het component niet eens meekrijgt; /api/krant/testeditie toetst
   // hetzelfde nog een keer.
-  const toonTestsectie = await magTesteditieZien(supabase, user.id)
+  const [toonTestsectie, bezwaarRes] = await Promise.all([
+    magTesteditieZien(supabase, user.id),
+    supabase.from('profiles').select('krant_schaduw_bezwaar_at').eq('id', user.id).maybeSingle(),
+  ])
 
   return (
     <>
@@ -73,6 +77,15 @@ export default async function NieuwsOnlyPage() {
       {/* Wie bewust de AI-Krant koos terwijl de tijdlijn open is, kan terug. */}
       {variant === 'ai' && inBeta && <TerugNaarTijdlijn />}
       <NieuwsOnlyClient userId={user.id} toonTestsectie={toonTestsectie} />
+      {/* /privacy 2.4 §3 en §8 beloven een bezwaar "onderaan je Krant" — ook
+          onder de Krant met AI, want de weekrun maakt ook voor deze lezer
+          proefedities (security-run R1 🟡-2). */}
+      <section
+        aria-label="Bezwaar tegen de Krant op de achtergrond"
+        className="mx-auto mt-10 max-w-3xl border-t border-[var(--border-ed)] px-4 pb-16 pt-5 text-[13px] leading-relaxed text-[var(--ink-3)] sm:px-6"
+      >
+        <KrantBezwaar bezwaar={Boolean(bezwaarRes.data?.krant_schaduw_bezwaar_at)} context="ai" />
+      </section>
     </>
   )
 }

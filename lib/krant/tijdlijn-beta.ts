@@ -56,5 +56,15 @@ export interface AttestHerbevestiging {
 export function herbevestigingGeldig(attest: { herbevestiging?: AttestHerbevestiging | null }, catalogusSha256: string): boolean {
   const hb = attest.herbevestiging
   if (!hb) return false
-  return hb.door === 'eigenaar' && hb.catalogusSha256 === catalogusSha256
+  // Een struikeldraad, geen bewijs (het script controleert niet wíé het draait) —
+  // maar dan wel een volledige: een lege toetslink of een kapotte datum telt niet
+  // (security-run R1, 🟡-1). Dezelfde eisen staan in scripts/krant/check-tijdlijn-poort.mjs.
+  return (
+    hb.door === 'eigenaar' &&
+    hb.catalogusSha256 === catalogusSha256 &&
+    typeof hb.juridischeToets === 'string' &&
+    /^https:\/\/\S+$/.test(hb.juridischeToets) &&
+    typeof hb.at === 'string' &&
+    Number.isFinite(Date.parse(hb.at))
+  )
 }

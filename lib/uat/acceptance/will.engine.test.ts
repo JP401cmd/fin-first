@@ -19,7 +19,8 @@
  * opslagkeuze, de privacyvloer en de suggestievragen in de lege staat) +
  * UAT-WILL-32 (een vragenlijst invullen in de chat, sep 2026) + UAT-WILL-33
  * t/m 39 (Krant 1C fase 2 — B40, ADR 0183: bronkeuze, de tijdlijn-rem,
- * archief/cursor, katerndrempel, bezwaar, AI-keuze wist de tijdlijn, nieuwsstip).
+ * archief/cursor, katerndrempel, bezwaar, AI-keuze wist de tijdlijn, nieuwsstip)
+ * + UAT-WILL-40 (matcher v5: oud nieuws telt niet als nieuw).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -78,7 +79,7 @@ describe('UAT Fin — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = WILL_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(19)
+    expect(exactWorkflows.length).toBe(20) // +1: WF-WILL-40 (matcher v5, 29-09-2026)
   })
 
   it('markeert de AI-gegenereerde/proces-workflows als ui-only (niet-deterministisch)', () => {

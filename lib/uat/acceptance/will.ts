@@ -608,7 +608,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'KATERN_ONDER=5; toonKatern4=true; toonKatern5=false',
-      source: 'lib/krant/tijdlijn-lezen.ts#KATERN_ONDER + de afleiding `toonKatern = totaal < KATERN_ONDER` (r279, gemirrord als eenregelige pure functie) — zie will-checks.ts',
+      source: 'lib/krant/tijdlijn-lezen.ts#KATERN_ONDER + de afleiding `toonKatern = totaal < KATERN_ONDER` (r283, gemirrord als eenregelige pure functie) — zie will-checks.ts',
     },
   },
   {
@@ -619,11 +619,11 @@ const criteria: AcceptanceCriterion[] = [
     given: 'Een tijdlijnlezer zonder eerder bezwaar, met bestaande schaduwedities (bron \'schaduw\').',
     when: 'De gebruiker klikt "Bezwaar maken" en bevestigt in de modal; later klikt hij "Bezwaar intrekken".',
     then:
-      'PUT /api/krant/bezwaar {bezwaar:true} zet `profiles.krant_schaduw_bezwaar_at` op nu en wist alle rijen in `krant_edities` met `bron=\'schaduw\'` voor deze gebruiker; heeft de lezer bovendien `krant_variant=\'ai\'` gekozen (kan bij een Geheel-account dat weer terugkeert), dan worden ook de bandvelden van het nieuwsprofiel geleegd (het profiel heeft dan geen doel meer). Leest de lezer de tijdlijn zelf, dan blijft het nieuwsprofiel staan — de vernieuwknop is zijn eigen verzoek en blijft werken; wél slaan de weekcron en de dagelijkse tijdlijncron deze lezer voortaan over (WF-BEHEER-31). Intrekken (`bezwaar:false`) zet de kolom terug op `null` zonder iets te wissen; de eerstvolgende cronrun leidt het profiel weer af.',
+      'PUT /api/krant/bezwaar {bezwaar:true} zet `profiles.krant_schaduw_bezwaar_at` op nu en wist alle rijen in `krant_edities` met `bron=\'schaduw\'` voor deze gebruiker. Daarna toetst `wisBandenZonderDoel` de WERKELIJKE bron van /nieuws via `bepaalKrantBron` (niet de opgeslagen variant): is dat niet de tijdlijn (AI-Krant, wachtscherm of dichte bèta), dan worden de bandvelden van het nieuwsprofiel, de rubrieken, de herkomst en `afgeleid_at` geleegd — ook zelf ingevulde velden (/privacy 2.4 sectie 6); `krant_variant` en `tijdlijn_gelezen_tot` blijven staan. Dezelfde toets draait ook na de AI-keuze (WF-WILL-38), dus de klikvolgorde (eerst bezwaar, dan AI-Krant) breekt die invariant niet (security Y2, 29-09). Leest de lezer de tijdlijn zelf, dan blijft het nieuwsprofiel staan — de vernieuwknop is zijn eigen verzoek en blijft werken; wél slaan de weekcron en de dagelijkse tijdlijncron deze lezer voortaan over (WF-BEHEER-31). Intrekken (`bezwaar:false`) zet de kolom terug op `null` zonder iets te wissen; de eerstvolgende cronrun leidt het profiel weer af.',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/api/krant/bezwaar/route.ts (PUT, zod {bezwaar:boolean}) + lib/krant/tijdlijn-keuzes.ts#zetSchaduwBezwaar (service-role, .eq(user_id) op elke query) — procestoets: het schrijfpad en de voorwaardelijke wis-tak zijn deterministisch, maar vereisen een Supabase-client en zijn dus niet als pure engine-check gemirrord',
+        'app/api/krant/bezwaar/route.ts (PUT, zod {bezwaar:boolean}) + lib/krant/tijdlijn-keuzes.ts#zetSchaduwBezwaar + #wisBandenZonderDoel (service-role, .eq(user_id) op elke query; bron via bepaalKrantBron) — procestoets: het schrijfpad en de voorwaardelijke wis-tak zijn deterministisch, maar vereisen een Supabase-client en zijn dus niet als pure engine-check gemirrord',
     },
   },
   {
@@ -635,11 +635,11 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De gebruiker klikt "Liever de Krant met AI" en bevestigt ("Tijdlijn wissen"); later, op de AI-Krant, klikt hij in de balk van `TerugNaarTijdlijn` op "Naar de tijdlijn".',
     then:
-      'PUT /api/krant/variant {variant:\'ai\'} zet `krant_variant=\'ai\'` EN wist in dezelfde stap alle tijdlijn-verversingen van deze gebruiker (`wisTijdlijn`) — de bevestigingsmodal noemt dit vooraf ("Je tijdlijn wordt dan direct gewist"). Een Krant-account krijgt op deze route altijd 403 ("De Krant heeft geen AI-variant"), ook al zou de AI-tiergate zelf slagen; ontbreekt het AI-abonnement, dan 403 met reason `ai_abonnement`. Terug (`variant:\'tijdlijn\'`) zet de kolom leeg zonder iets terug te zetten — de eerstvolgende verversing (knop of cron) begint de tijdlijn opnieuw vanaf nul, precies zoals de bevestigingstekst vooraf aankondigde.',
+      'PUT /api/krant/variant {variant:\'ai\'} zet `krant_variant=\'ai\'` EN wist in dezelfde stap alle tijdlijn-verversingen van deze gebruiker (`wisTijdlijn`) — de bevestigingsmodal noemt dit vooraf ("Je tijdlijn wordt dan direct gewist"). Staat de lezer buiten de tijdlijn-bèta, dan geeft de route voor elke keuze 403 (de keuze bestaat pas als de tijdlijn voor hem open is, security G3). Een Krant-account krijgt bij \'ai\' altijd 403 ("De Krant heeft geen AI-variant"); staat de kill-switch `ai_enabled` uit of ontbreekt het AI-abonnement (`kanAiKiezen=false`, dezelfde toets als de knop op /nieuws — eindreview Y2), dan 403 met code `ai_niet_beschikbaar` ("De Krant met AI vraagt AI aan en een AI-abonnement"). Na de keuze draait `wisBandenZonderDoel` (zie WF-WILL-37): stond er al een bezwaar, dan gaan de banden van het nieuwsprofiel mee weg (`profielGewist`). Terug (`variant:\'tijdlijn\'`) zet de kolom leeg zonder iets terug te zetten — de eerstvolgende verversing (knop of cron) begint de tijdlijn opnieuw vanaf nul, precies zoals de bevestigingstekst vooraf aankondigde.',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/api/krant/variant/route.ts (PUT, krantAccount→403, checkTierGate) + lib/krant/tijdlijn-keuzes.ts#zetKrantVariant (wisTijdlijn bij \'ai\') + components/berichten/tijdlijn-client.tsx (bevestigingstekst) + components/berichten/terug-naar-tijdlijn.tsx — procestoets: vereist een Supabase-client (service-role wis-pad), niet als pure engine-check gemirrord',
+        'app/api/krant/variant/route.ts (PUT, zod; !inBeta→403, krantAccount→403, !kanAiKiezen→403 ai_niet_beschikbaar — via lib/krant/tijdlijn-bron.ts#krantBronVoor) + lib/krant/tijdlijn-keuzes.ts#zetKrantVariant (wisTijdlijn bij \'ai\', daarna wisBandenZonderDoel) + components/berichten/tijdlijn-client.tsx (bevestigingstekst) + components/berichten/terug-naar-tijdlijn.tsx — procestoets: vereist een Supabase-client (service-role wis-pad), niet als pure engine-check gemirrord',
     },
   },
   {
@@ -656,6 +656,24 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'ui-only',
       source:
         'lib/krant/tijdlijn-lezen.ts#heeftNieuw (Supabase-afhankelijk, niet gemirrord) + app/api/krant/tijdlijn/route.ts (`?peek=1`) + app/api/krant/tijdlijn/gelezen/route.ts (zet tijdlijn_gelezen_tot) + lib/hooks/use-news-unread.ts#fetchTijdlijnUnread/tijdlijnPeekForbidden — procestoets: de vergelijking zelf is triviaal deterministisch maar leunt op een live rij-lezing, dus geen pure engine-check',
+    },
+  },
+  {
+    workflow: 'WF-WILL-40',
+    scenarioId: 'UAT-WILL-40',
+    titel: 'Oud nieuws dat we nu pas ophalen telt niet als nieuw (publicatiedatum ouder dan 45 dagen)',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Een geduid artikel dat binnen het venster van 7 dagen is opgehaald (`fetched_at`), maar dat de bron langer geleden publiceerde — bv. een CBS-bericht van april of een CPB-raming uit 2025 die via een nieuwe bron of een backfill binnenkwam. Varianten: publicatiedatum 46 dagen terug, 44 dagen terug, geen publicatiedatum, en een oud bericht (200 dagen) met een deadline die nog komt.',
+    when:
+      'De matcher toetst het leescontract (`voldoetAanLeescontract` → `inVenster`) — dezelfde pure toets voor de dagelijkse tijdlijncron, de vernieuwknop (WF-WILL-34), de weekcron (schaduweditie) en de herberekening.',
+    then:
+      'Een publicatiedatum ouder dan `NIEUWS_MAX_OUDERDOM_DAGEN` (45) telt NIET als nieuw, ook al is het artikel deze week opgehaald: het verschijnt niet in de tijdlijn of editie. Bij 44 dagen telt het wel. Zonder (bruikbare) publicatiedatum beslist de ophaaldatum. Een aankomende deadline gaat voor: dan blijft ook een oud bericht in het venster. Uitkomst draagt `matcherVersie` 5 (eigenaarsbesluit 29-09-2026).',
+    assertion: {
+      kind: 'exact',
+      expected: 'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=5; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudMetDeadline=true',
+      source:
+        'lib/krant/matcher.ts#voldoetAanLeescontract + inVenster/isOudNieuws + #NIEUWS_MAX_OUDERDOM_DAGEN + #MATCHER_VERSIE — echte, pure productiefunctie op de gedeelde fixture lib/krant/editie.fixture.ts (zelfde invoer als matcher.test.ts), geen mirror — zie will-checks.ts',
     },
   },
 ]

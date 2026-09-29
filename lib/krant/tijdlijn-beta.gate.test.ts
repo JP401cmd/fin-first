@@ -53,6 +53,28 @@ describe('herbevestigingGeldig', () => {
     expect(herbevestigingGeldig({ herbevestiging: null }, 'a'.repeat(64))).toBe(false)
     expect(herbevestigingGeldig({}, 'a'.repeat(64))).toBe(false)
   })
+
+  it('ongeldig: zonder link naar de juridische toets of met een kapotte datum (security-run R1)', () => {
+    expect(herbevestigingGeldig({ herbevestiging: { ...geldig, juridischeToets: '' } }, 'a'.repeat(64))).toBe(false)
+    expect(herbevestigingGeldig({ herbevestiging: { ...geldig, juridischeToets: 'geen-url' } }, 'a'.repeat(64))).toBe(false)
+    expect(herbevestigingGeldig({ herbevestiging: { ...geldig, at: 'gisteren' } }, 'a'.repeat(64))).toBe(false)
+  })
+})
+
+describe('scripts/krant/check-tijdlijn-poort.mjs — dezelfde poort buiten vitest (prebuild + pre-push)', () => {
+  it('leest de vlag, rekent dezelfde catalogus-hash en stelt dezelfde eisen', async () => {
+    const poort = await import('../../scripts/krant/check-tijdlijn-poort.mjs')
+    expect(poort.vlagOpen(readSourceLF(join(process.cwd(), 'lib', 'krant', 'tijdlijn-beta.ts')))).toBe(TIJDLIJN_BETA_OPEN)
+    expect(poort.catalogusSha(readFileSync(join(process.cwd(), 'lib', 'krant', 'sjablonen-catalogus.ts'), 'utf8'))).toBe(CATALOGUS_SHA)
+    expect(poort.catalogusSha('a\r\nb')).toBe(poort.catalogusSha('a\nb'))
+    const geldig = { door: 'eigenaar', rol: 'Grenswachter', at: '2026-09-29T10:00:00.000Z', catalogusSha256: 'x', juridischeToets: 'https://app.notion.com/p/1' }
+    expect(poort.herbevestigingFout({ herbevestiging: geldig }, 'x')).toBeNull()
+    expect(poort.herbevestigingFout({ herbevestiging: null }, 'x')).toMatch(/geen herbevestiging/)
+    expect(poort.herbevestigingFout({ herbevestiging: geldig }, 'y')).toMatch(/oudere catalogus/)
+    expect(poort.herbevestigingFout({ herbevestiging: { ...geldig, juridischeToets: '' } }, 'x')).toMatch(/juridische toets/)
+    // De twee implementaties zeggen hetzelfde over het huidige attest.
+    expect(poort.herbevestigingFout(attest, CATALOGUS_SHA) === null).toBe(herbevestigingGeldig(attest, CATALOGUS_SHA))
+  })
 })
 
 describe('inTijdlijnBeta — wie mag in de bèta', () => {

@@ -10,6 +10,7 @@ import { getPageInfo } from '@/lib/page-info-content'
 import { Button } from '@/components/editorial/button'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
+import { KrantBezwaar } from '@/components/berichten/krant-bezwaar'
 import { safeHttpUrl } from '@/lib/safe-url'
 // Alleen TYPES: tijdlijn-lezen.ts gebruikt Buffer en hoort niet in de clientbundel.
 import type { TijdlijnBericht, TijdlijnBlok, TijdlijnOverzicht, TijdlijnPagina } from '@/lib/krant/tijdlijn-lezen'
@@ -340,7 +341,7 @@ function ArchiefWeek({
 
 // ── Bevestigingen ────────────────────────────────────────────────────────────
 
-type Bevestiging = 'bezwaar' | 'ai' | null
+type Bevestiging = 'ai' | null
 
 // ── Hoofdcomponent ───────────────────────────────────────────────────────────
 
@@ -445,18 +446,11 @@ export function TijdlijnClient({
     setBezig(true)
     setBevestigFout(null)
     try {
-      const res =
-        bevestiging === 'bezwaar'
-          ? await fetch('/api/krant/bezwaar', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ bezwaar: !bezwaar }),
-            })
-          : await fetch('/api/krant/variant', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ variant: 'ai' }),
-            })
+      const res = await fetch('/api/krant/variant', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variant: 'ai' }),
+      })
       if (!res.ok) {
         setBevestigFout(await leesFout(res, 'Opslaan is niet gelukt. Probeer het later opnieuw.'))
         return
@@ -562,19 +556,7 @@ export function TijdlijnClient({
             .
           </p>
 
-          <div className="space-y-2">
-            {bezwaar ? (
-              <p>Je hebt bezwaar gemaakt: we werken je Krant niet meer automatisch bij. Vernieuwen doe je zelf.</p>
-            ) : (
-              <p>
-                Op de achtergrond houden we je nieuwsprofiel bij om de Krant te verbeteren. Wil je dat niet, dan kun je
-                bezwaar maken.
-              </p>
-            )}
-            <Button variant="secondary" size="sm" onClick={() => openBevestiging('bezwaar')}>
-              {bezwaar ? 'Bezwaar intrekken' : 'Bezwaar maken'}
-            </Button>
-          </div>
+          <KrantBezwaar bezwaar={bezwaar} context="tijdlijn" />
 
           {kanAiKiezen && (
             <div>
@@ -592,19 +574,12 @@ export function TijdlijnClient({
         onClose={() => {
           if (!bezig) setBevestiging(null)
         }}
-        destructive={bevestiging === 'ai'}
-        title={
-          bevestiging === 'ai'
-            ? 'Naar de Krant met AI?'
-            : bezwaar
-              ? 'Bezwaar intrekken?'
-              : 'Bezwaar maken?'
-        }
+        destructive
+        title="Naar de Krant met AI?"
         footer={
           <ModalFooter
             primary={{
-              label:
-                bevestiging === 'ai' ? 'Tijdlijn wissen' : bezwaar ? 'Bezwaar intrekken' : 'Bezwaar maken',
+              label: 'Tijdlijn wissen',
               onClick: () => void bevestig(),
               loading: bezig,
             }}
@@ -613,13 +588,7 @@ export function TijdlijnClient({
         }
       >
         <div className="space-y-3 px-5 py-4 text-[14px] leading-relaxed text-[var(--ink-2)]">
-          {bevestiging === 'ai' ? (
-            <p>Je tijdlijn wordt dan direct gewist. Terugkomen kan altijd, je tijdlijn begint dan opnieuw.</p>
-          ) : bezwaar ? (
-            <p>We houden je nieuwsprofiel dan weer op de achtergrond bij, zodat je Krant vanzelf bijgewerkt wordt.</p>
-          ) : (
-            <p>We werken je Krant dan niet meer automatisch bij. Vernieuwen doe je zelf.</p>
-          )}
+          <p>Je tijdlijn wordt dan direct gewist. Terugkomen kan altijd, je tijdlijn begint dan opnieuw.</p>
           {bevestigFout && (
             <p role="alert" className="text-[13px] text-[var(--negative)]">
               {bevestigFout}

@@ -571,7 +571,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/audit/page.tsx + app/(app)/beheer/errors/page.tsx (+ app/api/admin/error-groups/route.ts, lib/error-groups.ts) + app/(app)/beheer/email/page.tsx + app/(app)/beheer/jobs/page.tsx (taken uit lib/job-catalog.ts, incl. "Meldingen → Notion-sync", "Meldingen-sweep" en sinds ADR 0173 de wekelijkse "krant-editie" (ma 06:00 UTC, telt edities/lege edities per profieltype, geen inhoud), sinds B41 de "krant-weekmeting" (in dezelfde weekcron, status partial bij een drempeloverschrijding) en sinds Krant 1C fase 2 de dagelijkse "krant-tijdlijn" (06:30 UTC, app/api/krant/tijdlijn/cron/route.ts, alleen tellingen)) — drie alleen-lezen logboeken plus één afvinkbare foutenwerkvoorraad, geen cijfermatige uitkomst',
+        'app/(app)/beheer/audit/page.tsx + app/(app)/beheer/errors/page.tsx (+ app/api/admin/error-groups/route.ts, lib/error-groups.ts) + app/(app)/beheer/email/page.tsx + app/(app)/beheer/jobs/page.tsx (taken uit lib/job-catalog.ts, incl. "Meldingen → Notion-sync", "Meldingen-sweep" en sinds ADR 0173 de wekelijkse "krant-editie" (ma 06:00 UTC, telt edities/lege edities per profieltype, geen inhoud; sinds 1C fase 2 ook `bezwaar` = lezers met `profiles.krant_schaduw_bezwaar_at` die de run overslaat), sinds B41 de "krant-weekmeting" (in dezelfde weekcron, status partial bij een drempeloverschrijding) en sinds Krant 1C fase 2 de dagelijkse "krant-tijdlijn" (06:30 UTC, app/api/krant/tijdlijn/cron/route.ts, alleen tellingen)) — drie alleen-lezen logboeken plus één afvinkbare foutenwerkvoorraad, geen cijfermatige uitkomst',
     },
   },
   {

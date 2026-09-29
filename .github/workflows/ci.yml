@@ -98,7 +98,7 @@ jobs:
       # dat is een productbesluit, geen implementatiedetail. Die invariant liep
       # tot nu toe nergens automatisch mee.
       - name: Rekenmotor- & pariteitstests (vitest)
-        run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture lib/budget-utils.test.ts test/budget-berekeningen-suite-check.test.ts test/uat-stale-scan.test.ts scripts/merkstem scripts/ai-parity scripts/page-info scripts/litert lib/uat/acceptance-sources.test.ts
+        run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture lib/budget-utils.test.ts test/budget-berekeningen-suite-check.test.ts test/uat-stale-scan.test.ts scripts/merkstem scripts/ai-parity scripts/page-info scripts/litert lib/uat/acceptance-sources.test.ts lib/krant/tijdlijn-beta.gate.test.ts lib/krant/sjablonen-attest.test.ts
 
       # In-app regressiesuites (lib/regression-tests/suites/*.ts, ~80 suites) —
       # draaien normaal alleen via de server-runner (/beheer/regressietest of

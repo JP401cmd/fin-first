@@ -41,6 +41,13 @@ fi
 
 echo "✓ TypeScript check passed (production code clean)."
 
+# Tijdlijn-poort (Krant 1C, security-run R1): TIJDLIJN_BETA_OPEN = true mag
+# alleen met een geldige herbevestiging van het sjablonen-attest door de
+# eigenaar. Dezelfde toets draait in `npm run prebuild` (dus ook op Vercel) en
+# als vitest in CI; hier als node-script omdat vitest onder Git Bash faalt.
+echo "→ Running tijdlijn-poort check (Krant 1C)…"
+node scripts/krant/check-tijdlijn-poort.mjs
+
 # Datapad-conventie (ADR 0058): flag NIEUWE directe client-reads voor
 # weergavedata buiten de grandfather-allowlist. De bestaande ~47 lezers
 # staan op de allowlist; alleen nieuwe overtredingen blokkeren de push.
