@@ -73,6 +73,12 @@ describe('beoordeelHandmatig — dezelfde poort als de cron', () => {
     expect(o).toEqual({ id: 'a1', uitkomst: 'afgewezen', code: 'schema' })
   })
 
+  it('een geheim uit de env in een vrij veld = afgewezen met code geheim (security-run 29 sep)', () => {
+    const geheim = 'een-lange-waarde-uit-env-local-1234'
+    const o = beoordeelHandmatig(batchArtikel, a, { ...GELDIGE_UITVOER, samenvatting: `Sleutel ${geheim}.` }, [geheim])
+    expect(o).toMatchObject({ uitkomst: 'afgewezen', code: 'geheim' })
+  })
+
   it('null = overslaan; rij die niet meer wacht = overslaan', () => {
     expect(beoordeelHandmatig(batchArtikel, a, null)).toMatchObject({ uitkomst: 'overgeslagen', reden: 'geen-uitvoer' })
     expect(beoordeelHandmatig(batchArtikel, null, GELDIGE_UITVOER)).toMatchObject({ uitkomst: 'overgeslagen', reden: 'niet-meer-wachtend' })

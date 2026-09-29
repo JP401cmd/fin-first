@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T09:42:25.216Z",
+  "generatedAt": "2026-09-29T11:26:05.147Z",
   "generatedDate": "2026-09-29",
   "repo": {
     "name": "fin",
-    "version": "0.92.18"
+    "version": "0.92.19"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -19032,7 +19032,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 67
+        "commits": 66
       },
       {
         "path": "app/(app)/toekomst",
@@ -19080,7 +19080,7 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3941,
+        "loc": 3959,
         "commits": 23
       },
       {
@@ -19160,6 +19160,13 @@
         "description": "Use this agent for TriFinity's financial calculation engines (rekenmotoren): the code that turns raw DB data into the derived numbers users see — spaarquote, netto vermogen, belastingdruk (box 1/box 3), FIRE-doel, vrijheids-% and vrijheidstijd. It owns `lib/horizon-kernel/**` (the FIRE/Horizon engine: engine/solver/gap/bridge/run-unified/wrappers/adapter), `lib/horizon/build-input.ts`, `lib/horizon/networth-rows.ts`, `lib/constants.ts`, `lib/fire-params.ts`, `lib/budget-utils.ts`, `lib/effective-financials.ts`, `lib/savings-source.ts`, `lib/housing-strategy.ts`, `lib/box1-tax.ts`, `lib/box3-data.ts`, `lib/dashboard-data-loader.ts` and `lib/format.ts`; `lib/unified-projection.ts` is only the consumer type contract (SimRow/SimResult) produced by the kernel bridge — not an engine. Use it whenever a calculation, constant or assumption changes, or to verify a number is correct and single-sourced. It also keeps the curated *Berekeningen* view (`lib/architecture/calculations.ts`) in sync.",
         "model": "fable",
         "color": "amber"
+      },
+      {
+        "id": "categorie-schrijver",
+        "name": "categorie-schrijver",
+        "description": "Schrijft handmatige Krant-categorisaties (rubriek, samenvatting, impact) voor rijen die door een storing zonder rubriek bleven, voor de skill categorisatie-inhaalslag. Krijgt een cat-batch-bestand (systeemprompt van de cron + per artikel een prompt met een openbaar bronfragment) en een deel van de ids, en schrijft per id één object in het schema naar een eigen uitvoerbestand. Heeft bewust ALLEEN Read en Write: de bronfragmenten zijn onbetrouwbare tekst van derden en kunnen instructies bevatten, dus deze agent mag niets uitvoeren, geen database raken en niets ophalen. Alleen te gebruiken vanuit de skill categorisatie-inhaalslag (of /krant-ochtend).",
+        "model": "sonnet",
+        "color": "cyan"
       },
       {
         "id": "code-review",
@@ -19464,6 +19471,12 @@
         ]
       },
       {
+        "id": "categorisatie-inhaalslag",
+        "name": "categorisatie-inhaalslag",
+        "description": "Gebruik om Krant-artikelen zonder rubriek (category null, meestal na een storing van de categorisatie in de nieuws-ingest-cron) vanuit een Claude-sessie te categoriseren in plaats van via de API. Onderdeel van /krant-ochtend. Exporteert de open rijen met exact de cron-prompt, laat de agent categorie-schrijver het werk doen, toetst tegen de actuele rij (schema, lengte, link- en geheim-toets) en schrijft pas na akkoord.",
+        "steps": []
+      },
+      {
         "id": "change-request",
         "name": "change-request",
         "description": "Gebruik bij elke wijziging aan de draaiende omgeving die een PR-diff niet laat zien — een cron erbij of eraf, een env-var of secret, third-party-config (Supabase, Vercel, mailprovider, bankprovider), of een handmatige actie op productie. Vier vragen vooraf en één aantekening in het beheerders-runbook. Niet voor migraties (schemawijziging), een gewone deploy (release) of een nieuwe verwerker (verwerkersregister).",
@@ -19681,6 +19694,52 @@
             ]
           }
         ]
+      },
+      {
+        "id": "krant-ochtend",
+        "name": "krant-ochtend",
+        "description": "De dagelijkse Krant-ochtendroutine vanuit een Claude-sessie. Controleert alle Krant-jobs (nieuws-ingest, duidingswachtrij, rijen zonder rubriek, weekjob + weekmeting), vraagt één gebundeld akkoord, voert dan uit wat nodig is (categorisatie-inhaalslag → duiding-inhaalslag → weekjob) en schrijft tot slot de hartslag, waardoor de nieuws-ingest-cron 48 uur lang zelf niet duidt. Gebruik elke ochtend na 08:00 (NL) met \"/krant-ochtend\", of als de eigenaar vraagt \"moet er iets gebeuren aan de Krant?\".",
+        "steps": [
+          {
+            "index": 0,
+            "title": "Werkplek",
+            "agents": []
+          },
+          {
+            "index": 1,
+            "title": "Status (alleen lezen)",
+            "agents": []
+          },
+          {
+            "index": 2,
+            "title": "Eén akkoord",
+            "agents": []
+          },
+          {
+            "index": 3,
+            "title": "Uitvoeren (in deze volgorde)",
+            "agents": [
+              "categorie-schrijver",
+              "duiding-schrijver"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Hartslag",
+            "agents": []
+          },
+          {
+            "index": 5,
+            "title": "Rapport aan de eigenaar",
+            "agents": []
+          }
+        ]
+      },
+      {
+        "id": "krant-weekjob",
+        "name": "krant-weekjob",
+        "description": "Gebruik om de wekelijkse Krant-cron (/api/krant/cron — schaduweditie per lezer + de weekmeting op /beheer/nieuws) vanuit een Claude-sessie te draaien, zonder CRON_SECRET en zonder Vercel. Nodig als de maandagrun ontbrak of op het tijdbudget afbrak, of om een week opnieuw te meten nadat er ná de meting nog geduid is. Onderdeel van /krant-ochtend.",
+        "steps": []
       },
       {
         "id": "legal-response",

@@ -207,6 +207,11 @@ export interface IngestOpties {
   /** Model voor de duidingsstap (`getModel(service, 'nieuws_duiding')`); null = alleen wachtrij tellen. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   duidingModel?: any | null
+  /**
+   * Versie-bump ook zonder duidingsmodel (ochtendroutine, zie
+   * `DuidingOpties.versieBumpZonderModel`). Alleen zetten als een sessie duidt.
+   */
+  duidingVersieBumpZonderModel?: boolean
   /** Batch-cap van de duidingsstap in deze run. */
   duidingMaxPerRun?: number
   /** Tijdbudget van de duidingsstap (ms); daarna pakt geen werker een nieuwe rij. */
@@ -1075,6 +1080,7 @@ export async function runNewsIngest(
     duiding = await duidWachtendeArtikelen(supabase, opties.duidingModel ?? null, {
       maxPerRun: opties.duidingMaxPerRun,
       tijdBudgetMs: begrensDuidingBudget(opties.duidingTijdBudgetMs, RUN_TIJDBUDGET_MS - (klok() - runStartMs)),
+      ...(opties.duidingVersieBumpZonderModel ? { versieBumpZonderModel: true } : {}),
     })
   }
 

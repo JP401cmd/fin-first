@@ -29,6 +29,7 @@
 import { z } from 'zod'
 import { duidingModelSchema, DUIDING_VERSIE, HANDMATIG_MODEL_ID } from './duiding-schema'
 import { controleerDuiding } from './duiding-controles'
+import { bevatGeheim } from './geheim-toets'
 import {
   bereidDuidingVoor,
   buildDuidingPrompt,
@@ -101,9 +102,12 @@ export function beoordeelHandmatig(
   batchArtikel: InhaalslagBatchArtikel,
   rij: WachtendArtikel | null,
   uitvoer: unknown,
+  /** Zie lib/krant/geheim-toets.ts; het script geeft `geheimenUitEnv(process.env)` mee. */
+  geheimen: readonly string[] = [],
 ): HandmatigOordeel {
   const id = batchArtikel.id
   if (uitvoer === null || uitvoer === undefined) return { id, uitkomst: 'overgeslagen', reden: 'geen-uitvoer' }
+  if (bevatGeheim(uitvoer, geheimen)) return { id, uitkomst: 'afgewezen', code: 'geheim' }
   if (!rij) return { id, uitkomst: 'overgeslagen', reden: 'niet-meer-wachtend' }
   const voorbereiding = bereidDuidingVoor(rij, HANDMATIG_MODEL_ID)
   if (!voorbereiding) return { id, uitkomst: 'overgeslagen', reden: 'geen-grondslag' }

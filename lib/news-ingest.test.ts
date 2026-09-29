@@ -511,6 +511,16 @@ describe('runNewsIngest — bewaren op tijd, geen grens op aantal (ADR 0171)', (
   })
 })
 
+describe('runNewsIngest — ochtendroutine: versie-bump zonder model (29 sep)', () => {
+  it('geeft versieBumpZonderModel alleen door als de route erom vraagt', async () => {
+    const { client } = maakClient()
+    await runNewsIngest(client as never, MODEL, { now: NU, duidingModel: null, duidingMaxPerRun: 60, duidingVersieBumpZonderModel: true })
+    expect(vi.mocked(duidWachtendeArtikelen).mock.calls.at(-1)?.[2]).toMatchObject({ versieBumpZonderModel: true })
+    await runNewsIngest(client as never, MODEL, { now: NU, duidingModel: null, duidingMaxPerRun: 60 })
+    expect(vi.mocked(duidWachtendeArtikelen).mock.calls.at(-1)?.[2]).not.toHaveProperty('versieBumpZonderModel')
+  })
+})
+
 describe('runNewsIngest — categorisatie per brok, met tijdbudget (H1)', () => {
   // Bewust buiten DETAIL_HOSTS (/nl-nl/nieuws/): deze suite toetst de categorisatie, niet de detailcap.
   const veelLinks = (n: number) =>

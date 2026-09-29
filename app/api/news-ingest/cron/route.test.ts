@@ -24,6 +24,8 @@ vi.mock('@/lib/news-ingest', async (importOriginal) => {
 })
 vi.mock('@/lib/ai/config', () => ({ getModel: vi.fn(async () => ({ id: 'model' })) }))
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: () => ({}) }) }))
+const mockHartslag = vi.fn()
+vi.mock('@/lib/krant/ochtend-hartslag', () => ({ leesOchtendHartslag: (...a: unknown[]) => mockHartslag(...a) }))
 
 import { GET } from './route'
 import { getModel } from '@/lib/ai/config'
@@ -75,6 +77,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://voorbeeld.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role'
   delete process.env.CRON_SECRET
+  mockHartslag.mockResolvedValue({ laatste: null, vers: false })
 })
 
 describe('news-ingest cron — status volgt de uitkomst', () => {
@@ -138,5 +141,38 @@ describe('news-ingest cron — token-logging als systeemcall', () => {
     const calls = vi.mocked(getModel).mock.calls
     expect(calls.map((c) => c[1])).toEqual(['nieuws_ingest', 'nieuws_duiding'])
     for (const c of calls) expect(c[2]).toEqual({ userId: null })
+  })
+})
+
+describe('news-ingest cron — ochtendhartslag (ADR 0171-aanvulling 29 sep)', () => {
+  const opties = () => mockRunNewsIngest.mock.calls.at(-1)?.[2] as { duidingModel?: unknown; duidingVersieBumpZonderModel?: boolean }
+
+  beforeEach(() => {
+    mockRunNewsIngest.mockResolvedValue({
+      summary: { ...SUMMARY_BASIS, duiding: { geduid: 0, afgewezen: 0, mislukt: 0, overgeslagen: 0, wacht: 7 } },
+      health: health({ rss: 15, web_lijst: 33, web_pagina: 45 }),
+    })
+  })
+
+  it('verse hartslag: geen duidingsmodel maar wél de versie-bump; linkkeuze en categorisatie houden het model; blijft success', async () => {
+    mockHartslag.mockResolvedValue({ laatste: '2026-09-28T08:00:00.000Z', vers: true })
+    await GET(req())
+    expect(vi.mocked(getModel).mock.calls.map((c) => c[1])).toEqual(['nieuws_ingest'])
+    expect(mockRunNewsIngest.mock.calls.at(-1)?.[1]).toEqual({ id: 'model' })
+    expect(opties().duidingModel).toBeNull()
+    expect(opties().duidingVersieBumpZonderModel).toBe(true)
+    const run = laatsteJobRun() as unknown as { status: string; summary: { ochtend: unknown } }
+    expect(run.status).toBe('success')
+    expect(run.summary.ochtend).toEqual({ hartslag: '2026-09-28T08:00:00.000Z', uitbesteed: true })
+  })
+
+  it('verlopen of ontbrekende hartslag = vangnet: de cron doet alles zelf', async () => {
+    mockHartslag.mockResolvedValue({ laatste: '2026-09-25T08:00:00.000Z', vers: false })
+    await GET(req())
+    expect(vi.mocked(getModel).mock.calls.map((c) => c[1])).toEqual(['nieuws_ingest', 'nieuws_duiding'])
+    expect(opties().duidingModel).toEqual({ id: 'model' })
+    expect(opties().duidingVersieBumpZonderModel).toBe(false)
+    const run = laatsteJobRun() as unknown as { summary: { ochtend: unknown } }
+    expect(run.summary.ochtend).toEqual({ hartslag: '2026-09-25T08:00:00.000Z', uitbesteed: false })
   })
 })

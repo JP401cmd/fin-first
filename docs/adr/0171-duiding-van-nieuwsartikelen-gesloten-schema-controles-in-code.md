@@ -284,3 +284,60 @@ zod-parse en dezelfde `controleerDuiding`, tegen de actuele rij en alleen als de
   aantal, dan krijgt het een eigen verbeterkaart.
 - **Grens.** Structureel duiden blijft de cron, met token-logging, noodstop en meldlaag. De inhaalslag is
   een uitzondering bij een achterstand, geen vervanging.
+
+## Aanvulling 29 sep 2026 — de ochtendroutine: de sessie duidt zolang ze draait
+
+Besluit van de eigenaar, 29 sep. Zolang de Krant weinig lezers heeft, is een dagelijkse Claude-sessie
+goedkoper dan de duidingscalls van de cron, de grootste AI-post van de ingest. Dit herziet de laatste
+regel van de vorige aanvulling: structureel duiden mag nu óók vanuit de sessie, zolang die sessie echt
+draait.
+
+- **Hartslag.** De skill `/krant-ochtend` controleert alle Krant-jobs en schrijft tot slot één rij in
+  `job_runs` met job `krant-ochtend` (`scripts/krant/ochtend.ts hartslag`). Die rij is de hartslag.
+  Het script weigert als er daarna nog meer dan `HARTSLAG_MAX_OPEN` (10) duidingen openstaan. Houdt de
+  sessie de instroom niet bij, dan neemt de cron het over en loopt de achterstand niet stil op.
+- **De cron wijkt alleen voor de duiding, met een vangnet.** `/api/news-ingest/cron` leest de hartslag
+  voordat hij begint (`lib/krant/ochtend-hartslag.ts`).
+  - Is de hartslag ≤ 48 uur oud, dan haalt de cron gewoon op, kiest hij links, categoriseert hij en slaat
+    hij op. Hij duidt alleen niet: er is geen duidingsmodel en de wachtrij wordt alleen geteld.
+  - De `DUIDING_VERSIE`-bump draait wél (`versieBumpZonderModel`, na dezelfde guard-select). Een
+    controle-fix zet de oude duidingen dus ook in deze modus terug op `wacht`. Zonder hartslag, en
+    zonder model, blijft de bump uit: een storing wist niets.
+  - Is de hartslag ouder, ontbreekt hij of is hij onleesbaar, dan doet de cron alles zelf via de API.
+    Fail-open, want een Krant die stilstaat is erger dan een paar euro.
+- **De categorisatie blijft in de cron.** Ook dit komt uit de review van 29 sep. De live /nieuws-editie
+  (`app/api/news/route.ts`) leest `summary` en `potential_impact` van de categorisatie. Die aan de
+  sessie laten, zou echte lezers uren per dag (en bij een gemiste ochtend tot 48 uur) dunnere invoer
+  geven. Bovendien zou het vangnet de rijen die al zonder rubriek waren opgeslagen, nooit meer
+  categoriseren. De besparing weegt daar niet tegen op: de categorisatie is één call per 20 artikelen.
+  `scripts/krant/categorisatie-inhaalslag.ts` (puur deel: `lib/krant/categorisatie-inhaalslag.ts`) blijft
+  bestaan voor rijen die door een storing zonder rubriek bleven. Hij gebruikt exact de cron-prompt
+  (`CATEGORISATIE_SYSTEM_PROMPT` + `bouwCategorisatiePrompt`, uit `categorizeArticles` getrokken) en
+  de cron-invoer. Hij schrijft alleen `category`, `summary` en `potential_impact`, alleen zolang
+  `category` nog null is. De rubrieken schrijft een agent met alleen Read en Write
+  (`categorie-schrijver`).
+- **Volgorde.** Eerst categoriseren, dan duiden: de duidingsprompt geeft de rubriek als hint mee.
+- **Timing.** De sessie draait ná de ingest van 05:00 UTC (en de Vercel-jitter tot ~06:00 UTC). Dan is
+  de hartslag bij de volgende ingest ~20 uur oud: één gemiste ochtend verandert niets, na twee neemt de
+  cron het over. Draait de sessie vóór de ingest, dan zet al één gemiste ochtend het vangnet aan.
+- **De weekjob vanuit de sessie.** `ochtend.ts weekjob` draait de echte `GET` van `/api/krant/cron`
+  lokaal tegen de database. Er is geen tweede implementatie; de run is idempotent per week en gebruikt
+  geen AI. Hij is nodig als de maandagrun ontbrak of op het tijdbudget afbrak, of als er ná de laatste
+  meting nog in de gemeten week geduid werd (`status`: "ná de meting geduid").
+- **Poorten voor een sessie met tools** (security-run 29 sep).
+  - Een agent die bronfragmenten leest, heeft alleen Read en Write. Read is niet aan een pad gebonden,
+    dus de uitvoer gaat vóór het schrijven door een deterministische geheim-toets
+    (`lib/krant/geheim-toets.ts`): env-waarden van ≥ 16 tekens en sleutelvormige patronen.
+  - De categorisatie heeft daarnaast lengtegrenzen en een linkverbod.
+  - Schrijven eist `HEAD` gelijk aan `origin/master` (niet: erin), schone bronpaden inclusief
+    `scripts/krant`, en de productiehost in `NEXT_PUBLIC_SUPABASE_URL` (hostpin).
+  - Omdat die poorten pas ná de module-imports draaien, vergelijkt de skill `git status` vóór en ná elke
+    agent-run.
+- **Zichtbaar.** De ingest-summary draagt `ochtend: { hartslag, uitbesteed }`. `krant-ochtend` staat in
+  `JOB_CATALOG` als `handmatig` (geen Vercel-cron, dus geen drift) en zonder stilte-drempel: een gemiste
+  sessie is geen storing, want het vangnet neemt het over.
+- **Meting.** Handmatige duidingen blijven apart geteld (`handmatig-geduid`, zie hierboven). Draait de
+  routine elke dag, dan meet een week vooral de sessie; voor de K1-poort is dat geen bewijs van
+  modelkwaliteit.
+- **Terug naar de cron.** Schrijf geen hartslag meer; na 48 uur duidt de cron weer zelf. Er is geen
+  code-wijziging nodig.

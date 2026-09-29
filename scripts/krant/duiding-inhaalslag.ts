@@ -15,11 +15,10 @@
 //
 // De service-sleutel komt uit het opgegeven env-bestand en wordt nooit gelogd.
 
-import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, parse, resolve } from 'node:path'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   DUIDING_MAX_POGINGEN,
   WACHTEND_ARTIKEL_KOLOMMEN,
@@ -37,68 +36,20 @@ import {
   type HandmatigOordeel,
   type InhaalslagBatch,
 } from '../../lib/krant/duiding-inhaalslag'
+import { geheimenUitEnv } from '../../lib/krant/geheim-toets'
 import { amsterdamWeekGrenzen } from '../../lib/krant/weekmeting'
-import { parsePlatformStatus } from '../../lib/platform-status'
-
-function arg(naam: string): string | undefined {
-  const i = process.argv.indexOf(`--${naam}`)
-  return i >= 0 ? process.argv[i + 1] : undefined
-}
-const vlag = (naam: string) => process.argv.includes(`--${naam}`)
-
-function stop(melding: string): never {
-  console.error(`✗ ${melding}`)
-  process.exit(1)
-}
-
-function laadEnv(pad: string | undefined) {
-  if (!pad) stop('Geef --env <pad naar .env.local> (in de hoofdmap van fin-first).')
-  for (const regel of readFileSync(pad, 'utf8').split(/\r?\n/)) {
-    const m = regel.match(/^([A-Z0-9_]+)=(.*)$/)
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
-  }
-}
-
-function client(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) stop('NEXT_PUBLIC_SUPABASE_URL en SUPABASE_SERVICE_ROLE_KEY ontbreken in het env-bestand.')
-  console.log(`→ database: ${new URL(url).host}`)
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-}
-
-function git(...args: string[]): string {
-  return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-}
-
-/**
- * Dezelfde poort als productie: de controles en DUIDING_VERSIE komen uit de
- * lokale checkout. Schrijven mag alleen als die checkout niet afwijkt van wat
- * gedeployd is (security-run 29 sep, 🟡-2).
- */
-function eisSchoneCheckout(): string {
-  const vuil = git('status', '--porcelain', '--', 'lib/krant')
-  if (vuil) stop(`lib/krant heeft lokale wijzigingen — schrijf alleen vanaf een schone checkout:\n${vuil}`)
-  try {
-    git('fetch', '-q', 'origin', 'master')
-  } catch {
-    stop('git fetch origin master mislukte — kan niet bewijzen dat deze checkout gelijk is aan productie.')
-  }
-  try {
-    git('merge-base', '--is-ancestor', 'HEAD', 'origin/master')
-  } catch {
-    stop('HEAD zit niet in origin/master: draai vanaf de gedeployde master, niet vanaf een branch.')
-  }
-  return git('rev-parse', 'HEAD')
-}
-
-/** Staat de AI-noodstop van het platform uit, dan wordt er niet geschreven. */
-async function eisNoodstopAan(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'platform_status').maybeSingle()
-  if (error) stop(`noodstop niet te lezen: ${error.message}`)
-  const raw = data?.value == null ? null : typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
-  if (!parsePlatformStatus(raw).killSwitches.ai) stop('De AI-noodstop staat uit (platform_status): er wordt niet geschreven.')
-}
+import {
+  arg,
+  client,
+  eisNoodstopAan,
+  eisSchoneCheckout,
+  huidigeCommit,
+  laadEnv,
+  leesUitvoer,
+  stop,
+  uitvoerPaden as leesUitvoerPaden,
+  vlag,
+} from './cli-gedeeld'
 
 /** De wachtrij, met hetzelfde filter als `duidWachtendeArtikelen`. */
 function wachtrij(supabase: SupabaseClient) {
@@ -136,26 +87,11 @@ async function exporteer() {
   console.log(`  uitvoer: ${uitvoerPad}  ← vul per id een duiding (of laat null)`)
 }
 
-/** Voeg deelbestanden samen (één per subagent). Een id dat twee keer gevuld is, stopt de run. */
-function leesUitvoer(paden: string[]): Record<string, unknown> {
-  const samen: Record<string, unknown> = {}
-  for (const pad of paden) {
-    const deel = JSON.parse(readFileSync(pad, 'utf8')) as Record<string, unknown>
-    for (const [id, waarde] of Object.entries(deel)) {
-      if (waarde === null || waarde === undefined) continue
-      if (id in samen && samen[id] !== null) stop(`id ${id} is in meer dan één uitvoerbestand gevuld.`)
-      samen[id] = waarde
-    }
-  }
-  return samen
-}
-
 async function beoordeel() {
   const batchPad = arg('batch')
   const uitvoerArg = arg('uitvoer')
   if (!batchPad || !uitvoerArg) stop('Geef --batch <batch.json> en --uitvoer <uitvoer.json>[,<deel2.json>…].')
-  const uitvoerPaden = uitvoerArg.split(',').map((p) => p.trim()).filter(Boolean)
-  if (uitvoerPaden.some((p) => !p.endsWith('.json'))) stop('Elk --uitvoer-pad moet op .json eindigen.')
+  const uitvoerPaden = leesUitvoerPaden(uitvoerArg)
   const batch = JSON.parse(readFileSync(batchPad, 'utf8')) as InhaalslagBatch
   if (batch.versie !== INHAALSLAG_VERSIE) stop(`batch-versie ${batch.versie} ≠ ${INHAALSLAG_VERSIE}: exporteer opnieuw.`)
   if (batch.duidingVersie !== DUIDING_VERSIE) {
@@ -164,7 +100,7 @@ async function beoordeel() {
   const uitvoer = leesUitvoer(uitvoerPaden)
   if (vlag('schrijf') && !vlag('ja')) stop('--schrijf vraagt ook --ja (schrijft naar de database).')
   const schrijven = vlag('schrijf') && vlag('ja')
-  const commit = schrijven ? eisSchoneCheckout() : (() => { try { return git('rev-parse', 'HEAD') } catch { return 'onbekend' } })()
+  const commit = schrijven ? eisSchoneCheckout(['lib/krant', 'scripts/krant']) : huidigeCommit()
 
   const supabase = client()
   if (schrijven) await eisNoodstopAan(supabase)
@@ -179,7 +115,9 @@ async function beoordeel() {
   }
 
   // Alleen ids uit de batch: een id in uitvoer dat niet in de batch staat, wordt genegeerd.
-  const oordelen: HandmatigOordeel[] = batch.artikelen.map((a) => beoordeelHandmatig(a, actueel.get(a.id) ?? null, uitvoer[a.id]))
+  // Env-waarden als geheim: staat er één letterlijk in een duiding, dan wordt hij afgewezen.
+  const geheimen = geheimenUitEnv(process.env)
+  const oordelen: HandmatigOordeel[] = batch.artikelen.map((a) => beoordeelHandmatig(a, actueel.get(a.id) ?? null, uitvoer[a.id], geheimen))
   let geschreven = 0
   let alAfgehandeld = 0
   const schrijffouten: string[] = []

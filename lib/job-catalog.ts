@@ -48,6 +48,11 @@ export interface JobCatalogEntry {
    * een kwartier-sweep, niet meer bij een dagelijkse.
    */
   maxAgeHours: number | null
+  /**
+   * true = geen Vercel-cron; draait vanuit een Claude-sessie. De drift-check
+   * (`detectScheduleDrift`) zoekt deze taak dan niet in vercel.json.
+   */
+  handmatig?: true
 }
 
 export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
@@ -75,7 +80,8 @@ export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
     label: 'Nieuws-ingest',
     schedule: 'Dagelijks 05:00 UTC',
     path: '/api/news-ingest/cron',
-    description: 'RSS- en webbronnen ophalen, AI-categoriseren en opslaan.',
+    description:
+      'RSS- en webbronnen ophalen, AI-categoriseren, opslaan en duiden. Is de ochtendsessie (krant-ochtend) jonger dan 48 uur, dan laat hij het duiden aan die sessie over.',
     maxAgeHours: 26,
   },
   'krant-weekmeting': {
@@ -169,6 +175,19 @@ export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
       'Bouwt per lezer met de module nieuws de deterministische weekeditie van de Krant zonder AI (ADR 0172/0173) en schrijft die in de schaduw (krant_edities, bron schaduw). Meet lege edities per profieltype en, op testaccounts, de overlap met de LLM-editie. Niemand ziet deze editie tot 1C.',
     // Wekelijkse cadans: een week plus de dag-jitter van Vercel.
     maxAgeHours: 7 * 24 + 26,
+  },
+  'krant-ochtend': {
+    key: 'krant-ochtend',
+    label: 'Krant — ochtendsessie',
+    // Geen Vercel-cron: de eigenaar draait elke ochtend /krant-ochtend in een
+    // Claude-sessie. De rij is de hartslag (lib/krant/ochtend-hartslag.ts).
+    schedule: 'Handmatig, elke ochtend (Claude-sessie)',
+    path: 'scripts/krant/ochtend.ts',
+    handmatig: true,
+    description:
+      'Een Claude-sessie controleert de Krant-jobs en doet de duiding. Zolang deze hartslag jonger is dan 48 uur, laat de nieuws-ingest de duiding liggen; daarna doet de cron die weer zelf via de API (vangnet).',
+    // Niet bewaken: een gemiste sessie is geen storing, want de cron neemt het na 48 uur over.
+    maxAgeHours: null,
   },
 }
 
