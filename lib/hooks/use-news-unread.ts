@@ -37,6 +37,12 @@ import { inflight } from '@/lib/inflight'
 // tier-poort; hij geeft 403 aan wie niet de tijdlijn leest — dan valt de hook
 // terug op het AI-pad hieronder, maar alleen als het AI-recht er is (`enabled`).
 // Een 403 op de tijdlijn wordt per sessie onthouden, net als die op /api/news.
+//
+// `tijdlijnMogelijk` (eindreview R1-delta 🟡-2): zolang de tijdlijn voor deze
+// lezer dicht is, weet de aanroeper dat al (de rol plus de bèta-vlag) en slaan
+// we de peek over. Anders vuurt élke gebruiker bij elke volledige paginalading
+// een 403 af — een extra roundtrip, een consolefout, en de AI-stip komt later.
+// Dit is een besparing, geen poort: de route toetst zelf.
 let tijdlijnPeekForbidden = false
 
 async function fetchTijdlijnUnread(): Promise<boolean | null> {
@@ -72,7 +78,7 @@ async function fetchNewsUnread(): Promise<boolean> {
   return ids.some((id) => id != null && !readIds.includes(id))
 }
 
-export function useNewsUnread(enabled = true): boolean {
+export function useNewsUnread(enabled = true, tijdlijnMogelijk = true): boolean {
   const [hasUnread, setHasUnread] = useState(false)
 
   useEffect(() => {
@@ -80,7 +86,7 @@ export function useNewsUnread(enabled = true): boolean {
     ;(async () => {
       try {
         // Eerst de tijdlijn (geen tier-poort). null = deze lezer leest de AI-Krant.
-        if (!tijdlijnPeekForbidden) {
+        if (tijdlijnMogelijk && !tijdlijnPeekForbidden) {
           const tijdlijn = await inflight('news-unread-tijdlijn', fetchTijdlijnUnread)
           if (tijdlijn !== null) {
             if (!cancelled) setHasUnread(tijdlijn)
@@ -99,7 +105,7 @@ export function useNewsUnread(enabled = true): boolean {
     return () => {
       cancelled = true
     }
-  }, [enabled])
+  }, [enabled, tijdlijnMogelijk])
 
   return hasUnread
 }

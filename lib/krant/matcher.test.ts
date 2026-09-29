@@ -85,6 +85,30 @@ describe('matcher — leescontract (1A)', () => {
     // Een aankomende deadline houdt ook een oud bericht in het venster.
     expect(voldoetAanLeescontract({ ...fixture('a08-kinderopvangtoeslag'), published_at: dagenTerug(200) }, ctx)).toBe(true)
   })
+
+  // De grenzen van dezelfde regel, aan beide uiteinden (eindreview R1-delta 🟡-3).
+  // De case hierboven raakt het kerngeval van het besluit niet: a08 is buiten het
+  // venster opgehaald, dus daar wint de deadline al vóór de ouderdom meetelt.
+  it('de grenzen: precies 45 dagen, een onleesbare datum, en de deadline bij een vers opgehaald oud bericht', () => {
+    const ctx = context()
+    const vers = fixture('a02-box1-schijf1')
+    const dagenTerug = (d: number) => new Date(NU.getTime() - d * 24 * 60 * 60 * 1000).toISOString()
+    const deadline = fixture('a08-kinderopvangtoeslag').duiding!.deadline!
+    const metDeadline = (datum: string) => ({
+      ...vers,
+      published_at: dagenTerug(200),
+      duiding: { ...vers.duiding!, deadline: { ...deadline, datum } },
+    })
+
+    // Precies op de grens is nog niet "ouder dan".
+    expect(voldoetAanLeescontract({ ...vers, published_at: dagenTerug(45) }, ctx)).toBe(true)
+    // Een publicatiedatum die geen datum is: de ophaaldatum beslist.
+    expect(voldoetAanLeescontract({ ...vers, published_at: 'onbekend' }, ctx)).toBe(true)
+    // Binnen het venster opgehaald, lang geleden gepubliceerd, deadline komt nog: blijft.
+    expect(voldoetAanLeescontract(metDeadline('2026-10-31'), ctx)).toBe(true)
+    // Dezelfde rij met een verlopen deadline: de ouderdom beslist weer.
+    expect(voldoetAanLeescontract(metDeadline('2026-09-01'), ctx)).toBe(false)
+  })
 })
 
 describe('matcher — doelgroepregels', () => {

@@ -60,6 +60,7 @@ import {
 } from '@/lib/leverage-status'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { useNewsUnread } from '@/lib/hooks/use-news-unread'
+import { inTijdlijnBeta } from '@/lib/krant/tijdlijn-beta'
 import { hasSubscription } from '@/lib/feature-registry'
 import { useCashflowStatusContext } from '@/components/app/cashflow-status-provider'
 import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
@@ -288,6 +289,7 @@ export function Sidebar({
       <OverigeSection
         collapsed={collapsed}
         sidebarSignals={sidebarSignals}
+        role={role}
       />
 
       {/* De kompas-status staat als stip naast elke hefboom-rij (zie
@@ -917,9 +919,11 @@ function AppTagStrip({
 function OverigeSection({
   collapsed,
   sidebarSignals,
+  role,
 }: {
   collapsed: boolean
   sidebarSignals?: SidebarSignals
+  role?: string
 }) {
   // Nieuws-freshness: ÉÉN gedeelde bron (perf fase 1). Voorheen riep elke
   // OverigeRow `useNewsUnread()` aan (Rules of Hooks: onvoorwaardelijk) →
@@ -928,7 +932,10 @@ function OverigeSection({
   // 'm over (`enabled=false`). Het resultaat gaat als prop naar de Nieuws-rij.
   const { subscriptions } = useModuleAccess()
   const hasAi = hasSubscription(subscriptions, 'ai')
-  const newsUnread = useNewsUnread(hasAi)
+  // Staat de tijdlijn voor deze lezer nog dicht, dan slaan we de tijdlijn-peek
+  // over: anders geeft elke paginalading een 403. Een besparing, geen poort —
+  // de route toetst dezelfde vlag zelf.
+  const newsUnread = useNewsUnread(hasAi, inTijdlijnBeta(role))
 
   return (
     <div className="flex flex-col px-2 py-3">

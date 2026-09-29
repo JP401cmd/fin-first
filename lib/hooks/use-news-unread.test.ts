@@ -66,6 +66,28 @@ describe('useNewsUnread', () => {
       expect(result.current).toBe(false)
     })
 
+    it('tijdlijn dicht voor deze lezer (tijdlijnMogelijk=false): geen tijdlijn-peek, dus geen 403 per paginalading', async () => {
+      // Zonder AI-recht: helemaal geen verzoek.
+      const zonderAi = makeFetch([])
+      global.fetch = zonderAi as unknown as typeof fetch
+      const eerste = renderHook(() => useNewsUnread(false, false))
+      await act(async () => {})
+      expect(eerste.result.current).toBe(false)
+      expect(zonderAi).not.toHaveBeenCalled()
+
+      // Met AI-recht: direct het AI-pad, zonder eerst de tijdlijn te proberen.
+      __resetInflight()
+      const metAi = makeFetch([
+        { ok: true, json: { ids: ['a'], peek: true } },
+        { ok: true, json: { readIds: [] } },
+      ])
+      global.fetch = metAi as unknown as typeof fetch
+      const tweede = renderHook(() => useNewsUnread(true, false))
+      await act(async () => {})
+      expect(tweede.result.current).toBe(true)
+      expect(metAi.mock.calls.map((c) => c[0])).toEqual(['/api/news?peek=1', '/api/news/read'])
+    })
+
     it('een 403 op de tijdlijn wordt onthouden: de volgende mount vraagt hem niet opnieuw', async () => {
       const fetchSpy = makeFetch([])
       global.fetch = fetchSpy as unknown as typeof fetch

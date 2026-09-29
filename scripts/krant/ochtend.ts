@@ -231,7 +231,7 @@ async function hartslag() {
   if (!na.vers || !na.laatste || Date.parse(na.laatste) < Date.parse(startedAt)) {
     stop('De nieuwe hartslag is niet terug te lezen — controleer job_runs (de insert kan stil mislukt zijn).')
   }
-  console.log(`✓ hartslag geschreven (${na.laatste}). De ingest van morgen laat duiding en categorisatie aan de sessie over.`)
+  console.log(`✓ hartslag geschreven (${na.laatste}). De ingest van morgen laat de duiding aan de sessie over; categoriseren doet hij zelf.`)
 }
 
 async function main() {

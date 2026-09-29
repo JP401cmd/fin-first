@@ -1,8 +1,9 @@
 // ── Categorisatie-inhaalslag (puur) ─────────────────────────────────
 //
-// Zolang de ochtendhartslag vers is (lib/krant/ochtend-hartslag.ts), slaat de
-// news-ingest-cron de categorisatie over en bewaart hij de rij met category
-// null. Een Claude-sessie haalt die rijen in met exact de cron-prompt
+// De news-ingest-cron categoriseert zelf, ook zolang de ochtendhartslag vers
+// is (de live /nieuws-editie leest de summary). Faalt dat door een storing,
+// dan blijft de rij met category null staan. Een Claude-sessie haalt die
+// rijen in met exact de cron-prompt
 // (`CATEGORISATIE_SYSTEM_PROMPT` + `bouwCategorisatiePrompt`) en exact de
 // cron-invoer (bron_kop, bron_fragment geknipt op
 // CATEGORISATIE_FRAGMENT_MAX_TEKENS, source_name). Dezelfde velden worden
@@ -13,10 +14,6 @@
 // maximumlengte), plus — omdat hier een agent met bestandstoegang schrijft —
 // de geheim-toets en een verbod op links. Een rij die intussen wél een
 // categorie kreeg, wordt niet overschreven.
-//
-// Sinds de review van 29 sep categoriseert de cron gewoon zelf (de live
-// /nieuws-editie leest de summary). Deze inhaalslag is voor rijen die door een
-// storing zonder categorie bleven.
 
 import { createHash } from 'node:crypto'
 import { z } from 'zod'

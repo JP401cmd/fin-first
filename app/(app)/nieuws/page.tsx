@@ -48,10 +48,22 @@ export default async function NieuwsOnlyPage() {
   }
 
   if (bron === 'wacht') {
+    // Ook wie wacht, krijgt van de weekrun proefedities: de bezwaarknop hoort
+    // dus onder ELKE uitkomst van de bronkeuze (security-run R1-delta 🟡-A).
+    // Context 'ai': bij bron 'wacht' wist een bezwaar de proefedities én het
+    // afgeleide nieuwsprofiel (wisBandenZonderDoel), precies wat die tekst zegt.
+    const bezwaarRes = await supabase.from('profiles').select('krant_schaduw_bezwaar_at').eq('id', user.id).maybeSingle()
     return (
       <>
         <NavStackMeta title="Krant" topBar={{ kind: 'rich' }} />
-        <KrantWacht />
+        <KrantWacht>
+          <section
+            aria-label="Bezwaar tegen de Krant op de achtergrond"
+            className="mt-14 border-t border-[var(--border-ed)] pt-5 text-[13px] leading-relaxed text-[var(--ink-3)]"
+          >
+            <KrantBezwaar bezwaar={Boolean(bezwaarRes.data?.krant_schaduw_bezwaar_at)} context="ai" />
+          </section>
+        </KrantWacht>
       </>
     )
   }

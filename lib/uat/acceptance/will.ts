@@ -616,7 +616,7 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-WILL-37',
     titel: 'Bezwaar maken tegen verwerking op de achtergrond (en intrekken)',
     kriticiteit: 'BELANGRIJK',
-    given: 'Een tijdlijnlezer zonder eerder bezwaar, met bestaande schaduwedities (bron \'schaduw\').',
+    given: 'Een lezer zonder eerder bezwaar, met bestaande schaduwedities (bron \'schaduw\'). De bezwaarknop staat onderaan /nieuws onder ELKE uitkomst van de bronkeuze (WF-WILL-33): de tijdlijn, de Krant met AI en het wachtscherm — de weekrun maakt voor alle drie proefedities.',
     when: 'De gebruiker klikt "Bezwaar maken" en bevestigt in de modal; later klikt hij "Bezwaar intrekken".',
     then:
       'PUT /api/krant/bezwaar {bezwaar:true} zet `profiles.krant_schaduw_bezwaar_at` op nu en wist alle rijen in `krant_edities` met `bron=\'schaduw\'` voor deze gebruiker. Daarna toetst `wisBandenZonderDoel` de WERKELIJKE bron van /nieuws via `bepaalKrantBron` (niet de opgeslagen variant): is dat niet de tijdlijn (AI-Krant, wachtscherm of dichte bèta), dan worden de bandvelden van het nieuwsprofiel, de rubrieken, de herkomst en `afgeleid_at` geleegd — ook zelf ingevulde velden (/privacy 2.4 sectie 6); `krant_variant` en `tijdlijn_gelezen_tot` blijven staan. Dezelfde toets draait ook na de AI-keuze (WF-WILL-38), dus de klikvolgorde (eerst bezwaar, dan AI-Krant) breekt die invariant niet (security Y2, 29-09). Leest de lezer de tijdlijn zelf, dan blijft het nieuwsprofiel staan — de vernieuwknop is zijn eigen verzoek en blijft werken; wél slaan de weekcron en de dagelijkse tijdlijncron deze lezer voortaan over (WF-BEHEER-31). Intrekken (`bezwaar:false`) zet de kolom terug op `null` zonder iets te wissen; de eerstvolgende cronrun leidt het profiel weer af.',

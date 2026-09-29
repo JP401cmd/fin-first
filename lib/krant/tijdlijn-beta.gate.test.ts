@@ -75,6 +75,35 @@ describe('scripts/krant/check-tijdlijn-poort.mjs — dezelfde poort buiten vites
     // De twee implementaties zeggen hetzelfde over het huidige attest.
     expect(poort.herbevestigingFout(attest, CATALOGUS_SHA) === null).toBe(herbevestigingGeldig(attest, CATALOGUS_SHA))
   })
+
+  // Het script leest tekst. Zonder deze eisen meldt het "dicht" bij een open vlag
+  // zodra er een tweede regel boven staat (security-run R1-delta 🟡-B).
+  it('precies één declaratie van de vlag: een tweede regel, ook in commentaar, is een fout', async () => {
+    const poort = await import('../../scripts/krant/check-tijdlijn-poort.mjs')
+    const open = 'export const TIJDLIJN_BETA_OPEN = true\n'
+    expect(poort.vlagOpen(open)).toBe(true)
+    expect(poort.vlagOpen('export const TIJDLIJN_BETA_OPEN = false\n')).toBe(false)
+    expect(() => poort.vlagOpen('// was: export const TIJDLIJN_BETA_OPEN = false\n' + open)).toThrow(/2×/)
+    expect(() => poort.vlagOpen('const s = "export const TIJDLIJN_BETA_OPEN = false"\n' + open)).toThrow(/2×/)
+    expect(() => poort.vlagOpen('export const IETS_ANDERS = true\n')).toThrow(/0×/)
+    // Geen letterlijke waarde: de poort kan er niets over zeggen en faalt dus.
+    expect(() => poort.vlagOpen('export const TIJDLIJN_BETA_OPEN = process.env.X === "1"\n')).toThrow(/letterlijke/)
+    expect(() => poort.vlagOpen('export const TIJDLIJN_BETA_OPEN: boolean = true\n')).toThrow(/letterlijke/)
+  })
+
+  it('de vorm van tijdlijn-beta.ts: de echte bron is goed, een omweg langs de vlag niet', async () => {
+    const poort = await import('../../scripts/krant/check-tijdlijn-poort.mjs')
+    const bron = readSourceLF(join(process.cwd(), 'lib', 'krant', 'tijdlijn-beta.ts'))
+    expect(poort.vormFout(bron)).toBeNull()
+    // Dezelfde bron met Windows-regeleinden en andere inspringing blijft goed.
+    expect(poort.vormFout(bron.replace(/\n/g, '\r\n').replace(/ {2}/g, '\t'))).toBeNull()
+    // Een schakelaar die CI niet zet.
+    expect(poort.vormFout(bron.replace('betaToegang(rol, TIJDLIJN_BETA_OPEN)', 'betaToegang(rol, TIJDLIJN_BETA_OPEN || process.env.X === "1")'))).toMatch(/omgevingsvariabele/)
+    // De vlag wordt niet meer doorgegeven.
+    expect(poort.vormFout(bron.replace('betaToegang(rol, TIJDLIJN_BETA_OPEN)', 'betaToegang(rol, true)'))).toMatch(/inTijdlijnBeta/)
+    // De pure toets laat iedereen door.
+    expect(poort.vormFout(bron.replace('return open || rol === SUPERADMIN_ROLE', 'return true'))).toMatch(/betaToegang/)
+  })
 })
 
 describe('inTijdlijnBeta — wie mag in de bèta', () => {
@@ -100,12 +129,18 @@ describe('inTijdlijnBeta — wie mag in de bèta', () => {
       'lib/krant/tijdlijn-vernieuwen.ts',
       // Bezwaar/variant: wist de banden alleen als /nieuws geen tijdlijn is (security Y2).
       'lib/krant/tijdlijn-keuzes.ts',
+      // De nieuwsstip: slaat de tijdlijn-peek over zolang de tijdlijn voor deze
+      // lezer dicht is. Een besparing, geen poort — de route toetst zelf.
+      'components/app/shell/sidebar.tsx',
     ])
     const bronnen = ['app', 'lib', 'components']
       .flatMap((d) => (readdirSync(d, { recursive: true }) as string[]).map((p) => (d + '/' + p).split('\\').join('/')))
       .filter((p) => /\.(ts|tsx)$/.test(p) && !/\.test\.tsx?$/.test(p) && p !== 'lib/krant/tijdlijn-beta.ts')
     // Alleen IMPORTS tellen: de architectuurplaten noemen de helper in tekst.
-    const importeert = (p: string) => /import\s*\{[^}]*\b(inTijdlijnBeta|betaToegang)\b[^}]*\}\s*from\s*['"][^'"]*tijdlijn-beta['"]/.test(readSourceLF(p))
+    // Elke import van de module telt, ongeacht wat er gehaald wordt: een
+    // `import * as`, een directe import van de vlag of een dynamische import
+    // ontsnapte aan de oude toets op alleen de twee functienamen (R1-delta 🟢-E).
+    const importeert = (p: string) => /(?:\bfrom|\bimport)\s*\(?\s*['"][^'"]*\/tijdlijn-beta['"]/.test(readSourceLF(p))
     const gebruikers = bronnen.filter(importeert)
     expect(gebruikers.sort()).toEqual([...TOEGESTAAN].sort())
     // betaToegang (met expliciete vlag) hoort in geen enkel productiebestand.
