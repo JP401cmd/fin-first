@@ -1247,3 +1247,11 @@
 ## 2026-09-27
 
 - Geen wijzigingen.
+
+## 2026-09-28
+
+- **API-routes** toegevoegd: /api/krant/tijdlijn/cron
+
+## 2026-09-28
+
+- Geen wijzigingen.

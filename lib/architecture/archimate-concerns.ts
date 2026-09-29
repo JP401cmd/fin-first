@@ -52,6 +52,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-09-22',
   },
   {
+    id: 'krant-tijdlijn-beta-dicht-tot-poorten',
+    title: 'De tijdlijn-bèta van de Krant verwerkt al, maar alleen voor superadmins — drie poorten vóór de vlag open mag',
+    detail:
+      'Sinds ADR 0183 (Krant 1C fase 1, 28-09-2026) draait de dagcron /api/krant/tijdlijn/cron (06:30 UTC) en schrijft per lezer met nieuwsprofiel.krant_variant = \'tijdlijn\' een verversing (krant_edities, bron "tijdlijn"). Er is nog geen scherm; zolang TIJDLIJN_BETA_OPEN false staat houden twee sloten gewone lezers buiten: de kolomgrant van migratie 20261004120000 (alleen de service-role zet krant_variant) en inTijdlijnBeta in de cron (alleen de superadmin-rol). Dat is een verwerkingsslot op een rol, geen toestemmingsmechanisme — het mag dus niet de blijvende poort worden. De vlag mag pas open na (1) /privacy 2.4 die de tijdlijn, de 120 dagen en het bezwaar noemt, (2) de herbevestiging van catalogus v2 door de eigenaar (tijdlijn-beta.gate.test.ts maakt open zonder geldige herbevestiging onmogelijk) en (3) een security-GO op de routes van fase 2. Daarnaast: de schaduwweekrun rust sinds dit besluit op gerechtvaardigd belang (art. 6 lid 1 sub f, besluit eigenaar, afwijkend van het advies "alleen bèta-lezers"); de weekcron respecteert profiles.krant_schaduw_bezwaar_at (buiten de sessie-wis, zodat een reset het bezwaar niet opheft) fail-closed, maar de belangenafweging staat nog niet als juridische brief vast en er is nog geen plek waar een lezer bezwaar kan maken. Verwijder dit punt zodra de drie poorten gehaald zijn, de vlag open staat en de belangenafweging vastligt.',
+    severity: 'risk',
+    elementIds: ['as-nieuws', 'do-krant'],
+    reviewedAt: '2026-09-28',
+  },
+  {
     id: 'gesprek-op-apparaat-zonder-backup-of-wisgarantie',
     title: 'Een gesprek dat op het apparaat staat heeft geen back-up en geen server-side wisgarantie',
     detail:

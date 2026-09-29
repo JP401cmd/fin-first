@@ -7,7 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  *   - moduleselectie: alleen profielen met de module nieuws (null = alle modules);
  *   - idempotentie per week: een geldende schaduweditie → overgeslagen;
  *   - summary: tellingen per profieltype en de overlap van testaccounts, geen inhoud;
- *   - een falende gebruiker telt als fout en stopt de run niet.
+ *   - een falende gebruiker telt als fout en stopt de run niet;
+ *   - bezwaar (grondslag gerechtvaardigd belang, 1C): profiles.krant_schaduw_bezwaar_at
+ *     → overgeslagen; komt uit dezelfde profiles-lezing (fail-closed).
  */
 
 const mockRecordJobRun = vi.fn()
@@ -179,5 +181,26 @@ describe('de run', () => {
     expect(JSON.stringify(await res.json())).not.toContain('db kapot')
     expect(mockRecordJobRun).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ job: 'krant-editie', status: 'error' }))
     expect(mockRun).not.toHaveBeenCalled()
+  })
+})
+
+describe('bezwaar tegen de schaduwrun (grondslag gerechtvaardigd belang, kaart 1C)', () => {
+  it('een lezer met krant_schaduw_bezwaar_at wordt niet gedraaid en telt als bezwaar', async () => {
+    profielen = profielen.map((p) => (p.id === 'u-nieuws' ? { ...p, krant_schaduw_bezwaar_at: '2026-09-28T10:00:00Z' } : p))
+    const res = await GET(req('cron-secret'))
+    expect(res.status).toBe(200)
+    const gedraaid = mockRun.mock.calls.map((c) => (c[1] as { userId: string }).userId)
+    expect(gedraaid).not.toContain('u-nieuws')
+    expect(gedraaid).toContain('u-alle')
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(summary).toMatchObject({ bezwaar: 1, gebruikers: 2 })
+  })
+
+  it('faalt de profiles-lezing (die ook het bezwaar draagt), dan draait er niets (fail-closed) en logt de job een error', async () => {
+    profielenFout = { message: 'kapot' }
+    const res = await GET(req('cron-secret'))
+    expect(res.status).toBe(500)
+    expect(mockRun).not.toHaveBeenCalled()
+    expect(mockRecordJobRun).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ job: 'krant-editie', status: 'error' }))
   })
 })

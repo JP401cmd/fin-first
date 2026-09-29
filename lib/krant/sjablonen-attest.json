@@ -1,26 +1,34 @@
 {
-  "note": "Attest van de Krant-sjablooncatalogus (ADR 0172). Per sjabloon-id een sha256 per formulering. Bijwerken = de catalogus is opnieuw door merkstem en compliance-check gegaan: node scripts/krant/attest-sjablonen.mjs --attest …",
-  "attestedAt": "2026-09-21T21:20:02.980Z",
-  "attestedBy": "Claude Code (senior-developer), kaart Krant 1B, 21 sep 2026 — compliance-check-skill; herbevestiging door de eigenaar/Grenswachter open",
-  "sjabloonVersie": 1,
+  "note": "Attest van de Krant-sjablooncatalogus (ADR 0172). Per sjabloon-id een sha256 per formulering. Bijwerken = de catalogus is opnieuw door merkstem en compliance-check gegaan: node scripts/krant/attest-sjablonen.mjs --attest … ; herbevestiging door de eigenaar: --herbevestig --toets …",
+  "attestedAt": "2026-09-28T18:15:04.814Z",
+  "attestedBy": "Claude Code (hoofdthread), kaart Krant 1C fase 1, 28 sep 2026 - zelfattestatie op catalogus v2; herbevestiging door de eigenaar/Grenswachter open (B38 voorwaarde 2)",
+  "sjabloonVersie": 2,
   "merkstem": {
-    "manifestAttestedAt": "2026-09-25T20:51:56.668Z",
+    "manifestAttestedAt": "2026-09-28T18:15:04.637Z",
     "oppervlak": {
       "id": "krant-sjablonen",
       "files": [
         {
           "file": "lib/krant/sjablonen-catalogus.ts",
-          "sha256": "e7f1b226cd1d74a73de5aa815ae0031344e6cd9bc22f65cc147133cf538b403c"
+          "sha256": "c7605feb6be33942f45b3cf178841adf48bbe9c69f1818c5411bc6aa51818abb"
         }
       ]
     }
   },
   "compliance": {
     "verdict": "goedgekeurd",
-    "at": "2026-09-21T21:20:02.980Z",
-    "motivering": "Compliance-check 21 sep 2026 op alle 19 sjabloon-ids (26 formuleringen): elke tekst is een som op de eigen band (inzicht) of een beschrijvende regel; geen product of aanbieder bij naam, geen gebiedende wijs, geen sparen-of-beleggen, geen rendementsbelofte; een voorstel of verwachting krijgt een voorbehoud voor de regel; elke gevoeligheidsvorm (B5) zegt expliciet dat de Krant de bank/rente niet voorspelt; deadlines beschrijvend; alleen euro's (B2) - bewuste, gedocumenteerde uitzondering op de vrijheidstijd-regel (ADR 0172). Merkstem: je/jij, kort, concreet, kansen niet schaarste; oppervlak krant-sjablonen geattesteerd in het merkstem-manifest."
+    "at": "2026-09-28T18:15:04.814Z",
+    "motivering": "Catalogus v2 volgt de compliance-check van 28 sep 2026 (subpagina onder kaart 1C): hypotheekrente-gevoeligheid met B5-zin en 'voor eventuele renteaftrek' (ook juist bij variabele rente); studieschuld-direct met de voorwaarde van de rentevaste periode; box3[1] zonder 'scheelt ... meer'; relevant gesplitst naar de grond (raakt-doelgroep 'geldt ook voor jou' alleen bij een bevestigde doelgroepregel, raakt-thema anders); wat-mist gesplitst in -bedrag en -raakt; editie-leeg zonder 'deze week'; nieuwe B37-vorm 'Over jouw situatie' met reden uit de raakt-regel die ja gaf (gevoelige redenen inkomen/uitkering/krediet alleen achter 'waarom zie ik dit?'), onderwerp per thema en slot naar de grond; Achtergrond gelabeld als niet op jouw situatie afgestemd; alle lezersfragmenten (banden, bereiken, veldnamen, partnerfragment) in de catalogus en dus onder dit attest. Geen gebiedende wijs, geen aanbieder, geen passendheidstaal, geen dagen of vrijheidstijd (B2); elke tekst haalt de aangescherpte Wft-woordenlijst. Open: DUO 5-jaarsregel verifieren door de eigenaar.",
+    "toets": "https://app.notion.com/p/3e9f9e8d568a817d8a14d872d6d8a598"
   },
+  "herbevestiging": null,
   "sjablonen": {
+    "achtergrond-kop": [
+      "1e09f08a25d171f65478819389fd3b883681847267fff53f75f07df3905bc06f"
+    ],
+    "achtergrond-label": [
+      "f4b8314379ec373f78cac358df670d2627bfa0022040c0f51f6e1f662db2508d"
+    ],
     "algemeen-kop": [
       "9f91065d96e55aec6761ed55ca4277f314f77f1d4b08af4de0d2086342bde0d4"
     ],
@@ -49,22 +57,55 @@
     ],
     "direct-box3": [
       "1a1222f6c1c0eb0fb27691d05414c1c60e228374224c3c783b8c61c0b4f35815",
-      "a301c6a00ced43d48f7672decf2b69d6e3da7360f23bbb23d0c1717b5ff9fe8f"
+      "d0aeafc6a2f896aa1f4ca95757e7ec8823c232d514bb748f07a665389835756b"
     ],
     "direct-eigen-risico": [
       "5cc098f4d710963bbe965b0d8648604ed343d764c613cc021b93742991e39f0f",
       "925162d690eeafb3f6835d9cd571b1143b21e3aa5f5d0efd80664adcdb017408"
     ],
     "direct-studieschuld": [
-      "6b515f40838c04196d929e461ece59c7949541c5e92b24b15f4d73a14e131623",
-      "d68f0d2f1e661c78fdaadbeec9c81aa74ef1f7adc09edb086f9083afb1db27e5"
+      "f15220f08c4f3480a320159224e3d4c1f512321429dcf1650bbc6416e8cd5b64",
+      "421c7b015b0f7229b97083837f7e200a3b1b5d27d3aac6caf13e16ee3d1aef41"
     ],
     "editie-leeg": [
-      "0bc7d412cfe837fc993249a31a87eff15c69152eb2cbcbd0b565903e2fb3787b"
+      "c476dccb755ef642d52aa46a917eb60db83ac99284b4aec95d3ff7ad98dd5c48"
+    ],
+    "fragment-geen": [
+      "8aa4ce9154c559056efbc3efccb660fe7ae6c868e288ea46e450c65e63a22884"
+    ],
+    "fragment-hoogstens": [
+      "8716ad6e1e2027c96ebc818b61b1d3f271aff5aab1f63fdbac9edcfed5c0d777"
+    ],
+    "fragment-maand": [
+      "7c4bad64d7623f01e519e1b78afecb6a53ee6d224af727226062e5d762de6a82"
+    ],
+    "fragment-maanden": [
+      "6560ea9f1d7cab506c1de2f4a0c0548780609b7433ebdda0134cb2ce5713cd58"
+    ],
+    "fragment-minstens": [
+      "72e3e42f4dd9f8ee099f1fd0269100a0ec1133bf15044afcac131a5b043f3515"
+    ],
+    "fragment-onder": [
+      "bdaf19d2c7322dcfa91f56304b61b56b66bfd5ce1912c336921dd2dc11b17212"
+    ],
+    "fragment-opsomming": [
+      "d2a189db6e4ff993303bdd03c052d91254182286bd9199998c30029052b1b447"
+    ],
+    "fragment-partner": [
+      "02b47b8bc6edbc0012c3f5fcd7c24be7cd7add3e277d103ae438b53869b9ea9c"
+    ],
+    "fragment-procentpunt": [
+      "6856588ffdeb7f77814bf3f60dc8a257051e31f0957267c29f8dbfb9029a6708"
+    ],
+    "fragment-tussen": [
+      "c54a3216e4d18b27b2d9b2f60b379f2123d631bdc38366f843382ff8eea7017f"
+    ],
+    "fragment-vanaf": [
+      "a392969ebac55b59a510abf0396c48c0f06de61850ac3f4b2fdf94507eaf369b"
     ],
     "gevoeligheid-hypotheekrente": [
-      "903b38e51b18ce4f751c4d331fa154009e2148089bd70b8d7531de0f9f89e90a",
-      "c54285c5f9278ae54d637ef3141de068e526cce7f399db02242d93cc4e00e20f"
+      "adc24155673023ce67fd36c91a4e3fd96a6f2ad10d1a0692fda6473befe91ce5",
+      "1e486320deaa886810a9f642e172cde4e0bae9fa6578ff1fbde1b476f68c2105"
     ],
     "gevoeligheid-spaarrente": [
       "1222a88b4256a76c2f478676cee922975d2e7cc93aeb5d098015e6eb0df7764d",
@@ -73,9 +114,179 @@
     "gevoeligheid-studieschuld": [
       "72bde896952fd5ba2e80ee90d5c2744f910d45709b295941a7f36756a307a4f2"
     ],
-    "relevant": [
-      "c0b03a8c9c4d8c3fba20c3c1cb4ae9a46c5add44d7425986631cb0aec70614bc",
-      "ced9edbb119b5fea44ceac76d84e8d48a4e50babdb4fdf4ce4b3aacc6462fdd8"
+    "onderwerp-aow": [
+      "461227f6121b8d8457b2bd34e534a0a934edf6c308afa5d53e99b7091d8c2e3b"
+    ],
+    "onderwerp-beleggen": [
+      "d2818cdabdc39beec04807cb1e595d43445be9bec55a958adac88f1cea289f23"
+    ],
+    "onderwerp-box3-vermogen": [
+      "112e966bb57d8f88dd5d99b8515e6dd46fc88a292e8d77fed93ef5de893c3d61"
+    ],
+    "onderwerp-consumptief-krediet": [
+      "323a641def181bd007dc7956fe312996fcebac935d9d6cc2b01093a908ac8e2a"
+    ],
+    "onderwerp-eigen-woning": [
+      "dacb70df604892b2a6e33d6149e91258fc99882546d551db8dd49bd21cd358ef"
+    ],
+    "onderwerp-huis-kopen": [
+      "258c73dfb7aa56066018b0f1fc3e79bd6254396a578d137c325ae52f85d0b7b2"
+    ],
+    "onderwerp-huur": [
+      "12562987bff7bf2f85bf99e4c4fadb3adccd5abfa59eea475319c60baf1e0f68"
+    ],
+    "onderwerp-inkomstenbelasting": [
+      "c1eb12dfdaf774e96069f4915f3e90e52733b4d6e00ab255b4da383acc12741b"
+    ],
+    "onderwerp-kinderen": [
+      "6c86afb5bc6790942db3fe432a2981539ebfe447c6b2ea79b15de2526c977d7c"
+    ],
+    "onderwerp-minimumloon-uitkering": [
+      "c2d85e6cc9452f0fb9978c0e574f15b08ab87ac37124fd40549ef048888e7b17"
+    ],
+    "onderwerp-ondernemers": [
+      "392373f19e0a1cd8313c28123c9266364c2270206131cc1f53db1339dcd5c6f8"
+    ],
+    "onderwerp-pensioenopbouw": [
+      "675bf8b0fe9b38208b2622450ca1cb20202192a13f6e27267b2f3de6be7f723d"
+    ],
+    "onderwerp-sparen-rente": [
+      "d12d3c15302b68bb63e4db3b01bd03d43b4266791f9eaa3148be6cd6daec4c3a"
+    ],
+    "onderwerp-studieschuld": [
+      "e77f1ed0b425902993daf70d4fa79a35414ac58c1b3639ba303cead23f296af4"
+    ],
+    "onderwerp-toeslagen": [
+      "2643a7eea0b5801f3a09fec4e9d6ce10b2d3c1fe83f017280917223f648868ee"
+    ],
+    "onderwerp-zorgkosten": [
+      "d7d9aaac259c03c78369be8bbe44982e50db242927ed61995394c9acd2ca79ed"
+    ],
+    "raakt-doelgroep": [
+      "51cd8b8e1618cffbc0cbbd0f8260ce1676fe4adef78956b90bea4ce1ce33aec9"
+    ],
+    "raakt-kop": [
+      "436c46d04cae3ea06407a148065d192157e57880c6b7792c0730aea3880f896e"
+    ],
+    "raakt-onderwerp": [
+      "6005fc5fa429109ace69c7faa83f30fed74edc2f296a34bbdd54b6c5c6f542d6"
+    ],
+    "raakt-onderwerp-jaar": [
+      "ffe51f22b30aee45d16ccedfae756437a793e49eea4f5cbc71aea739ad8599cb"
+    ],
+    "raakt-reden": [
+      "57554d8e3f3256cb1a11f9cf979a1fbacdc1464e6243044c4498bfd5e75bd533"
+    ],
+    "raakt-thema": [
+      "1ca047f92a09027a2c598bc26e32125732b8ec309f1fff8b27b2912e59b9ef18"
+    ],
+    "reden-beleggingen": [
+      "871a0f2c8558fa3e4ca84944da68eba8ada5ed3d4f527e4b66b7937f3775bf09"
+    ],
+    "reden-beleggingen-25k": [
+      "7e315a28cc4acc2be2537b8db50f2454ce5d95f288b45148e3ef359d0875b0d7"
+    ],
+    "reden-geboren-tot-1970": [
+      "88464df45fabbb4325ee973c801e2196e7ed9505cfb08fe3669373db8a8d3692"
+    ],
+    "reden-huur": [
+      "018f598628cceffccfd31ae093495cffa9806b070dbc1873723ecc3c73c7cf2d"
+    ],
+    "reden-inkomen-1750": [
+      "b0ad7f315695f35a54887bb49a905b385332aa4e9e0370219f7d34a8588bd485"
+    ],
+    "reden-inkomen-3250": [
+      "dc15b2074b97083481a99c410a2937f9062aec1555c721407a96d1059fac2d21"
+    ],
+    "reden-kinderen": [
+      "cd61ad5f382d56d9cffbe16461452dbf26ec22252d7dd5d22810dcc753769e0e"
+    ],
+    "reden-kinderen-onder-18": [
+      "f0a08aa1d3e8c99ed002698353633bc1311051c1b25886d4ab29c4b4edef5d4b"
+    ],
+    "reden-koopplan": [
+      "1c0c6c488577d4380416fda806439a3c6418c2c7c25baa1646efa1c3a933fde4"
+    ],
+    "reden-koopwoning": [
+      "5d544254535095c95f6bfd7f32ddfe50f115ea2be2b13baed595331eafa88a3a"
+    ],
+    "reden-krediet": [
+      "d07995a840b080da6587f10b14f82932e4557025d0a15cb41f4e043381777dcc"
+    ],
+    "reden-lijfrente": [
+      "138038f194f77c17a9790721dfd8ccbe4e99740bce8c11cc94c05022fe27915b"
+    ],
+    "reden-met-pensioen": [
+      "1620cbf60523ffb9f9d4a5b87478d803e9d7dda5bacb641e3cdc0512d0001430"
+    ],
+    "reden-ondernemer": [
+      "37b8d9d67424fac36a6d615e059ee0447a578b4926c5aedcf284e105c2daaa2e"
+    ],
+    "reden-pensioen-werkgever": [
+      "0fe531bf53649b58d615ee49ac7a88a3d5bb3d67056f82dbe556e01bb717dcc4"
+    ],
+    "reden-spaargeld-50k": [
+      "38509aae3e445dabf50a4f3093206d766678e7ce897ce36b95fd840b4be14041"
+    ],
+    "reden-spaargeld-5k": [
+      "0f86746e7ef03fa7b85123c93a93719bf35e23290972e1f2ae23194da3d0f814"
+    ],
+    "reden-studie": [
+      "3932aa049bede9cc4f1d93e3c50a107e47eb0f2236f90e22370ce4bbd8249c6c"
+    ],
+    "reden-studieschuld": [
+      "b8fd2ec88993de79881fb28d8739ba8183878a8a55820c2d61b1c66d031083bc"
+    ],
+    "reden-tweede-woning": [
+      "813a94791f38ba094c45784a5e37b35bd83e493f121ba1c3f515011caa3a843d"
+    ],
+    "reden-uitkering": [
+      "66862eeca44b891950b1fa0ef841f139c6a66d01ca41f99e0d6915589a9b4b5b"
+    ],
+    "veld-beleggingen": [
+      "7dfd6f853f77818001f089bc9eddae696b9fbf618ef4d2f0994ec7a0176b1b8c"
+    ],
+    "veld-beleggingen_vorm": [
+      "cf523a6f0c10f17999aa210f058f2faa33bdbd8088f6d8dc6241790a409465d5"
+    ],
+    "veld-geboortejaar": [
+      "64cfb9fec1d92771dc582947367814a177368b97c53c4b360f2faeeff689452c"
+    ],
+    "veld-huishouden": [
+      "b506acb37de34e5023949dc8068824cda91e24b61d49241e36d683b61376e6c9"
+    ],
+    "veld-hypotheek_rentevast": [
+      "c1882276620e301aadd0bf77af5b7f6a1e27958f1c9df9913ac0534d7475b476"
+    ],
+    "veld-hypotheek_restschuld": [
+      "1772808d98c6c56b856438fb7cba7601fd0d61a2387f65964988f0008fb8df52"
+    ],
+    "veld-inkomen": [
+      "cf6754721a7b8b6178b7a0b5d140b5f747675a6d6eb0793d10e9d7f807f5b65f"
+    ],
+    "veld-kinderen": [
+      "9c85dab36c20a8f6c3c99a9d1988f8c98ccf2e14a975db6a9026d00efdf1aa88"
+    ],
+    "veld-pensioen_lijfrente": [
+      "101605eba72fed08dc15b620d863d338a34505af698d54c4d13a2724d1e67434"
+    ],
+    "veld-pensioen_werkgever": [
+      "df328f729b6914f50b9697189743d23bef0fa28e4d56bdb1e0beae1085b64342"
+    ],
+    "veld-schulden": [
+      "4dfab14b3885af4d740680a6dd5b4d96d3ae2b845efa38120f1589ff7193a675"
+    ],
+    "veld-spaargeld": [
+      "ccabf6ef0750c0f3ef30eaab1f15c597aaa294fd12576c9e45affe05d8366342"
+    ],
+    "veld-werk": [
+      "330fdaf88bfb4f8bc0b9fafecef268753c0a83d6c3c7753bbd9845db22cde6bc"
+    ],
+    "veld-wonen": [
+      "5a2663a0ee187a41f365ef74fdf4700db0b81318b0292773878bc65215893499"
+    ],
+    "veld-woonplan": [
+      "d61d20c640c553c22d9f462955a170256c70751c90ab9fd45d3272ad4b5743d5"
     ],
     "voorbehoud-verwachting": [
       "f6f30a7a48bcd20246489f7b2cd73bf00ff53283e407df847dae01ed7aac32d1"
@@ -83,8 +294,11 @@
     "voorbehoud-voorstel": [
       "f0b6da8c424aa110edda71ac97f28e86fe7dce173e693139871e570ccdb00576"
     ],
-    "wat-mist": [
+    "wat-mist-bedrag": [
       "7f5ccf1f2b4ccb674025fedb2feb01a2cf9ab4e01b7e75f4c8fb4810d415f03d"
+    ],
+    "wat-mist-raakt": [
+      "835009292e8fb769408ab2e831e372fe71e0a77fa549caa5c9d62c53472db384"
     ]
   }
 }

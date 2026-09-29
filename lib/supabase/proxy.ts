@@ -24,6 +24,7 @@ export const CRON_PUBLIC_PATHS: readonly string[] = [
   // externe dead man's switch — juist die aanroep heeft nooit een sessie.
   '/api/cron/alerts-sweep',
   '/api/krant/cron', // weekeditie van de Krant zonder AI, in de schaduw (ADR 0173)
+  '/api/krant/tijdlijn/cron', // dagelijkse verversing van de tijdlijn-bèta (Krant 1C)
 ]
 
 /**

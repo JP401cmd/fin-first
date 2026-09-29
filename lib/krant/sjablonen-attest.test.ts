@@ -9,14 +9,18 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 import { SJABLONEN, SJABLOON_VERSIE, type SjabloonId } from './sjablonen-catalogus'
+import type { AttestHerbevestiging } from './tijdlijn-beta'
 
 interface Attest {
   attestedAt: string
   attestedBy: string
   sjabloonVersie: number
   merkstem: { manifestAttestedAt: string | null; oppervlak: { id: string; files: { file: string; sha256: string }[] } | null }
-  compliance: { verdict: string; at: string; motivering: string }
+  compliance: { verdict: string; at: string; motivering: string; toets?: string }
+  /** Tweede sleutel: de eigenaar herbevestigt het attest op één catalogus-versie. `--attest` wist 'm. */
+  herbevestiging?: AttestHerbevestiging | null
   sjablonen: Record<string, string[]>
 }
 
@@ -44,20 +48,32 @@ describe('sjablonen-attest', () => {
     expect(attest.merkstem.oppervlak?.files.map((f) => f.file)).toContain('lib/krant/sjablonen-catalogus.ts')
   })
 
+  // Bewust GEEN gelijkheid meer op manifestAttestedAt: die dwong bij elke
+  // merkstem-herattestatie een handedit van dit attest af (7da5f954a,
+  // 5ad9307e9) zonder dat de catalogus veranderde. De copy-hash is de
+  // inhoudelijke vergelijking en blijft staan.
   it('is niet stil stale t.o.v. het merkstem-manifest: dezelfde copy-hash van de catalogus in beide', () => {
     const manifest = JSON.parse(readFileSync(join(process.cwd(), 'lib', 'merkstem', 'merkstem-manifest.json'), 'utf8')) as {
-      attestedAt: string
       surfaces: { id: string; files: { file: string; sha256: string }[] }[]
     }
     const live = manifest.surfaces.find((s) => s.id === 'krant-sjablonen')?.files.find((f) => f.file === 'lib/krant/sjablonen-catalogus.ts')
     expect(live, 'oppervlak krant-sjablonen ontbreekt in het merkstem-manifest').toBeDefined()
-    expect(attest.merkstem.manifestAttestedAt).toBe(manifest.attestedAt)
     expect(attest.merkstem.oppervlak?.files.find((f) => f.file === 'lib/krant/sjablonen-catalogus.ts')?.sha256).toBe(live!.sha256)
   })
 
-  it('sentinel: één gewijzigd woord geeft een hash die het attest niet kent', () => {
-    const tekst = SJABLONEN['relevant'][0]
-    expect(attest.sjablonen.relevant).toContain(sha256(tekst))
-    expect(attest.sjablonen.relevant).not.toContain(sha256(tekst.replace('jouw', 'je')))
+  it('een herbevestiging, als die er is, komt van de eigenaar en hoort bij de huidige catalogus', () => {
+    const hb = attest.herbevestiging ?? null
+    if (hb === null) return
+    const catalogusSha = sha256(readSourceLF(join(process.cwd(), 'lib', 'krant', 'sjablonen-catalogus.ts')))
+    expect(hb.door, 'herbevestiging hoort van de eigenaar te komen').toBe('eigenaar')
+    expect(hb.catalogusSha256, 'herbevestiging vervallen — catalogus gewijzigd').toBe(catalogusSha)
+  })
+
+  // algemeen-label i.p.v. relevant: relevant wordt in 1C gesplitst, algemeen-label blijft.
+  it('sentinel: één toegevoegd woord geeft een hash die het attest niet kent', () => {
+    const tekst = SJABLONEN['algemeen-label'][0]
+    const gewijzigd = `${tekst} x`
+    expect(attest.sjablonen['algemeen-label']).toContain(sha256(tekst))
+    expect(attest.sjablonen['algemeen-label']).not.toContain(sha256(gewijzigd))
   })
 })

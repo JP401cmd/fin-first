@@ -45,6 +45,44 @@ export const GEBIEDENDE_WIJS: readonly RegExp[] = [
   /\bhet is (verstandig|slim|raadzaam) om\b/i,
 ]
 
+/**
+ * Aansporing richting de lezer die GEBIEDENDE_WIJS te smal liet (compliance-
+ * check 28 sep, §5). Aparte lijst en aparte `soort`, en bewust ná de
+ * bestaande lijsten getoetst: zo blijft de uitkomst voor elke tekst die al
+ * werd geweerd exact gelijk, en is aan de soort te zien dat deze aanvulling
+ * een zin raakte.
+ *
+ * Werkwoorden waarvan de gebiedende wijs gelijk is aan de derde persoon
+ * ("wacht", "check") alleen aan het begin van een zin — "de minister wacht
+ * met een besluit" is nieuws, "Wacht met verkopen" is een aansporing. Waar de
+ * derde persoon een -t krijgt ("overweegt", "kijkt", "maakt") volstaat de
+ * woordgrens: die sluit de beschrijvende vorm vanzelf uit.
+ */
+export const AANSPORING: readonly RegExp[] = [
+  /\boverweeg\b/i,
+  /\bprofiteer\b/i,
+  /\bkijk of\b/i,
+  /\bmaak (\w+ )?gebruik van\b/i,
+  /\bdoe er (goed|verstandig|slim) aan\b/i,
+  /\bleg (\w+ ){0,2}in\b/i,
+  /\bcheck (of|je|jouw|dan|nu|altijd|eerst|wat|hoe|welke)\b/i,
+  /(^|[.!?:;]\s+)(wacht met|check)\b/i,
+  /\bhet loont (om|de moeite)\b/i,
+]
+
+/**
+ * Een aanbeveling of productrangorde in de mond van de Krant: "wij raden
+ * aan", "aanrader", "Tip:", "de beste spaarrekening". Een superlatief telt
+ * alleen vóór een productwoord — "het beste moment" of "de hoogste rente
+ * sinds 2008" is geen rangorde van aanbieders.
+ */
+export const AANBEVELING: readonly RegExp[] = [
+  /\b(wij|we|ik) (raad|raden) (je |jou |u )?(\w+ )?aan\b/i,
+  /\baanrader\b/i,
+  /\btip\s*:/i,
+  /\b(beste|goedkoopste|voordeligste|scherpste) (\w+ )?\w*(rekening|hypotheek|hypotheken|verzekering|broker|bank|deposito|fonds|lening|creditcard|aanbieder|product|belegging)(en|s)?\b/i,
+]
+
 /** De sparen-of-beleggen-keuze als handelingsperspectief. */
 export const HANDELINGSKEUZE: readonly RegExp[] = [/\bsparen of beleggen\b/i, /\bbeleggen of sparen\b/i, /\baflossen of beleggen\b/i]
 
@@ -97,7 +135,39 @@ export const AANBIEDERS: readonly string[] = [
   'Vanguard',
   'iShares',
   'Northern Trust',
+  // Aanvulling compliance-check 28 sep (§5).
+  'Nationale Nederlanden',
+  'NN',
+  'ASR',
+  'Rabo',
+  'Interactive Brokers',
+  'IBKR',
+  'eToro',
+  'Lynx',
+  'Flatex',
+  'Kraken',
+  'Binance',
+  'Bitpanda',
+  'ONVZ',
+  'FBTO',
+  'Ohra',
+  'Univé',
+  'Unive',
+  'Zorg en Zekerheid',
+  'Allianz',
+  'Argenta',
+  'Munt Hypotheken',
+  'Tulp',
+  'Venn',
 ]
+
+/**
+ * Namen die ook een gewoon Nederlands woord zijn ("kraken", "tulp", "zorg en
+ * zekerheid") of te kort om los te staan ("Venn") — alleen met de hoofdletter
+ * zoals de aanbieder zich schrijft. Korte hoofdletterafkortingen (NN, ASR,
+ * IBKR, ONVZ, FBTO) zijn al vanzelf hoofdlettergevoelig.
+ */
+const HOOFDLETTERGEVOELIG: ReadonlySet<string> = new Set(['Kraken', 'Tulp', 'Venn', 'Zorg en Zekerheid'])
 
 /** B2: woorden van de vrijheidstijd-vertaling die de Krant niet gebruikt. */
 export const EURO_ONLY_VERBODEN: readonly RegExp[] = [/\bdagtarief\b/i, /\bvrijheidstijd\b/i, /\bvrijheidsdag(en)?\b/i, /\b\d+ dag(en)? (vrijheid|werk)\b/i]
@@ -107,12 +177,15 @@ export type WftOvertreding =
   | { soort: 'handelingskeuze'; patroon: string }
   | { soort: 'aanbieder'; naam: string }
   | { soort: 'euro-only'; patroon: string }
+  | { soort: 'aansporing'; patroon: string }
+  | { soort: 'aanbeveling'; patroon: string }
 
 function aanbiederPatroon(naam: string): RegExp {
   const escaped = naam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  // Korte afkortingen (ING, CZ, SNS, ASN) alleen als heel woord in hoofdletters;
-  // de rest hoofdletterongevoelig als heel woord.
-  return naam.length <= 4 && naam === naam.toUpperCase()
+  // Korte afkortingen (ING, CZ, SNS, ASN) en namen die ook een gewoon woord
+  // zijn alleen als heel woord met exact deze hoofdletters; de rest
+  // hoofdletterongevoelig als heel woord.
+  return (naam.length <= 4 && naam === naam.toUpperCase()) || HOOFDLETTERGEVOELIG.has(naam)
     ? new RegExp(`(^|[^A-Za-z])${escaped}(?![A-Za-z])`)
     : new RegExp(`(^|[^A-Za-z])${escaped}(?![A-Za-z])`, 'i')
 }
@@ -125,5 +198,8 @@ export function vindWftOvertreding(tekst: string): WftOvertreding | null {
   for (const re of HANDELINGSKEUZE) if (re.test(tekst)) return { soort: 'handelingskeuze', patroon: re.source }
   for (const { naam, re } of AANBIEDER_PATRONEN) if (re.test(tekst)) return { soort: 'aanbieder', naam }
   for (const re of EURO_ONLY_VERBODEN) if (re.test(tekst)) return { soort: 'euro-only', patroon: re.source }
+  // Ná de bestaande lijsten: een tekst die al werd geweerd houdt zijn soort.
+  for (const re of AANSPORING) if (re.test(tekst)) return { soort: 'aansporing', patroon: re.source }
+  for (const re of AANBEVELING) if (re.test(tekst)) return { soort: 'aanbeveling', patroon: re.source }
   return null
 }

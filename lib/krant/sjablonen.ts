@@ -12,6 +12,11 @@
 // dezelfde editie twee keer dezelfde zin geeft (golden tests) en twee lezers
 // niet allemaal dezelfde formulering zien.
 //
+// Sinds catalogus v2 (Krant 1C) staat hier GEEN lezerstekst meer: ook de
+// fragmenten ("of meer", "tot", "maanden", de veldnamen) komen uit de
+// catalogus, zodat ze onder het attest vallen. sjablonen-bron.test.ts bewaakt
+// dat.
+//
 // euro-only (B2, ADR 0172): bewaakt door lib/krant/euro-only.test.ts.
 //
 // PUUR: geen IO.
@@ -74,35 +79,35 @@ export function eur(bedrag: number): string {
  * "€ 25.000 tot € 50.000", "€ 250.000 of meer" ("van vanaf …" was de val).
  */
 export function bandTekst(band: Band): string {
-  if (band.hi == null) return `${eur(band.lo)} of meer`
-  if (band.lo === 0) return band.hi === 0 ? 'geen' : `minder dan ${eur(band.hi)}`
-  return `${eur(band.lo)} tot ${eur(band.hi)}`
+  if (band.hi == null) return renderSjabloon('fragment-vanaf', 0, { bedrag: eur(band.lo) })
+  if (band.lo === 0) return band.hi === 0 ? renderSjabloon('fragment-geen', 0) : renderSjabloon('fragment-onder', 0, { bedrag: eur(band.hi) })
+  return renderSjabloon('fragment-tussen', 0, { lo: eur(band.lo), hi: eur(band.hi) })
 }
 
 /** Een impactbereik als bedrag: "€ 40", "€ 38 tot € 100", "minstens € 120", "hoogstens € 107". */
 export function bereikTekst(b: Pick<ImpactBereik, 'lo' | 'hi'>): string {
-  if (b.hi == null) return `minstens ${eur(b.lo)}`
+  if (b.hi == null) return renderSjabloon('fragment-minstens', 0, { bedrag: eur(b.lo) })
   if (b.lo === b.hi) return eur(b.lo)
-  if (b.lo === 0) return `hoogstens ${eur(b.hi)}`
-  return `${eur(b.lo)} tot ${eur(b.hi)}`
+  if (b.lo === 0) return renderSjabloon('fragment-hoogstens', 0, { bedrag: eur(b.hi) })
+  return renderSjabloon('fragment-tussen', 0, { lo: eur(b.lo), hi: eur(b.hi) })
 }
 
 /** "3 maanden" / "1 maand". */
 export function maandenTekst(maanden: number): string {
   const m = Math.abs(Math.round(maanden))
-  return m === 1 ? '1 maand' : `${m} maanden`
+  return m === 1 ? renderSjabloon('fragment-maand', 0) : renderSjabloon('fragment-maanden', 0, { aantal: String(m) })
 }
 
 /** Een AOW-leeftijd of een bereik daarvan, via de canonieke schrijfwijze. */
 export function aowTekst(lo: number, hi: number): string {
   const a = formatAowAge(lo)
   const b = formatAowAge(hi)
-  return a === b ? a : `${a} tot ${b}`
+  return a === b ? a : renderSjabloon('fragment-tussen', 0, { lo: a, hi: b })
 }
 
 /** De stap van de gevoeligheidsvorm: "0,25 procentpunt". */
 export function stapTekst(stapPp: number): string {
-  return `${new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 2 }).format(stapPp)} procentpunt`
+  return renderSjabloon('fragment-procentpunt', 0, { getal: new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 2 }).format(stapPp) })
 }
 
 /** Een ISO-datum als "1 oktober 2026". */
@@ -113,28 +118,33 @@ export function datumTekst(iso: string): string {
   )
 }
 
-/** Leesbare naam per profielsleutel, voor "wat mist". */
-export const VELD_LABELS: Record<DoelgroepSleutel, string> = {
-  geboortejaar: 'je geboortejaar',
-  huishouden: 'je huishouden',
-  kinderen: 'je kinderen',
-  werk: 'je werk',
-  inkomen: 'je inkomen',
-  wonen: 'je woonsituatie',
-  hypotheek_restschuld: 'je hypotheekschuld',
-  hypotheek_rentevast: 'je rentevaste periode',
-  woonplan: 'je woonplan',
-  spaargeld: 'je spaargeld',
-  beleggingen: 'je beleggingen',
-  beleggingen_vorm: 'de vorm van je beleggingen',
-  schulden: 'je schulden',
-  pensioen_werkgever: 'je pensioenopbouw',
-  pensioen_lijfrente: 'je lijfrente',
+/** De catalogus-id van de leesbare naam per profielsleutel, voor "wat mist". */
+export const VELD_SJABLOON: Record<DoelgroepSleutel, SjabloonId> = {
+  geboortejaar: 'veld-geboortejaar',
+  huishouden: 'veld-huishouden',
+  kinderen: 'veld-kinderen',
+  werk: 'veld-werk',
+  inkomen: 'veld-inkomen',
+  wonen: 'veld-wonen',
+  hypotheek_restschuld: 'veld-hypotheek_restschuld',
+  hypotheek_rentevast: 'veld-hypotheek_rentevast',
+  woonplan: 'veld-woonplan',
+  spaargeld: 'veld-spaargeld',
+  beleggingen: 'veld-beleggingen',
+  beleggingen_vorm: 'veld-beleggingen_vorm',
+  schulden: 'veld-schulden',
+  pensioen_werkgever: 'veld-pensioen_werkgever',
+  pensioen_lijfrente: 'veld-pensioen_lijfrente',
+}
+
+/** Leesbare naam per profielsleutel (uit de catalogus). */
+export function veldLabel(veld: DoelgroepSleutel): string {
+  return renderSjabloon(VELD_SJABLOON[veld], 0)
 }
 
 /** "je spaargeld", "je spaargeld en je huishouden", "je spaargeld, je beleggingen en je huishouden". */
 export function veldenTekst(velden: readonly DoelgroepSleutel[]): string {
-  const labels = [...new Set(velden.map((v) => VELD_LABELS[v]))]
+  const labels = [...new Set(velden.map(veldLabel))]
   if (labels.length <= 1) return labels[0] ?? ''
-  return `${labels.slice(0, -1).join(', ')} en ${labels[labels.length - 1]}`
+  return renderSjabloon('fragment-opsomming', 0, { eerdere: labels.slice(0, -1).join(', '), laatste: labels[labels.length - 1] })
 }

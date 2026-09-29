@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-27T18:00:13.582Z",
-  "generatedDate": "2026-09-27",
+  "generatedAt": "2026-09-28T18:41:50.443Z",
+  "generatedDate": "2026-09-28",
   "repo": {
     "name": "fin",
-    "version": "0.92.12"
+    "version": "0.92.14"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -191,9 +191,9 @@
   "stats": {
     "routes": 136,
     "routesProduction": 90,
-    "api": 335,
+    "api": 336,
     "tables": 105,
-    "migrations": 267,
+    "migrations": 269,
     "integrations": 25,
     "components": 1243,
     "providers": 19,
@@ -3666,6 +3666,14 @@
       ]
     },
     {
+      "url": "/api/krant/tijdlijn/cron",
+      "file": "app/api/krant/tijdlijn/cron/route.ts",
+      "domain": "krant",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/life-events/strategie",
       "file": "app/api/life-events/strategie/route.ts",
       "domain": "life-events",
@@ -6671,6 +6679,37 @@
       ]
     },
     {
+      "domain": "krant",
+      "label": "krant",
+      "count": 3,
+      "routes": [
+        {
+          "url": "/api/krant/cron",
+          "file": "app/api/krant/cron/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/testeditie",
+          "file": "app/api/krant/testeditie/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/tijdlijn/cron",
+          "file": "app/api/krant/tijdlijn/cron/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "next-steps",
       "label": "next-steps",
       "count": 3,
@@ -6879,29 +6918,6 @@
           "methods": [
             "GET",
             "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "krant",
-      "label": "krant",
-      "count": 2,
-      "routes": [
-        {
-          "url": "/api/krant/cron",
-          "file": "app/api/krant/cron/route.ts",
-          "domain": "krant",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/krant/testeditie",
-          "file": "app/api/krant/testeditie/route.ts",
-          "domain": "krant",
-          "methods": [
-            "GET"
           ]
         }
       ]
@@ -8767,7 +8783,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 267
+    "migrationCount": 269
   },
   "tablesByDomain": [
     {
@@ -11823,6 +11839,10 @@
       ],
       "krant": [
         {
+          "name": "nieuwsprofiel",
+          "write": false
+        },
+        {
           "name": "profiles",
           "write": false
         }
@@ -13015,7 +13035,8 @@
           "label": "krant",
           "write": false,
           "routes": [
-            "/api/krant/cron"
+            "/api/krant/cron",
+            "/api/krant/tijdlijn/cron"
           ]
         },
         {
@@ -15550,6 +15571,16 @@
             "/api/integrations/wallets/[id]",
             "/api/integrations/wallets/[id]/sync",
             "/api/integrations/wallets/[id]/test"
+          ]
+        }
+      ],
+      "nieuwsprofiel": [
+        {
+          "domain": "krant",
+          "label": "krant",
+          "write": false,
+          "routes": [
+            "/api/krant/tijdlijn/cron"
           ]
         }
       ],
@@ -18983,6 +19014,20 @@
       ],
       "summary": "Opent iemand /overzicht, dan werkt de app op de achtergrond elke bank- of brokerkoppeling bij die langer dan twaalf uur niet gesynchroniseerd is. Dat gaat via de bestaande sync-routes, in de sessie van de gebruiker. Een globale schakelaar \"Automatisch bijwerken\" op /mijn/koppelin",
       "file": "docs/adr/0182-koppelingen-bijwerken-bij-openen.md"
+    },
+    {
+      "id": "0183-de-tijdlijn-van-de-krant-als-opt-in-beta",
+      "title": "De tijdlijn van de Krant als opt-in bèta: verversingen in de bestaande edities, een eigen dagcron en een kolomgrant op de keuze",
+      "status": "voorgesteld",
+      "date": "2026-09-28",
+      "elements": [
+        "as-nieuws",
+        "do-krant",
+        "t-supabase",
+        "t-platform"
+      ],
+      "summary": "De Krant zonder AI wordt een persoonlijke tijdlijn in plaats van een weekeditie (B31–B33, 27 sep) en komt als opt-in bèta naast de AI-Krant, die de standaard blijft (B38, 28 sep). Dit besluit legt fase 1 vast: schema en motor, nog zonder scherm. Het bouwt op ADR 0172 (matcher, sj",
+      "file": "docs/adr/0183-de-tijdlijn-van-de-krant-als-opt-in-beta.md"
     }
   ],
   "churn": {
@@ -18990,7 +19035,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 86
+        "commits": 87
       },
       {
         "path": "lib/ai",
@@ -19002,7 +19047,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 21
+        "commits": 22
       },
       {
         "path": "app/api/assets",
@@ -19014,7 +19059,7 @@
       },
       {
         "path": "components/horizon",
-        "commits": 8
+        "commits": 9
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -19042,8 +19087,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3817,
-        "commits": 17
+        "loc": 3853,
+        "commits": 20
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -20263,7 +20308,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-27",
+    "previousDate": "2026-09-28",
     "hasChanges": false,
     "sections": []
   },
@@ -20747,6 +20792,13 @@
     {
       "date": "2026-09-27",
       "api": 335,
+      "components": 1243,
+      "tables": 105,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-28",
+      "api": 336,
       "components": 1243,
       "tables": 105,
       "routesProduction": 90

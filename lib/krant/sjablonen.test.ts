@@ -36,6 +36,15 @@ const VOORBEELD_SLOTS: Record<string, string> = {
   stap: stapTekst(0.25),
   velden: veldenTekst(['spaargeld', 'huishouden']),
   datum: datumTekst('2026-10-31'),
+  // v2 (1C): de raakt-vorm en de fragmenten.
+  reden: 'heb je beleggingen',
+  onderwerp: 'de AOW',
+  lo: eur(25_000),
+  hi: eur(50_000),
+  aantal: '3',
+  getal: '0,25',
+  eerdere: 'je spaargeld, je werk',
+  laatste: 'je huishouden',
 }
 
 describe('sjablonen — catalogus', () => {
@@ -65,13 +74,13 @@ describe('sjablonen — catalogus', () => {
 
   it('elke gevoeligheidsvorm zegt dat het geen voorspelling is (B5): de bank/rente is niet van de Krant', () => {
     for (const id of IDS.filter((i) => i.startsWith('gevoeligheid-'))) {
-      for (const tekst of SJABLONEN[id]) expect(tekst, `${id}: ${tekst}`).toMatch(/staat hier niet|weet alleen jouw bank|opnieuw wordt vastgezet/i)
+      for (const tekst of SJABLONEN[id]) expect(tekst, `${id}: ${tekst}`).toMatch(/staat hier niet|weet alleen jouw bank/i)
     }
   })
 
   it('een ontbrekend slot gooit in plaats van een gat te renderen', () => {
     expect(() => renderSjabloon('direct-box3', 0, {})).toThrow(/mist slot/)
-    expect(() => renderSjabloon('relevant', 9)).toThrow(/geen variant/)
+    expect(() => renderSjabloon('raakt-kop', 9)).toThrow(/geen variant/)
   })
 })
 

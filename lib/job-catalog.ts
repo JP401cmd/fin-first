@@ -158,6 +158,18 @@ export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
     // Wekelijkse cadans: een week plus de dag-jitter van Vercel.
     maxAgeHours: 7 * 24 + 26,
   },
+  'krant-tijdlijn': {
+    key: 'krant-tijdlijn',
+    label: 'Krant — tijdlijn (bèta)',
+    // 06:30 UTC: ná de ingest + duiding van 05:00 en ná de weekrun van maandag
+    // 06:00, zodat de twee niet om dezelfde service-client concurreren.
+    schedule: 'Dagelijks 06:30 UTC',
+    path: '/api/krant/tijdlijn/cron',
+    description:
+      'Ververst de tijdlijn van elke lezer die de bèta "tijdlijn zonder AI" aan heeft (Krant 1C, B31/B38): nieuwe relevante berichten bovenaan, niets eraf, een artikel hoogstens één keer; ruimt berichten ouder dan 120 dagen op. Zolang de bèta dicht is alleen voor superadmins. Summary = tellingen, geen inhoud.',
+    // Dagelijks plus de dag-jitter van Vercel.
+    maxAgeHours: 26,
+  },
 }
 
 /** Catalogus in weergavevolgorde (insertion order van het Record). */

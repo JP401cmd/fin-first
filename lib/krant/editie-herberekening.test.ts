@@ -24,6 +24,9 @@ function tabellen() {
       { id: 'e-oud', user_id: 'user-c', bron: 'schaduw', week_key: '2026-W39', vervangen_door: 'e-nieuwer' },
       // Deze week, zonder dit artikel → niet geraakt.
       { id: 'e-los', user_id: 'user-d', bron: 'schaduw', week_key: '2026-W39', vervangen_door: null },
+      // Tijdlijn (1C): wordt NIET herberekend, alleen opgeschoond — ook een oudere week.
+      { id: 't-nu', user_id: 'user-a', bron: 'tijdlijn', week_key: '2026-W39', vervangen_door: null, item_count: 2, leeg: false },
+      { id: 't-oud', user_id: 'user-e', bron: 'tijdlijn', week_key: '2026-W30', vervangen_door: null, item_count: 1, leeg: false },
     ],
     krant_editie_items: [
       { id: 'i1', editie_id: 'e-nu', user_id: 'user-a', article_id: ARTIKEL, positie: 0 },
@@ -31,6 +34,9 @@ function tabellen() {
       { id: 'i3', editie_id: 'e-vorige', user_id: 'user-b', article_id: ARTIKEL, positie: 0 },
       { id: 'i4', editie_id: 'e-oud', user_id: 'user-c', article_id: ARTIKEL, positie: 0 },
       { id: 'i5', editie_id: 'e-los', user_id: 'user-d', article_id: 'ander', positie: 0 },
+      { id: 't1', editie_id: 't-nu', user_id: 'user-a', article_id: ARTIKEL, positie: 0, tijdlijn: true },
+      { id: 't2', editie_id: 't-nu', user_id: 'user-a', article_id: 'ander', positie: 1, tijdlijn: true },
+      { id: 't3', editie_id: 't-oud', user_id: 'user-e', article_id: ARTIKEL, positie: 0, tijdlijn: true },
     ],
   }
 }
@@ -51,7 +57,7 @@ describe('herberekening na terugtrekken (B4)', () => {
   it('draait de keten opnieuw zonder het artikel en zet vervangen_door op de oude editie', async () => {
     const nep = maakNepClient(tabellen())
     const res = await herberekenNaTerugtrekking(nep.client as never, ARTIKEL, { now: NU })
-    expect(res).toEqual({ edities: 1 })
+    expect(res).toEqual({ edities: 1, tijdlijnBerichten: 2 })
     expect(runMock).toHaveBeenCalledTimes(1)
     expect(runMock.mock.calls[0][1]).toMatchObject({ userId: 'user-a', weekKey: '2026-W39', bron: 'schaduw', uitsluitArtikelId: ARTIKEL })
     const rij = (id: string) => nep.rijen('krant_edities').find((r) => r.id === id)!
@@ -64,8 +70,21 @@ describe('herberekening na terugtrekken (B4)', () => {
   it('zonder geraakte editie: niets herberekend, niets gelezen buiten de meta-kolommen', async () => {
     const nep = maakNepClient(tabellen())
     const res = await herberekenNaTerugtrekking(nep.client as never, 'onbekend-artikel', { now: NU })
-    expect(res).toEqual({ edities: 0 })
+    expect(res).toEqual({ edities: 0, tijdlijnBerichten: 0 })
     expect(runMock).not.toHaveBeenCalled()
-    expect(nep.queries.map((q) => q.table)).toEqual(['krant_editie_items'])
+    expect(nep.queries.map((q) => q.table)).toEqual(['krant_editie_items', 'krant_editie_items'])
+  })
+
+  it('tijdlijn: het bericht verdwijnt uit élke tijdlijn, de rest blijft, de teller klopt — en er wordt niets herberekend', async () => {
+    const nep = maakNepClient(tabellen())
+    await herberekenNaTerugtrekking(nep.client as never, ARTIKEL, { now: NU })
+    const items = nep.rijen('krant_editie_items').map((r) => r.id)
+    expect(items).not.toContain('t1')
+    expect(items).not.toContain('t3')
+    expect(items).toContain('t2')
+    const rij = (id: string) => nep.rijen('krant_edities').find((r) => r.id === id)!
+    expect(rij('t-nu')).toMatchObject({ item_count: 1, leeg: false })
+    expect(rij('t-oud')).toMatchObject({ item_count: 0, leeg: true })
+    for (const call of runMock.mock.calls) expect(call[1]).not.toMatchObject({ bron: 'tijdlijn' })
   })
 })

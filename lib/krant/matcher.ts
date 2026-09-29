@@ -32,6 +32,21 @@
 //
 // Leeg is geldig: geen artikel boven de drempel → `leeg: true`.
 //
+// TWEE MODI (MATCHER_VERSIE 4, Krant 1C · B37/B38):
+//   'editie'   (standaard) de schaduweditie van K1. De SELECTIE is gelijk aan
+//              v3 (welke artikelen, score, vorm, volgorde); alleen de teksten
+//              volgen catalogus v2.
+//   'tijdlijn' één verversing van de tijdlijn-bèta. Verschilt op drie
+//              punten: (a) een bericht zonder bedrag haalt de tijdlijn al met
+//              score 2 (SCORE_DREMPEL_RAAKT) — alleen bij een BEVESTIGDE grond
+//              (doelgroepregel of thema dat raakt), nooit bij een onbevestigde
+//              doelgroep; (b) zo'n bericht krijgt de vorm 'raakt' ("Over jouw
+//              situatie"): reden uit de raakt-regel die 'ja' gaf, onderwerp,
+//              slot naar de grond — en zonder grond is het geen bericht maar
+//              Achtergrond of katern; (c) `algemeen.achtergrond` draagt
+//              hoogstens ACHTERGROND_MAX kwalitatieve artikelen zonder regel
+//              voor jou.
+//
 // Getallen in een item komen UITSLUITEND uit impact.ts (canonieke motoren of
 // gegronde params). De `samenvatting` is de door 1A gecontroleerde tekst van
 // het artikel zelf — geen persoonlijke som, en elk getal daarin staat
@@ -85,8 +100,10 @@ import {
  * 2 (22-09-2026, ADR 0176): tiebreak van het algemeen katern op duidingssoort en kop in plaats van id.
  * 3 (27-09-2026, B35 · Krant 1G): een relevant artikel zonder bevestigde doelgroep scoort toch GERICHT
  *   als één van zijn gegronde thema's dit profiel raakt (OF over de `raakt`-regels); waarom `thema:<id>`.
+ * 4 (28-09-2026, Krant 1C · B37/B38): modus 'tijdlijn' (drempel 2 voor 'raakt', Achtergrond); in beide modi
+ *   een bedrag van € 0 nooit als som (compliance-check §3a) en de relevant-tekst naar de grond.
  */
-export const MATCHER_VERSIE = 3
+export const MATCHER_VERSIE = 4
 
 /** Volgorde bij gelijke datum in het algemeen katern: wat vastligt of gemeten is, vóór verwachting en uitleg. */
 const KATERN_SOORT_RANG: Record<DuidingV1['soort'], number> = {
@@ -100,6 +117,18 @@ const KATERN_SOORT_RANG: Record<DuidingV1['soort'], number> = {
 
 /** Een artikel haalt de editie vanaf deze score (LOCAL_NEWS_MIN_SCORE-lijn). */
 export const SCORE_DREMPEL = 3
+/** B37: in de tijdlijn haalt een bericht zonder bedrag met een BEVESTIGDE grond het al met deze score. */
+export const SCORE_DREMPEL_RAAKT = 2
+/** B37: het blok Achtergrond naast de tijdlijn. */
+export const ACHTERGROND_MAX = 3
+/**
+ * Welke soorten duiding Achtergrond zijn — en welke in de tijdlijn de vorm
+ * 'raakt' mogen krijgen: vastgelegde of voorgestelde regels en uitleg. Nooit
+ * markt, cijfers of verwachtingen: een koersbeweging aan jouw beleggingen
+ * koppelen ("Dat geldt ook voor jou") is precies wat de Wft-grens verbiedt
+ * (eindreview 28-09, H1).
+ */
+const ACHTERGROND_SOORTEN: ReadonlySet<DuidingV1['soort']> = new Set(['besloten', 'voorstel', 'achtergrond'])
 /** Hoogstens zoveel items per editie (LOCAL_NEWS_MAX_ITEMS-lijn). */
 export const EDITIE_MAX = 8
 /** Hoogstens zoveel items per rubriek, tenzij er anders te weinig is. */
@@ -164,9 +193,14 @@ export interface MatchContext {
   gedemptRubrieken: ReadonlySet<string>
   impact: ImpactContext
   weekVensterDagen?: number
+  /** 'editie' (standaard, de K1-schaduw) of 'tijdlijn' (de bèta, B37/B38). */
+  modus?: MatchModus
 }
 
-export type EditieVorm = MechanismeVorm
+export type MatchModus = 'editie' | 'tijdlijn'
+
+/** 'raakt' bestaat alleen in de tijdlijn: "Over jouw situatie", zonder bedrag (B37). */
+export type EditieVorm = MechanismeVorm | 'raakt'
 
 export interface EditieDeadline extends Deadline {
   tekst: string
@@ -213,7 +247,13 @@ export interface EditieUitkomst {
   sjabloonVersie: number
   profielType: string
   items: EditieItem[]
-  algemeen: { kop: string; label: string; items: AlgemeenItem[] }
+  algemeen: {
+    kop: string
+    label: string
+    items: AlgemeenItem[]
+    /** Alleen in de tijdlijnmodus: kwalitatief nieuws zonder regel voor jou (B37). */
+    achtergrond?: { kop: string; label: string; items: AlgemeenItem[] }
+  }
   leeg: boolean
   /** De tekst bij een lege editie; null als er items zijn. */
   legeTekst: string | null
@@ -314,6 +354,59 @@ export function toetsThema(thema: ThemaId, profiel: NieuwsprofielV1): RegelUitko
   return onbekend ? 'onbekend' : 'nee'
 }
 
+/** De raakt-regels van een thema die voor dit profiel 'ja' geven, in themavolgorde. */
+export function jaRegels(thema: ThemaId, profiel: NieuwsprofielV1): DoelgroepRegel[] {
+  const raakt = THEMAS[thema].raakt
+  if (raakt === 'iedereen') return []
+  return raakt.filter((r) => toetsRegel(r, profiel) === 'ja')
+}
+
+/** De sleutel van een regel: veld, operator en waarden — zonder spaties, dus geen lezerstekst. */
+export function regelSleutel(regel: DoelgroepRegel): string {
+  return `${regel.veld}:${regel.op}:${regel.waarden.join('|')}`
+}
+
+/**
+ * De reden-zin per raakt-regel van themas.ts (catalogus `reden-*`). Een nieuwe
+ * regel in themas.ts zonder rij hier maakt matcher.test.ts rood. De bedragen
+ * in de labels zijn de grens van de regel, niet de band van de lezer.
+ */
+export const REDEN_PER_REGEL: Readonly<Record<string, SjabloonId>> = {
+  'spaargeld:minstens:50k-100k': 'reden-spaargeld-50k',
+  'spaargeld:minstens:5k-25k': 'reden-spaargeld-5k',
+  'beleggingen:minstens:25k-100k': 'reden-beleggingen-25k',
+  'beleggingen:minstens:tot-25k': 'reden-beleggingen',
+  'beleggingen_vorm:bevat:tweede-woning': 'reden-tweede-woning',
+  'pensioen_werkgever:is:ja': 'reden-pensioen-werkgever',
+  'pensioen_lijfrente:is:ja': 'reden-lijfrente',
+  'geboortejaar:hoogstens:1970': 'reden-geboren-tot-1970',
+  'werk:bevat:pensioen': 'reden-met-pensioen',
+  'wonen:in:huur-sociaal|huur-vrije-sector': 'reden-huur',
+  'wonen:in:koop-met-hypotheek|koop-zonder-hypotheek': 'reden-koopwoning',
+  'woonplan:is:kopen-binnen-2-jaar': 'reden-koopplan',
+  'inkomen:hoogstens:2500-3250': 'reden-inkomen-3250',
+  'inkomen:hoogstens:tot-1750': 'reden-inkomen-1750',
+  'kinderen:in:jongste-0-3|jongste-4-11|jongste-12-17': 'reden-kinderen-onder-18',
+  'kinderen:in:jongste-0-3|jongste-4-11|jongste-12-17|alleen-18-plus': 'reden-kinderen',
+  'schulden:in:studieschuld-tot-15k|studieschuld-15k-40k|studieschuld-boven-40k': 'reden-studieschuld',
+  'werk:bevat:studie': 'reden-studie',
+  'werk:in:zelfstandig|dga': 'reden-ondernemer',
+  'werk:in:uitkering': 'reden-uitkering',
+  'schulden:in:consumptief-krediet': 'reden-krediet',
+}
+
+/**
+ * Gevoelige redenen (compliance-keuze 4): inkomen, uitkering, krediet staan
+ * nooit in de zichtbare regel — alleen als `reden:<id>` in `waarom`, voor
+ * "waarom zie ik dit?". Schermdelen en screenshots spelen mee.
+ */
+export const GEVOELIGE_REDENEN: ReadonlySet<SjabloonId> = new Set([
+  'reden-inkomen-3250',
+  'reden-inkomen-1750',
+  'reden-uitkering',
+  'reden-krediet',
+] as SjabloonId[])
+
 /** De thema's van de duiding die dit profiel raken ('ja'), in duidingvolgorde. */
 function themasVoorProfiel(duiding: DuidingV1, profiel: NieuwsprofielV1): ThemaId[] {
   return duiding.themas.filter((t) => toetsThema(t.thema, profiel) === 'ja').map((t) => t.thema)
@@ -357,7 +450,7 @@ function sjabloonVoor(mechanisme: MechanismeId, impact: ImpactBereik): SjabloonI
     case 'eigen-risico':
       return 'direct-eigen-risico'
     default:
-      return 'relevant'
+      return 'raakt-thema'
   }
 }
 
@@ -371,7 +464,7 @@ function slotsVoor(id: SjabloonId, impact: ImpactBereik, profiel: NieuwsprofielV
       return {
         spaargeld: bandTekst(SPAARGELD_BANDEN[profiel.spaargeld!]),
         beleggingen: bandTekst(BELEGGINGEN_BANDEN[profiel.beleggingen.band!]),
-        partner: profiel.huishouden === 'fiscaal-partner' ? ' (samen met je fiscale partner)' : '',
+        partner: profiel.huishouden === 'fiscaal-partner' ? renderSjabloon('fragment-partner', 0) : '',
         bedrag,
         richting,
         jaar: String(impact.jaar),
@@ -386,8 +479,9 @@ function slotsVoor(id: SjabloonId, impact: ImpactBereik, profiel: NieuwsprofielV
         maanden: maandenTekst(impact.lo),
       }
     case 'direct-studieschuld':
+      return { schuld: bandTekst(STUDIESCHULD_BANDEN[studieschuld!]), bedrag, richting, jaar: String(impact.jaar) }
     case 'gevoeligheid-studieschuld':
-      return { schuld: bandTekst(STUDIESCHULD_BANDEN[studieschuld!]), bedrag, richting, stap }
+      return { schuld: bandTekst(STUDIESCHULD_BANDEN[studieschuld!]), bedrag, stap }
     case 'direct-eigen-risico':
       return { oud: eur(impact.eigenRisico!.oud), nieuw: eur(impact.eigenRisico!.nieuw), bedrag, richting }
     case 'gevoeligheid-spaarrente':
@@ -429,21 +523,37 @@ function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profi
   // De som wordt dan niet eens gemaakt; het item zegt wat er mist.
   const bevestigd = dg.onbekend.length === 0
   const impact: ImpactUitkomst = bevestigd ? berekenImpact(duiding, profiel, ctx.impact) : { soort: 'ontbreekt', velden: dg.onbekend }
+  const tijdlijn = ctx.modus === 'tijdlijn'
+  // De grond van een bericht zonder bedrag: alleen een BEVESTIGDE doelgroep of
+  // een thema dat raakt maakt het persoonlijk. Onbevestigd is nooit een grond.
+  const grond: 'doelgroep' | 'thema' | null = !bevestigd ? null : duiding.doelgroep.length > 0 ? 'doelgroep' : themaJa.length > 0 ? 'thema' : null
+  // Compliance-check §3a: een som van € 0 (of 0 maanden AOW) is geen regel voor
+  // jou. Hij rendert nooit als bedrag ("€ 0 per jaar  box 3-heffing") maar
+  // valt terug op de vorm zonder bedrag; de score (1) verandert niet.
+  const nulBereik = impact.soort === 'bereik' && impact.vorm !== 'gevoeligheid' && impact.lo === 0 && (impact.hi ?? 0) === 0
 
   let vorm: EditieVorm = 'relevant'
   let bereik: ImpactBereik | null = null
-  let sjabloonId: SjabloonId = 'relevant'
-  if (impact.soort === 'bereik') {
+  let sjabloonId: SjabloonId = grond === 'doelgroep' ? 'raakt-doelgroep' : 'raakt-thema'
+  if (impact.soort === 'bereik' && !nulBereik) {
     vorm = impact.vorm
     bereik = impact
     sjabloonId = sjabloonVoor(duiding.mechanisme!.soort, impact)
     waarom.push(`impact:${impact.vorm}`)
   } else if (impact.soort === 'ontbreekt') {
     for (const v of impact.velden) if (!watMist.includes(v)) watMist.push(v)
-    sjabloonId = 'wat-mist'
+    // Bevestigd + ontbreekt = een rekenend mechanisme mist een veld → er kán een
+    // bedrag komen; onbevestigd → de Krant weet nog niet óf het jou raakt.
+    sjabloonId = bevestigd ? 'wat-mist-bedrag' : 'wat-mist-raakt'
     waarom.push(bevestigd ? 'impact:ontbreekt' : 'doelgroep-onbevestigd')
   } else {
-    waarom.push(`impact:${impact.reden}`)
+    waarom.push(nulBereik ? 'impact:nul' : `impact:${(impact as { reden: string }).reden}`)
+    // In de tijdlijn is een bericht zonder bedrag en zonder grond geen bericht:
+    // het hoort in Achtergrond of het katern (compliance-check §3b).
+    if (tijdlijn) {
+      if (grond === null || !ACHTERGROND_SOORTEN.has(duiding.soort) || duiding.mechanisme?.soort === 'beursbeweging') return null
+      vorm = 'raakt'
+    }
   }
   let score = bevestigd ? basisScore(impact, duiding, themaJa.length > 0) : SCORE_RELEVANT_GERICHT
   const deadline = deadlineVoor(duiding, ctx)
@@ -465,14 +575,31 @@ function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profi
     waarom.push('rubriek-gedempt')
     if (score < SCORE_GEDEMPT_MIN) return null
   }
-  if (score < SCORE_DREMPEL) return null
+  const drempel = vorm === 'raakt' ? SCORE_DREMPEL_RAAKT : SCORE_DREMPEL
+  if (score < drempel) return null
 
   const variant = variantVoor(sjabloonId, artikel.id)
-  const slots: Slots = sjabloonId === 'wat-mist' ? { velden: veldenTekst(watMist) } : bereik ? slotsVoor(sjabloonId, bereik, profiel, ctx) : {}
-  // Een voorstel of verwachting is geen besluit: de regel voor jou krijgt een voorbehoud.
-  const voorbehoud =
-    duiding.soort === 'voorstel' ? renderSjabloon('voorbehoud-voorstel', 0) : duiding.soort === 'verwachting' ? renderSjabloon('voorbehoud-verwachting', 0) : null
-  const regel = renderSjabloon(sjabloonId, variant, slots)
+  const watMistSjabloon = sjabloonId === 'wat-mist-bedrag' || sjabloonId === 'wat-mist-raakt'
+  const slots: Slots = watMistSjabloon ? { velden: veldenTekst(watMist) } : bereik ? slotsVoor(sjabloonId, bereik, profiel, ctx) : {}
+  // Zonder bedrag en mét grond (beide modi): de drie-delige regel "Over jouw
+  // situatie" — een los "Dat geldt ook voor jou." verwees nergens naar
+  // (eindreview L2). Bij een voorstel of verwachting nooit "geldt ook voor
+  // jou": dan het neutrale slot, want toepasselijkheid van iets dat nog niet
+  // besloten is, is niet te stellen (eindreview M6).
+  const zonderBedrag = bereik === null && !watMistSjabloon && grond !== null
+  const onzeker = duiding.soort === 'voorstel' || duiding.soort === 'verwachting'
+  const slotGrond: 'doelgroep' | 'thema' = grond === 'doelgroep' && !onzeker ? 'doelgroep' : 'thema'
+  if (zonderBedrag) sjabloonId = slotGrond === 'doelgroep' ? 'raakt-doelgroep' : 'raakt-thema'
+  // Een voorstel of verwachting is geen besluit: een som krijgt een voorbehoud.
+  // De regel zonder bedrag noemt geen gevolg en krijgt het neutrale slot.
+  const voorbehoud = zonderBedrag
+    ? null
+    : duiding.soort === 'voorstel'
+      ? renderSjabloon('voorbehoud-voorstel', 0)
+      : duiding.soort === 'verwachting'
+        ? renderSjabloon('voorbehoud-verwachting', 0)
+        : null
+  const regel = zonderBedrag ? raaktTekst(duiding, profiel, grond!, slotGrond, themaJa, waarom) : renderSjabloon(sjabloonId, variant, slots)
   const samenvatting = samenvattingVoor(duiding, waarom)
   const item: EditieItem = {
     artikelId: artikel.id,
@@ -495,6 +622,40 @@ function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profi
     samenvatting,
   }
   return { artikel, item }
+}
+
+/**
+ * B37 "Over jouw situatie", drie delen uit de catalogus: de reden uit de
+ * raakt-regel die 'ja' gaf (compliance-check: nooit een vrij gekozen
+ * profielkenmerk — "koopwoning" bij een box 3-bericht was precies die fout),
+ * het onderwerp (het eerste thema dat raakt, anders het eerste thema van de
+ * duiding) met het jaar alleen als de ingangsdatum gegrond is, en het slot
+ * naar de grond. Een gevoelige reden (inkomen, uitkering, krediet) staat
+ * alleen in `waarom`; is er geen andere, dan vervalt de zichtbare reden.
+ */
+function raaktTekst(
+  duiding: DuidingV1,
+  profiel: NieuwsprofielV1,
+  grond: 'doelgroep' | 'thema',
+  slotGrond: 'doelgroep' | 'thema',
+  themaJa: readonly ThemaId[],
+  waarom: string[],
+): string {
+  const kandidaten: DoelgroepRegel[] = [...(grond === 'doelgroep' ? duiding.doelgroep : []), ...themaJa.flatMap((t) => jaRegels(t, profiel))]
+  const redenen = kandidaten.map((r) => REDEN_PER_REGEL[regelSleutel(r)]).filter((id): id is SjabloonId => id != null)
+  for (const id of new Set(redenen)) waarom.push(`reden:${id}`)
+  const zichtbaar = redenen.find((id) => !GEVOELIGE_REDENEN.has(id))
+
+  const delen: string[] = []
+  if (zichtbaar) delen.push(renderSjabloon('raakt-reden', 0, { reden: renderSjabloon(zichtbaar, 0) }))
+  const thema = themaJa[0] ?? duiding.themas[0]?.thema
+  if (thema) {
+    const onderwerp = renderSjabloon(`onderwerp-${thema}` as SjabloonId, 0)
+    const jaar = duiding.ingangsdatum?.slice(0, 4)
+    delen.push(jaar ? renderSjabloon('raakt-onderwerp-jaar', 0, { onderwerp, jaar }) : renderSjabloon('raakt-onderwerp', 0, { onderwerp }))
+  }
+  delen.push(renderSjabloon(slotGrond === 'doelgroep' ? 'raakt-doelgroep' : 'raakt-thema', 0))
+  return delen.join(' ')
 }
 
 /** De eerste letter omlaag ná een voorbehoud, behalve bij een hoofdletterwoord (AOW, DUO). */
@@ -525,7 +686,7 @@ function samenvattingVoor(duiding: DuidingV1, waarom: string[]): string | null {
   return null
 }
 
-const VORM_RANG: Record<EditieVorm, number> = { direct: 0, gevoeligheid: 1, relevant: 2 }
+const VORM_RANG: Record<EditieVorm, number> = { direct: 0, gevoeligheid: 1, relevant: 2, raakt: 3 }
 
 function vergelijk(a: EditieItem, b: EditieItem): number {
   return VORM_RANG[a.vorm] - VORM_RANG[b.vorm] || b.score - a.score || (a.artikelId < b.artikelId ? -1 : a.artikelId > b.artikelId ? 1 : 0)
@@ -569,28 +730,24 @@ export function matchEditie(profiel: NieuwsprofielV1, artikelen: readonly Kandid
   // gezien"-moment) beslist de SOORT van de duiding — een besluit of cijfer
   // vóór achtergrond — dan de kop, en pas als laatste het id (bugkaart P2:
   // vóór MATCHER_VERSIE 2 besliste feitelijk de UUID).
+  // Tijdlijn (B37): eerst de Achtergrond — kwalitatief nieuws zonder regel voor
+  // jou (besloten, voorstel, uitleg; nooit markt of cijfers) — daarna het katern
+  // uit wat overblijft. In de editiemodus bestaat Achtergrond niet.
+  const tijdlijn = ctx.modus === 'tijdlijn'
+  const achtergrondItems: AlgemeenItem[] = tijdlijn
+    ? leesbaar
+        .filter((a) => !gekozen.has(a.id) && ACHTERGROND_SOORTEN.has(a.duiding.soort) && a.duiding.mechanisme?.soort !== 'beursbeweging')
+        .sort(katernVolgorde)
+        .slice(0, ACHTERGROND_MAX)
+        .map(naarAlgemeenItem)
+    : []
+  const inAchtergrond = new Set(achtergrondItems.map((i) => i.artikelId))
+
   const algemeenItems: AlgemeenItem[] = leesbaar
-    .filter((a) => !gekozen.has(a.id))
-    .sort((a, b) => {
-      const ta = a.published_at ?? a.fetched_at
-      const tb = b.published_at ?? b.fetched_at
-      if (ta !== tb) return ta < tb ? 1 : -1
-      const sa = KATERN_SOORT_RANG[a.duiding.soort]
-      const sb = KATERN_SOORT_RANG[b.duiding.soort]
-      if (sa !== sb) return sa - sb
-      if (a.title !== b.title) return a.title < b.title ? -1 : 1
-      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
-    })
+    .filter((a) => !gekozen.has(a.id) && !inAchtergrond.has(a.id))
+    .sort(katernVolgorde)
     .slice(0, ALGEMEEN_MAX)
-    .map((a) => ({
-      artikelId: a.id,
-      titel: a.title,
-      rubriek: a.category,
-      bron: a.source_name,
-      url: a.source_url,
-      gepubliceerd: a.published_at,
-      samenvatting: samenvattingVoor(a.duiding, []),
-    }))
+    .map(naarAlgemeenItem)
 
   const leeg = items.length === 0
   return {
@@ -598,8 +755,39 @@ export function matchEditie(profiel: NieuwsprofielV1, artikelen: readonly Kandid
     sjabloonVersie: SJABLOON_VERSIE,
     profielType: profielType(profiel, ctx.impact.peiljaar),
     items,
-    algemeen: { kop: renderSjabloon('algemeen-kop', 0), label: renderSjabloon('algemeen-label', 0), items: algemeenItems },
+    algemeen: {
+      kop: renderSjabloon('algemeen-kop', 0),
+      label: renderSjabloon('algemeen-label', 0),
+      items: algemeenItems,
+      ...(tijdlijn
+        ? { achtergrond: { kop: renderSjabloon('achtergrond-kop', 0), label: renderSjabloon('achtergrond-label', 0), items: achtergrondItems } }
+        : {}),
+    },
     leeg,
     legeTekst: leeg ? renderSjabloon('editie-leeg', 0) : null,
+  }
+}
+
+/** Katernvolgorde: nieuwste eerst; bij gelijke datum de soort (besluit/cijfer vóór uitleg), dan de kop, dan het id. */
+function katernVolgorde(a: KandidaatArtikel & { duiding: DuidingV1 }, b: KandidaatArtikel & { duiding: DuidingV1 }): number {
+  const ta = a.published_at ?? a.fetched_at
+  const tb = b.published_at ?? b.fetched_at
+  if (ta !== tb) return ta < tb ? 1 : -1
+  const sa = KATERN_SOORT_RANG[a.duiding.soort]
+  const sb = KATERN_SOORT_RANG[b.duiding.soort]
+  if (sa !== sb) return sa - sb
+  if (a.title !== b.title) return a.title < b.title ? -1 : 1
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+}
+
+function naarAlgemeenItem(a: KandidaatArtikel & { duiding: DuidingV1 }): AlgemeenItem {
+  return {
+    artikelId: a.id,
+    titel: a.title,
+    rubriek: a.category,
+    bron: a.source_name,
+    url: a.source_url,
+    gepubliceerd: a.published_at,
+    samenvatting: samenvattingVoor(a.duiding, []),
   }
 }

@@ -20,7 +20,8 @@ import type { EditieItem, EditieUitkomst } from './matcher'
 /** Hoeveel weken schaduwedities per gebruiker bewaard blijven. */
 export const SCHADUW_CAP_WEKEN = 26
 
-export type EditieBron = 'schaduw' | 'live'
+/** 'tijdlijn' = één verversing van de tijdlijn-bèta (Krant 1C, B31/B38). */
+export type EditieBron = 'schaduw' | 'live' | 'tijdlijn'
 
 export interface SchrijfEditieInvoer {
   userId: string
@@ -36,12 +37,18 @@ export interface GeschrevenEditie {
   items: number
 }
 
-/** De rij-vorm van één item, zoals hij in krant_editie_items landt. */
-export function itemNaarRij(item: EditieItem, editieId: string, userId: string, positie: number) {
+/**
+ * De rij-vorm van één item, zoals hij in krant_editie_items landt. `tijdlijn`
+ * is de gedenormaliseerde bron van de editie: hij draagt de partiële unieke
+ * index lezer + artikel (migratie 20261004120000) — een artikel staat
+ * hoogstens één keer in iemands tijdlijn.
+ */
+export function itemNaarRij(item: EditieItem, editieId: string, userId: string, positie: number, tijdlijn = false) {
   return {
     editie_id: editieId,
     user_id: userId,
     article_id: item.artikelId,
+    tijdlijn,
     positie,
     vorm: item.vorm,
     score: item.score,
@@ -92,7 +99,7 @@ export async function schrijfEditie(service: SupabaseClient, invoer: SchrijfEdit
 
   if (uitkomst.items.length === 0) return { id: editieId, items: 0 }
 
-  const rijen = uitkomst.items.map((item, i) => itemNaarRij(item, editieId, userId, i))
+  const rijen = uitkomst.items.map((item, i) => itemNaarRij(item, editieId, userId, i, bron === 'tijdlijn'))
   const { error: itemsFout } = await service.from('krant_editie_items').insert(rijen)
   if (itemsFout) {
     // Compensatie: geen editie zonder haar regels. Faalt ook die, dan staat er

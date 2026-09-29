@@ -1,7 +1,7 @@
 // ── Nep-Supabase-client voor de fase-2-tests van de Krant ────────────────────
 //
 // Een in-memory tabelset die de query-keten van supabase-js nabootst (select /
-// insert / upsert / update / delete + eq / is / in / gt / gte / lt / or /
+// insert / upsert / update / delete + eq / neq / is / not-is / in / gt / gte / lt / or /
 // order / limit / maybeSingle / single) en élke query vastlegt. Twee dingen
 // maken 'm nuttig als bewijs, niet alleen als stub:
 //
@@ -72,6 +72,16 @@ export function maakNepClient(tabellen: Record<string, NepRij[]>, opties: NepOpt
         case 'eq':
           out = out.filter((r) => r[col] === v)
           break
+        case 'neq':
+          out = out.filter((r) => r[col] !== v)
+          break
+        case 'not': {
+          // Alleen de vorm die de Krant gebruikt: .not(col, 'is', null).
+          const [, op, w] = s.args as [string, string, unknown]
+          if (op !== 'is') throw new Error(`nep-client: .not(${col}, ${op}) niet ondersteund`)
+          out = out.filter((r) => (w === null ? r[col] != null : r[col] !== w))
+          break
+        }
         case 'is':
           out = out.filter((r) => (v === null ? r[col] == null : r[col] === v))
           break
@@ -157,7 +167,7 @@ export function maakNepClient(tabellen: Record<string, NepRij[]>, opties: NepOpt
     return { data: null, error: null }
   }
 
-  const chainMethods = ['select', 'insert', 'upsert', 'update', 'delete', 'eq', 'is', 'in', 'gt', 'gte', 'lt', 'or', 'order', 'limit', 'maybeSingle', 'single']
+  const chainMethods = ['select', 'insert', 'upsert', 'update', 'delete', 'eq', 'neq', 'is', 'not', 'in', 'gt', 'gte', 'lt', 'or', 'order', 'limit', 'maybeSingle', 'single']
 
   function maakQuery(table: string) {
     const q: NepQuery = { table, stappen: [] }

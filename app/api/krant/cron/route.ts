@@ -63,6 +63,8 @@ export interface KrantCronSummary {
   edities: number
   leeg: number
   overgeslagen: number
+  /** Lezers met bezwaar tegen de schaduwrun (profiles.krant_schaduw_bezwaar_at): niet gedraaid. */
+  bezwaar: number
   fouten: number
   opgeruimd: number
   kandidaten: number
@@ -112,6 +114,7 @@ export async function GET(request: Request) {
     edities: 0,
     leeg: 0,
     overgeslagen: 0,
+    bezwaar: 0,
     fouten: 0,
     opgeruimd: 0,
     kandidaten: 0,
@@ -127,14 +130,21 @@ export async function GET(request: Request) {
   try {
     const { data: profielen, error: profielenFout } = await service
       .from('profiles')
-      .select('id, is_demo_user, active_modules')
+      .select('id, is_demo_user, active_modules, krant_schaduw_bezwaar_at')
       .eq('onboarding_completed', true)
     if (profielenFout) {
       await recordJobRun(service, { job: 'krant-editie', status: 'error', startedAt, error: profielenFout.message })
       return serverError(profielenFout, 'krant-cron:GET')
     }
 
-    const lezers = (profielen ?? []).filter((p) => resolveActiveModules(p).includes('nieuws'))
+    // Grondslag gerechtvaardigd belang (besluit 28-09-2026, ADR 0183): wie
+    // bezwaar maakte, valt buiten de schaduwrun. Het bezwaar komt uit dezelfde
+    // profiles-lezing als de modules — faalt die, dan draait de run al niet
+    // (fail-closed hierboven). Op profiles, niet op nieuwsprofiel: een reset
+    // wist nieuwsprofiel en zou het bezwaar stil opheffen.
+    const nieuwslezers = (profielen ?? []).filter((p) => resolveActiveModules(p).includes('nieuws'))
+    const lezers = nieuwslezers.filter((p) => p.krant_schaduw_bezwaar_at == null)
+    summary.bezwaar = nieuwslezers.length - lezers.length
     summary.gebruikers = lezers.length
 
     const [{ artikelen, ongeldig }, aowRows] = await Promise.all([laadKandidaten(service, now), getAowLeeftijden(service)])

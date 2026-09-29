@@ -1,6 +1,6 @@
 {
-  "matcherVersie": 3,
-  "sjabloonVersie": 1,
+  "matcherVersie": 4,
+  "sjabloonVersie": 2,
   "profielType": "35-49·koop·partner",
   "items": [
     {
@@ -32,7 +32,7 @@
         "richting": "meer",
         "jaar": "2027"
       },
-      "tekst": "Als dit voorstel doorgaat: vanaf 2027 scheelt dit jou minstens € 267 per jaar meer box 3-heffing, gerekend op € 50.000 tot € 100.000 spaargeld en € 250.000 of meer beleggingen (samen met je fiscale partner).",
+      "tekst": "Als dit voorstel doorgaat: vanaf 2027 is dit voor jou minstens € 267 per jaar meer box 3-heffing, gerekend op € 50.000 tot € 100.000 spaargeld en € 250.000 of meer beleggingen (samen met je fiscale partner).",
       "deadline": null,
       "watMist": [],
       "waarom": [
@@ -219,7 +219,7 @@
         "schuld": "€ 300.000 tot € 450.000",
         "bedrag": "€ 750 tot € 1.125"
       },
-      "tekst": "Elke 0,25 procentpunt hypotheekrente is op jouw restschuld (€ 300.000 tot € 450.000) € 750 tot € 1.125 per jaar, zodra je rente opnieuw wordt vastgezet.",
+      "tekst": "Elke 0,25 procentpunt hypotheekrente is op jouw restschuld (€ 300.000 tot € 450.000) € 750 tot € 1.125 per jaar, vóór eventuele renteaftrek. Wat jouw rente doet, staat hier niet.",
       "deadline": null,
       "watMist": [],
       "waarom": [
@@ -239,10 +239,10 @@
       "score": 4,
       "mechanisme": "toeslag-regel",
       "impact": null,
-      "sjabloonId": "relevant",
+      "sjabloonId": "raakt-doelgroep",
       "variant": 0,
       "slots": {},
-      "tekst": "Dit raakt jouw situatie; een bedrag valt er nu niet aan te hangen.",
+      "tekst": "Dat geldt ook voor jou. Wat het in euro’s doet, rekent de Krant hier niet uit.",
       "deadline": {
         "datum": "2026-10-31",
         "soort": "aanvraag",
@@ -268,10 +268,10 @@
       "score": 3,
       "mechanisme": "box3-parameter",
       "impact": null,
-      "sjabloonId": "relevant",
+      "sjabloonId": "raakt-doelgroep",
       "variant": 0,
       "slots": {},
-      "tekst": "Dit raakt jouw situatie; een bedrag valt er nu niet aan te hangen.",
+      "tekst": "Dat geldt ook voor jou. Wat het in euro’s doet, rekent de Krant hier niet uit.",
       "deadline": null,
       "watMist": [],
       "waarom": [
