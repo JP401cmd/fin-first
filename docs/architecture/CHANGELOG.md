@@ -1267,3 +1267,7 @@
 - **API-routes** toegevoegd: /api/admin/users/product, /api/modules
 - **Integraties** verwijderd: OpenRouter
 - **Componenten (aantal)** toegevoegd: +13
+
+## 2026-09-29
+
+- Geen wijzigingen.
