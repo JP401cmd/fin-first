@@ -52,6 +52,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-09-29',
   },
   {
+    id: 'krant-v1-zonder-rate-limit-tot-fase-2',
+    title: 'De native API v1 heeft nog geen rate-limit per gebruiker, en het /otp-pad is nog niet gezien in de logs',
+    detail:
+      'ADR 0187 (Krant 3A fase 1) opent `/api/v1/krant/config|profiel|feedback` met Bearer-JWT-auth i.p.v. cookies. De authenticatie- en modulepoort staan (vereisBearer: getClaims/getUser, module `nieuws`, `blocked_at`, fail-closed zonder profielrij) en RLS blijft de beveiligingsgrens — maar rate-limit is nog GEEN code, op beide niveaus (besluit eigenaar, ADR 0187 besluit 11): fase 1 een Vercel-firewallregel per IP op `/api/v1/*` (change-request, staat als ☐-rij in docs/beheerders-runbook.md, nog niet aangevinkt), fase 2 een atomaire RPC per gebruiker op `auth.uid()` (patroon ADR 0076, nog niet gebouwd). Tot de firewallregel staat is elke v1-route — vooral `POST feedback`, die geen eigen teller heeft — onbegrensd aanroepbaar door wie een geldig token heeft; een lek van of brute-force op een token wordt niet afgeremd. Los daarvan: de e-mailcode-aanmelding (`/otp`, 10 minuten/6 cijfers, `supabase/config.toml` al aangepast) draait via dezelfde allowlist-hook als het web (`hook_restrict_signup_by_allowlist`), maar `/otp` zelf is nog niet in de auth_logs gezien (alleen `/signup` en `/callback`) — de eigenaar-smoke met een onbekend e-mailadres (verwacht: geweigerd, geen gebruiker) staat nog open. Verwijder dit punt zodra de Vercel-firewallregel staat aangevinkt in het runbook, de per-gebruiker-RPC van fase 2 gebouwd is, en de `/otp`-smoke is gedaan.',
+    severity: 'risk',
+    elementIds: ['as-nieuws', 't-platform', 't-supabase'],
+    reviewedAt: '2026-09-29',
+  },
+  {
     id: 'krant-tijdlijn-beta-dicht-tot-poorten',
     title: 'De tijdlijn-bèta van de Krant heeft nu een scherm, maar staat nog alleen voor superadmins open — drie poorten vóór de vlag open mag',
     detail:

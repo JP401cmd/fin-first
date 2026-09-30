@@ -772,6 +772,72 @@ const criteria: AcceptanceCriterion[] = [
         'lib/krant/matcher.ts#matchEditie (v7: raaktTekst + gespreid + uitgeverVan, #BRON_MAX_PER_BLOK) — echte, pure productiefunctie op de gedeelde fixture lib/krant/editie.fixture.ts, geen mirror — zie will-checks.ts',
     },
   },
+  // ── Krant 3A fase 1: de native API v1 met Bearer (ADR 0187; hernummerd van 40–43 bij de merge van 30-09-2026) ──
+  {
+    workflow: 'WF-WILL-46',
+    scenarioId: 'UAT-WILL-46',
+    titel: 'De native Krant-API (v1) weigert zonder token en bij een niet-leesbare JWT',
+    kriticiteit: 'KERN',
+    given:
+      'Een verzoek naar `/api/v1/krant/config` zonder `Authorization`-header; apart hetzelfde verzoek met een `Authorization: Bearer <token>` die geen leesbare JWT is (header of payload geen JSON-object, of een `alg` buiten ES256/RS256/HS256 — bv. `alg: none`).',
+    when:
+      'De proxy-tak `v1Poort` (lib/supabase/proxy.ts, ADR 0187) draait vóór elke `/api/v1/*`-handler en toetst alleen de vorm; een Bearer-header die er geldig uitziet passeert de proxy en komt bij de handler, die `vereisBearer` aanroept — die leest het token eerst met de pure `leesBearerToken` (lib/supabase/bearer.ts) vóór auth-js het ziet.',
+    then:
+      'Zonder Bearer-header: 401 in de proxy zelf, dezelfde envelope als `unauthorized()`. Mét een niet-leesbare JWT: de proxy laat het verzoek door (hij toetst alleen `bearer <iets>`), maar `leesBearerToken` geeft `null` en de handler antwoordt ook 401 — zonder dat er een `error_logs`-rij bijkomt (dat zou elke onzin-request een logregel geven). Een geldige JWT-vorm (leesbare header/payload, toegestane `alg`) passeert deze voorvalidatie en gaat door naar de echte verificatie (WF-WILL-47).',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'lib/supabase/proxy.ts#v1Poort/isV1Path + lib/supabase/proxy.v1.test.ts + lib/supabase/bearer.ts#leesBearerToken/vereisBearer + lib/supabase/bearer.test.ts + lib/api/respond.ts#unauthorized + docs/adr/0187-api-v1-met-bearer.md — procestoets: v1Poort/leesBearerToken zijn puur en al gedekt door toegewijde unit-tests, maar de volledige keten (proxy → handler → vereisBearer) vraagt een live/gemockte Supabase-client, dus geen aparte engine-mirror hier',
+    },
+  },
+  {
+    workflow: 'WF-WILL-47',
+    scenarioId: 'UAT-WILL-47',
+    titel: 'De native Krant-API weigert een geblokkeerd account of een account zonder module nieuws',
+    kriticiteit: 'KERN',
+    given:
+      'Een geverifieerde Bearer-lezer met `profiles.blocked_at` gezet, of wiens `active_modules` de module `nieuws` niet bevat; apart een geverifieerd token waarvan de `profiles`-rij ontbreekt.',
+    when: '`vereisBearer` (lib/supabase/bearer.ts) leest ná de tokenverificatie de eigen `profiles`-rij (`.eq(id, userId)`, via de Bearer-client — dus own-row RLS) en toetst blokkade + modulepoort.',
+    then:
+      'Geblokkeerd of zonder module `nieuws`: 403. Een ontbrekende profielrij is hier FAIL-CLOSED (403) — anders dan de web-shell, die bij een ontbrekende rij op alle modules terugvalt: een geverifieerd token zonder profiel is een anomalie, geen lezer (ADR 0187 besluit 3). Dit geldt gelijk voor `config`, `profiel` (GET/PUT) en `feedback`, want alle drie roepen dezelfde `vereisBearer` aan — er is geen route zonder deze poort.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'lib/supabase/bearer.ts#vereisBearer + lib/supabase/bearer.test.ts + lib/supabase/bearer.fixture.ts + app/api/v1/krant/config/route.ts + app/api/v1/krant/profiel/route.ts + app/api/v1/krant/feedback/route.ts + app/api/v1/service-role.gate.test.ts — procestoets: fail-closed op een ontbrekende profielrij vraagt een gemockte Supabase-respons, geen pure engine-check',
+    },
+  },
+  {
+    workflow: 'WF-WILL-48',
+    scenarioId: 'UAT-WILL-48',
+    titel: 'PUT profiel op de native API is alleen voor tijdlijnlezers en begrenst de rubriekenlijst',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Een Bearer-lezer wiens `/nieuws` niet de tijdlijn is (`bepaalKrantBron` kiest `ai` of `wacht`) doet `PUT /api/v1/krant/profiel`; apart een tijdlijnlezer die een body met 21 rubrieken stuurt (boven `RUBRIEKEN_MAX=20`), een dubbele rubriek, of een onbekende sleutel (bv. `krant_variant`).',
+    when:
+      'De route roept eerst `krantBronVoor` (lib/krant/tijdlijn-bron.ts) aan voor de extra weigering, en valideert de body daarna met `parseBody` tegen `profielPutBodySchema` (lib/krant/contract.ts — `z.strictObject`, `uniekeLijst` met `.max(RUBRIEKEN_MAX)` op `rubrieken`).',
+    then:
+      'Geen tijdlijnlezer: 403 ("je leest de tijdlijn niet") — `GET profiel` blijft voor iedereen met module `nieuws` open, alleen PUT is dichtgezet. 21 rubrieken, een dubbele waarde of een onbekende sleutel: 400 vóór er iets geschreven wordt. 20 unieke rubrieken zonder onbekende sleutels: 200, en elk meegegeven veld wordt in `herkomst` op `zelf` gezet zodat de weekafleiding het niet meer overschrijft.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'app/api/v1/krant/profiel/route.ts + app/api/v1/krant/profiel/route.test.ts + lib/krant/contract.ts#profielPutBodySchema + lib/krant/profiel.ts#RUBRIEKEN_MAX + lib/krant/tijdlijn-bron.ts#bepaalKrantBron/krantBronVoor + lib/krant/contract.test.ts — procestoets: de schema-grens is pure zod (al gedekt in contract.test.ts), maar de tijdlijnlezer-poort vraagt een live/gemockte `krantBronVoor`, dus als geheel geen aparte engine-mirror hier',
+    },
+  },
+  {
+    workflow: 'WF-WILL-49',
+    scenarioId: 'UAT-WILL-49',
+    titel: 'Het gepubliceerde OpenAPI-contract van de Krant-API blijft in sync met de bron',
+    kriticiteit: 'BELANGRIJK',
+    given: '`lib/krant/contract.ts` wijzigt (een nieuw optioneel veld, een nieuwe operatie, of een gewijzigde grens zoals `RUBRIEKEN_MAX`).',
+    when: '`npm run krant:openapi` (scripts/krant/openapi.mjs) schrijft `docs/api/krant-v1.json` opnieuw uit het contract (OpenAPI 3.1 via `z.toJSONSchema`); `--check` doet hetzelfde zonder te schrijven en geeft een afwijkende exit-code bij drift.',
+    then:
+      'Loopt het gecommitte `docs/api/krant-v1.json` uit de pas met `lib/krant/contract.ts`, dan is `lib/krant/contract-openapi.test.ts` rood én geeft `node scripts/krant/openapi.mjs --check` een non-zero exit — de poort merkt drift dus vóór de app-repo (Krant 3B, B17) een verouderd contract inleest.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'scripts/krant/openapi.mjs + lib/krant/contract-openapi.ts + lib/krant/contract-openapi.test.ts + docs/api/krant-v1.json + lib/krant/contract.ts + docs/adr/0187-api-v1-met-bearer.md — procestoets (build-/CI-verificatie), geen berekende waarde om te mirroren',
+    },
+  },
 ]
 
 export const WILL_ACCEPTANCE: AcceptanceSet = {

@@ -30,6 +30,7 @@
     "check:headings": "node scripts/check-heading-levels.mjs",
     "check:productiecijfers": "node scripts/check-productiecijfers.mjs",
     "check:self-modification": "node scripts/check-self-modification.mjs",
+    "krant:openapi": "node scripts/krant/openapi.mjs",
     "uat:stale": "node scripts/uat/stale-scan.mjs",
     "page-info:check": "node scripts/page-info/check-coverage.mjs",
     "glossary:check": "node scripts/glossary/check-coverage.mjs",

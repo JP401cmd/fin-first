@@ -22,7 +22,11 @@
  * archief/cursor, katerndrempel, bezwaar, AI-keuze wist de tijdlijn, nieuwsstip)
  * + UAT-WILL-40 (matcher v5: oud nieuws telt niet als nieuw)
  * + UAT-WILL-41 t/m 43 (Krant 1E: de AI-laag, de terugval en het quotum)
- * + UAT-WILL-44 (matcher v6: de redactieregels van ADR 0191).
+ * + UAT-WILL-44 (matcher v6: de redactieregels van ADR 0191)
+ * + UAT-WILL-45 (matcher v7: onderwerp = eerste thema, twee per uitgever)
+ * + UAT-WILL-46 t/m 49 (Krant 3A fase 1 — ADR 0187: de native API v1 met Bearer —
+ * de auth-/module-poort, PUT profiel alleen voor tijdlijnlezers + de begrensde
+ * rubriekenlijst, en het OpenAPI-contract in sync; ui-only, dus geen engine-check).
  */
 
 import { describe, it, expect } from 'vitest'
