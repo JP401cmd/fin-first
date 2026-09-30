@@ -23,7 +23,11 @@ vi.mock('@supabase/supabase-js', async (importActual) => ({
 }))
 
 const mockKrantBronVoor = vi.fn()
-vi.mock('@/lib/krant/tijdlijn-bron', () => ({ krantBronVoor: (...a: unknown[]) => mockKrantBronVoor(...a) }))
+vi.mock('@/lib/krant/tijdlijn-bron', async (importActual) => ({
+  // leestTijdlijn blijft de echte definitie: de route gebruikt hem als poort (security-run 0.92.27, G3).
+  leestTijdlijn: (await importActual<typeof import('@/lib/krant/tijdlijn-bron')>()).leestTijdlijn,
+  krantBronVoor: (...a: unknown[]) => mockKrantBronVoor(...a),
+}))
 
 import { GET, PUT } from './route'
 
@@ -105,7 +109,15 @@ describe('toegang', () => {
     expect(nep.queriesOp('nieuwsprofiel')).toHaveLength(0)
   })
 
-  it.each(['ai', 'wacht'] as const)('403 op PUT als de bron %s is (alleen tijdlijnlezers schrijven, security G2)', async (bron) => {
+  // Sinds 1E (ADR 0190) is 'ai' de tijdlijn MÉT de AI-laag: die lezer leest de
+  // tijdlijn en mag zijn profiel schrijven (`leestTijdlijn`, zoals PUT
+  // /api/krant/tijdlijn/gelezen). 'oud' (de uitgefaseerde AI-Krant) en 'wacht' niet.
+  it('PUT mag voor een lezer met de AI-laag (bron ai, sinds 1E)', async () => {
+    mockKrantBronVoor.mockResolvedValue({ bron: 'ai', krantAccount: false, variant: 'ai', inBeta: true, kanAiKiezen: true })
+    expect((await PUT(putReq({ woonplan: 'geen-koopplan' }))).status).toBe(200)
+  })
+
+  it.each(['oud', 'wacht'] as const)('403 op PUT als de bron %s is (alleen tijdlijnlezers schrijven, security G2)', async (bron) => {
     mockKrantBronVoor.mockResolvedValue({ bron, krantAccount: bron === 'wacht', variant: null, inBeta: false, kanAiKiezen: false })
     const res = await PUT(putReq({ woonplan: 'geen-koopplan' }))
     expect(res.status).toBe(403)
@@ -242,10 +254,10 @@ describe('PUT — schrijven', () => {
 
   it('maakt een rij aan als die er nog niet is', async () => {
     nep = maakNepClient({ profiles: [{ id: 'user-a', active_modules: ['nieuws'] }], nieuwsprofiel: [] })
-    const res = await PUT(putReq({ rubrieken: ['wonen'] }))
+    const res = await PUT(putReq({ rubrieken: ['woningmarkt'] }))
     expect(res.status).toBe(200)
     const body = profielResponseSchema.parse(await res.json())
-    expect(body.profiel.rubrieken).toEqual(['wonen'])
+    expect(body.profiel.rubrieken).toEqual(['woningmarkt'])
     expect(body.herkomst).toEqual({ rubrieken: 'zelf' })
   })
 

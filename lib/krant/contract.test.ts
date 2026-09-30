@@ -15,6 +15,7 @@ import {
 } from './contract'
 import { PROFIEL_VELDEN } from './profiel-velden'
 import { RUBRIEKEN_MAX } from './profiel'
+import { NEWS_CATEGORIES } from '../news-item'
 import { TIJDLIJN_PAGINA, WEEK_KEY, rijNaarBericht, type TijdlijnBericht, type TijdlijnPagina, type TijdlijnWeek } from './tijdlijn-lezen'
 
 /**
@@ -98,11 +99,12 @@ describe('profiel', () => {
     expect(PROFIEL_VELDEN).toHaveLength(13)
   })
 
-  it('lijsten zijn begrensd en zonder dubbelen (rubrieken ≤ 20 = de DB-CHECK)', () => {
-    const rubrieken = (n: number) => Array.from({ length: n }, (_, i) => `rubriek-${i}`)
-    expect(profielPutBodySchema.safeParse({ rubrieken: rubrieken(RUBRIEKEN_MAX) }).success).toBe(true)
-    expect(profielPutBodySchema.safeParse({ rubrieken: rubrieken(RUBRIEKEN_MAX + 1) }).success).toBe(false)
-    expect(profielPutBodySchema.safeParse({ rubrieken: ['wonen', 'wonen'] }).success).toBe(false)
+  it('lijsten zijn begrensd en zonder dubbelen; rubrieken alleen uit NEWS_CATEGORIES (security-run 0.92.27, G4)', () => {
+    expect(RUBRIEKEN_MAX).toBeGreaterThanOrEqual(NEWS_CATEGORIES.length)
+    expect(profielPutBodySchema.safeParse({ rubrieken: [...NEWS_CATEGORIES] }).success).toBe(true)
+    expect(profielPutBodySchema.safeParse({ rubrieken: null }).success).toBe(true)
+    expect(profielPutBodySchema.safeParse({ rubrieken: ['wonen'] }).success).toBe(false) // geen rubriek
+    expect(profielPutBodySchema.safeParse({ rubrieken: ['fiscaal', 'fiscaal'] }).success).toBe(false)
     expect(profielPutBodySchema.safeParse({ werk: ['loondienst', 'dga'] }).success).toBe(true)
     expect(profielPutBodySchema.safeParse({ werk: ['dga', 'dga'] }).success).toBe(false)
     expect(profielPutBodySchema.safeParse({ schulden: ['geen', 'geen'] }).success).toBe(false)
@@ -122,6 +124,7 @@ describe('puurheid', () => {
   it.each(['lib/krant/contract.ts', 'lib/krant/contract-openapi.ts'])('%s importeert alleen zod en pure profielmodules', (pad) => {
     const imports = [...readSourceLF(pad).matchAll(/^import .* from '([^']+)'/gm)].map((m) => m[1])
     expect(imports.length).toBeGreaterThan(0)
-    for (const i of imports) expect(['zod', './profiel', './profiel-velden', './contract']).toContain(i)
+    // ../news-item: alleen zod + de rubriekenlijst (G4, security-run 0.92.27).
+    for (const i of imports) expect(['zod', './profiel', './profiel-velden', './contract', '../news-item']).toContain(i)
   })
 })

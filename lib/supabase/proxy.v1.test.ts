@@ -62,6 +62,14 @@ describe('v1Poort', () => {
     expect(await res.json()).toEqual(await forbidden().json())
   })
 
+  // Randgevallen (security-run 0.92.27, G5): "null", leeg en hoofdletters.
+  it.each([['null'], [''], ['HTTPS://EVIL.TEST']])('POST met Origin %j → 403', (waarde) => {
+    const headers = new Headers(BEARER)
+    headers.set('ORIGIN', waarde)
+    const res = v1Poort(new NextRequest('https://x.test/api/v1/krant/feedback', { method: 'POST', headers }))
+    expect(res.status).toBe(403)
+  })
+
   it('een mutatie zonder Origin gaat door', () => {
     const res = v1Poort(req('/api/v1/krant/feedback', BEARER, 'POST'))
     expect(res.headers.get('x-middleware-next')).toBe('1')

@@ -101,6 +101,13 @@ function isGebruiker(sub: unknown, role: unknown, isAnonymous: unknown): sub is 
 
 type Verificatie = { soort: 'gebruiker'; userId: string } | { soort: 'ongeldig' } | { soort: 'onbereikbaar'; error: unknown }
 
+/** De WebCrypto-fouten die een token met een sleutel die er niet bij past oplevert (geen netwerk- of serverfout). */
+const CRYPTO_WEIGERINGEN: ReadonlySet<string> = new Set(['DataError', 'NotSupportedError', 'InvalidAccessError'])
+
+function isCryptoWeigering(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && CRYPTO_WEIGERINGEN.has((err as { name?: unknown }).name as string)
+}
+
 async function verifieer(client: SupabaseClient, jwt: string, muteren: boolean): Promise<Verificatie> {
   if (muteren) {
     const { data, error } = await client.auth.getUser(jwt)
@@ -108,7 +115,17 @@ async function verifieer(client: SupabaseClient, jwt: string, muteren: boolean):
     const user = data?.user
     return user && isGebruiker(user.id, user.role, user.is_anonymous) ? { soort: 'gebruiker', userId: user.id } : { soort: 'ongeldig' }
   }
-  const { data, error } = await client.auth.getClaims(jwt)
+  let uitkomst: Awaited<ReturnType<SupabaseClient['auth']['getClaims']>>
+  try {
+    uitkomst = await client.auth.getClaims(jwt)
+  } catch (err) {
+    // auth-js retourneert de meeste fouten, maar WebCrypto GOOIT bij een
+    // alg/kty-mismatch (een RS256-kop op een EC-sleutel uit de JWKS). Dat is
+    // een onleesbare token: 401 zonder log, geen storing (security 0.92.27, G1).
+    if (isCryptoWeigering(err)) return { soort: 'ongeldig' }
+    throw err
+  }
+  const { data, error } = uitkomst
   if (error) return isAuthRetryableFetchError(error) ? { soort: 'onbereikbaar', error } : { soort: 'ongeldig' }
   const claims = data?.claims
   return claims && isGebruiker(claims.sub, claims.role, claims.is_anonymous)

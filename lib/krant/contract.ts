@@ -21,7 +21,8 @@
 // client of een generator dit bestand zonder Next/Supabase kan laden.
 
 import { z } from 'zod'
-import { nieuwsprofielV1Schema } from './profiel'
+import { RUBRIEKEN_MAX, nieuwsprofielV1Schema } from './profiel'
+import { NEWS_CATEGORIES } from '../news-item'
 import { PROFIEL_VELDEN } from './profiel-velden'
 
 // ── Versies ──────────────────────────────────────────────────────────────────
@@ -78,8 +79,21 @@ export const profielResponseSchema = z.strictObject({
  * `krant_variant`, `afgeleid_at`, `tijdlijn_vernieuwd_at`, `herkomst` of
  * `versie` — die schrijft de lezer nooit (kolomgrant migratie 20261004120000).
  */
+/**
+ * Rubrieken in een PUT: alleen de bestaande rubrieken (NEWS_CATEGORIES), uniek, hoogstens RUBRIEKEN_MAX.
+ * Strenger dan de respons (daar blijft het een tekst): binnen v1 mag een request later alleen ruimer
+ * worden, dus dit kon alleen vóór de publicatie (security-run 0.92.27, G4). Een nieuwe rubriek erbij is additief.
+ */
+const rubriekenPutSchema = z
+  .array(z.enum(NEWS_CATEGORIES))
+  .max(RUBRIEKEN_MAX)
+  .refine((lijst) => new Set(lijst).size === lijst.length, { message: 'Dubbele waarde' })
+  .meta({ uniqueItems: true })
+  .nullable()
+
 export const profielPutBodySchema = nieuwsprofielV1Schema
   .omit({ versie: true })
+  .extend({ rubrieken: rubriekenPutSchema })
   .partial()
   .refine((body) => Object.keys(body).length > 0, { message: 'Geef minstens één profielveld' })
   // De refine is voor JSON Schema onzichtbaar; minProperties zegt hetzelfde in het gepubliceerde contract.
@@ -214,7 +228,7 @@ export const KRANT_V1_OPERATIES: readonly V1Operatie[] = [
     methode: 'put',
     fase: 1,
     samenvatting: 'Zet de meegegeven profielvelden en markeer ze als zelf ingevuld.',
-    extraWeigering: 'je leest de tijdlijn niet (alleen tijdlijnlezers schrijven hun profiel)',
+    extraWeigering: 'je leest de tijdlijn niet, met of zonder AI-laag (alleen tijdlijnlezers schrijven hun profiel)',
     body: profielPutBodySchema,
     response: profielResponseSchema,
   },

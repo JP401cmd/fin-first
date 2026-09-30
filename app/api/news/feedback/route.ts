@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
+import { feedbackBodySchema } from '@/lib/krant/contract'
 
 // ── POST — Feedback op een nieuwsitem ("Minder hierover") ────────────
 //
@@ -15,19 +17,11 @@ export async function POST(request: Request) {
     return unauthorized()
   }
 
-  const body = await request.json().catch(() => null) as {
-    articleId?: string
-    headline?: string
-    category?: string
-    verdict?: string
-  } | null
-
-  if (!body?.articleId || (body.verdict !== 'less' && body.verdict !== 'more')) {
-    return NextResponse.json(
-      { error: 'articleId en verdict ("less" of "more") zijn verplicht' },
-      { status: 400 },
-    )
-  }
+  // Dezelfde strikte body als de native API (`POST /api/v1/krant/feedback`): één
+  // regel voor één tabel, met grenzen op headline en category (security-run 0.92.27, Y2).
+  const parsed = await parseBody(feedbackBodySchema, request)
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
 
   const { error } = await supabase.from('news_feedback').upsert(
     {

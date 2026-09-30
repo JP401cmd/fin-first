@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { forbidden, serverError } from '@/lib/api/respond'
-import { krantBronVoor } from '@/lib/krant/tijdlijn-bron'
+import { krantBronVoor, leestTijdlijn } from '@/lib/krant/tijdlijn-bron'
 import { parseBody } from '@/lib/api/parse-body'
 import { vereisBearer } from '@/lib/supabase/bearer'
 import { profielPutBodySchema } from '@/lib/krant/contract'
@@ -43,8 +43,9 @@ export async function PUT(request: Request) {
     // Schrijven alleen voor wie de tijdlijn leest (security G2, zoals PUT
     // /api/krant/tijdlijn/gelezen): buiten de bèta maakt niemand zo een
     // nieuwsprofiel-rij aan of zet hij 'zelf'-waarden. Inzage (GET) blijft open.
+    // Sinds 1E (ADR 0190) is 'ai' de tijdlijn mét de AI-laag: ook die lezer schrijft (security-run 0.92.27, G3).
     const { bron } = await krantBronVoor(auth.client, auth.userId)
-    if (bron !== 'tijdlijn') return forbidden()
+    if (!leestTijdlijn(bron)) return forbidden()
     const rij = await schrijfEigenProfiel(auth.client, auth.userId, parsed.data)
     return NextResponse.json(rijNaarV1Profiel(rij))
   } catch (err) {

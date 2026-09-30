@@ -175,6 +175,21 @@ describe('verificatie per modus', () => {
     spy.mockRestore()
   })
 
+  // Security-run 0.92.27 (G1): een token met een RS256-kop op een EC-sleutel (kid
+  // uit de publieke JWKS) laat WebCrypto GOOIEN in plaats van een fout te
+  // retourneren. Dat is een onleesbare token (401, geen log), geen storing.
+  it.each(['DataError', 'NotSupportedError', 'InvalidAccessError'])(
+    'een WebCrypto-weigering (%s) uit getClaims → 401 zonder log',
+    async (naam) => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockGetClaims.mockRejectedValue(new DOMException('Invalid JWK kty', naam))
+      const r = await vereisBearer(req({ authorization: `Bearer ${JWT}` }), { muteren: false })
+      expect(!r.ok && r.response.status).toBe(401)
+      expect(spy).not.toHaveBeenCalled()
+      spy.mockRestore()
+    },
+  )
+
   it('een onverwachte throw ná de voorvalidatie → generieke 500', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockGetClaims.mockRejectedValue(new Error('onverwacht intern'))
@@ -238,6 +253,15 @@ describe('Origin op een mutatie', () => {
     const r = await vereisBearer(req({ authorization: `Bearer ${JWT}`, origin: 'https://evil.test' }, 'POST'), { muteren: true })
     expect(!r.ok && r.response.status).toBe(403)
     expect(mockCreateClient).not.toHaveBeenCalled()
+  })
+
+  // Randgevallen (security-run 0.92.27, G5): een browser kan "null" sturen, een
+  // proxy een lege waarde; de headernaam is hoofdletterongevoelig.
+  it.each([['null'], [''], ['HTTPS://EVIL.TEST']])('Origin %j op een mutatie → 403', async (waarde) => {
+    const headers = new Headers({ authorization: `Bearer ${JWT}` })
+    headers.set('ORIGIN', waarde)
+    const r = await vereisBearer(new Request('https://x.test/api/v1/krant/feedback', { method: 'POST', headers }), { muteren: true })
+    expect(!r.ok && r.response.status).toBe(403)
   })
 
   it('bij lezen is Origin geen reden om te weigeren', async () => {

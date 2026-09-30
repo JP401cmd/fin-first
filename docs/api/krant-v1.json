@@ -826,8 +826,14 @@
                         "type": "array",
                         "items": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 40
+                          "enum": [
+                            "fiscaal",
+                            "rente",
+                            "woningmarkt",
+                            "beleggingen",
+                            "pensioen",
+                            "macro"
+                          ]
                         },
                         "uniqueItems": true
                       },
@@ -1253,7 +1259,7 @@
             }
           },
           "403": {
-            "description": "Geen toegang: module nieuws ontbreekt; account geblokkeerd; het request draagt een Origin-header; je leest de tijdlijn niet (alleen tijdlijnlezers schrijven hun profiel) (code forbidden)",
+            "description": "Geen toegang: module nieuws ontbreekt; account geblokkeerd; het request draagt een Origin-header; je leest de tijdlijn niet, met of zonder AI-laag (alleen tijdlijnlezers schrijven hun profiel) (code forbidden)",
             "content": {
               "application/json": {
                 "schema": {

@@ -22,7 +22,7 @@ const VOL: ProfielPutBody = {
   beleggingen: { band: 'geen', vorm: null },
   schulden: ['studieschuld-tot-15k'],
   pensioenopbouw: { werkgever: 'nee', lijfrente: 'nee' },
-  rubrieken: ['wonen', 'belasting'],
+  rubrieken: ['woningmarkt', 'fiscaal'],
 }
 
 describe('putNaarKolommen', () => {
