@@ -1,10 +1,10 @@
 // De "geen tweede kopie"-toets van de regelkalender.
 //
-// Elke regel draait tegen de ECHTE kalender (REGELKALENDER) én tegen een
-// fixture-kalender, zodat aantoonbaar is dat hij bijt: een lege echte kalender
-// maakt de REGELKALENDER-runs triviaal groen, de fixture-runs bewijzen dat een
-// drift, een dubbele entry, een niet-wijziging en een ontbrekende
-// logvermelding rood worden.
+// Elke regel draait tegen de ECHTE kalender (REGELKALENDER, sinds 30 sep 2026
+// gevuld met het Belastingplan 2027) én tegen een fixture-kalender, zodat
+// aantoonbaar is dat hij bijt: de fixture-runs bewijzen dat een drift, een
+// dubbele entry, een niet-wijziging en een ontbrekende logvermelding rood
+// worden.
 //
 // FIXTURE-WAARDEN: nergens met de hand overgenomen. Box 3/box 1 komen uit
 // DREMPELS op sleutelnaam (direct, NIET via BOX3_/BOX1_PARAM_DREMPEL — zodat
@@ -186,6 +186,10 @@ const FIXTURE_LOG = [
 // ── De echte kalender ────────────────────────────────────────────────────────
 
 describe('REGELKALENDER — de echte kalender', () => {
+  it('is niet leeg (anders zijn de runs hieronder triviaal groen)', () => {
+    expect(REGELKALENDER.length).toBeGreaterThan(0)
+  })
+
   it('is schema-geldig en zonder bezwaren', () => {
     expect(valideerKalender(REGELKALENDER)).toEqual([])
   })

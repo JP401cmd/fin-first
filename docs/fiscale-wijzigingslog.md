@@ -10,6 +10,8 @@ in `docs/adr/`, en dat nummer komt terug in de statuskolom.
 
 | Datum gezien | Bron | Wat verandert | Ingangsdatum | Raakt | Status |
 |---|---|---|---|---|---|
+| 2026-09-30 | Belastingplan 2027 (Prinsjesdag 15 sep 2026), memorie van toelichting, § Parametertabellen, Tabel 1 "Overzicht IB-parameters voor belastingplichtigen jonger dan de AOW-leeftijd" (pdf-blz. 34) — [wetsvoorstel + MvT op rijksfinancien.nl](https://www.rijksfinancien.nl/sites/default/files/bestanden/belastingplan-2027/wetsvoorstel-belastingplan-2027/Wetsvoorstel-Belastingplan-2027.pdf) | Box 1 in 2027 volgens het voorstel: tarief schijf 1 36,23% (was 35,75%), tarief schijf 2 38,16% (was 37,56%), grens schijf 1 € 39.247 (was € 38.883), algemene heffingskorting maximaal € 3.154 (was € 3.115), arbeidskorting maximaal € 5.929 (was € 5.685; in de tabel "bedrag grens 3", in de sleuteltabel 2027 "Arbeidskorting: maximum"). Toptarief 49,50% en grens schijf 2 € 78.426 blijven gelijk. Bedragen geïndexeerd met de voor 48% toegepaste tabelcorrectiefactor (1,01248). | 2027-01-01 | Nog niets in de code: `BOX1_PARAMS` krijgt 2027 pas bij `aangenomen`. Kalender-entry `box1-2027-belastingplan-2027` in `lib/regelkalender.ts` | voorstel |
+| 2026-09-30 | Belastingplan 2027, Fiscale sleuteltabel 2027 (pakket Belastingplan 2027, versie september 2026), Box 3, kolom "Niveau 2027" — [sleuteltabel op rijksfinancien.nl](https://www.rijksfinancien.nl/sites/default/files/bestanden/belastingplan-2027/pakket-belastingplan-2027/Fiscale-sleuteltabel-2027-incl-correctie-tarieven-energiebelasting-zelfstandigenaftrek.pdf) | Box 3 in 2027 volgens het voorstel: heffingsvrij vermogen € 60.098 per persoon (was € 59.357). Tarief 36% blijft gelijk. Het bedrag voor partners en de forfaits 2027 staan niet in de stukken en zijn niet vastgelegd. | 2027-01-01 | Nog niets in de code: `BOX3_PARAMS` krijgt 2027 pas bij `aangenomen`. Kalender-entry `box3-2027-belastingplan-2027` in `lib/regelkalender.ts` | voorstel |
 | 2026-08-27 | Art. 5.3 lid 2 en lid 3 onder b Wet IB 2001 — bestaande wet | De Box 3-indeling week op vier punten van de wet af. Roerende zaken voor eigen gebruik (auto, sieraden, inboedel) vielen door een fall-through in het 6%-beleggingsforfait i.p.v. buiten de grondslag; een pensioenaanspraak zonder de losse `tax_benefit`-vink werd volledig als belegging belast; en een belastingschuld werd afgetrokken terwijl lid 3 onder b dat verbiedt. De schuldendrempel was al correct. | Al van kracht (achterstand, geen nieuwe wetgeving) | `lib/box3-data.ts` (`classifyAsset` als exhaustive switch, `classifyDebt`, `BOX3_UITSLUITING_REDENEN`, `BOX3_CLASSIFICATIE_NOTITIES`), `lib/box3-taxable-input.ts` (`BOX3_ASSET_TYPES` vervallen), `lib/health-score-input.ts` (`buildTaxData`), `lib/asset-data.ts` (`box3_vrijgesteld`), `components/overview/box3-detail.tsx`, migratie `20260827120000_assets_box3_vrijgesteld.sql`, regressiesuite `box3-belasting` | verwerkt · ADR 0108 |
 | 2026-08-26 | Art. 2.10 lid 2 Wet IB 2001 (tariefsaanpassing aftrekbare kosten eigen woning) — bestaande wet, sinds 2014 | De hypotheekrenteaftrek werkte in de motor door tegen het schijftarief waarin hij landde (49,50%) i.p.v. het maximale aftrektarief (37,56% in 2026). De correctie ontbrak volledig; `hypotheekAftrekMaxTarief` stond al in de jaartabel maar had nul rekenconsumenten. | Al van kracht (achterstand, geen nieuwe wetgeving) | `lib/box1-tax.ts` (`computeTariefsaanpassing`, `tariefsaanpassingPct`, `hraAftrekTarief`, velden `tariefsaanpassing` + `eigenwoningBelastingEffect` op `Box1Result`), `lib/hypotheek-vs-beleggen.ts`, `components/overview/belasting/box1-eigen-woning.tsx`, `components/overview/belasting/box1-waterfall.tsx`, UAT WF-BELAST-07 | verwerkt · ADR 0106 |
 
@@ -72,6 +74,19 @@ AOW-stap wordt vijf jaar vooruit vastgesteld, terwijl het toegestane jaarbereik 
 loopt.
 
 Een entry toevoegen is dus altijd twee dingen tegelijk: een rij hier, met dezelfde url of
-hetzelfde kamerstuk, én de entry in de kalender. De kalender is leeg zolang de eigenaar er
-geen entry met bron in zet: waarden voor een komend jaar vult geen agent in (besluit 27 sep
-2026).
+hetzelfde kamerstuk, én de entry in de kalender.
+
+**Wie vult hem (besluit 30 sep 2026, herziet dat van 27 sep).** De kalender is gevuld met het
+Belastingplan 2027, status `voorstel`. Er staan alleen waarden in die letterlijk in een officieel
+stuk op rijksfinancien.nl staan (wetsvoorstel, memorie van toelichting, bijlagen of sleuteltabel,
+Miljoenennota of begroting). Niets afgeleid, niets afgerond, niets uit een nieuwsbericht; bij
+twijfel blijft een waarde leeg. Niet opgenomen voor 2027, met reden:
+
+- **Heffingsvrij vermogen partners en de box 3-forfaits** — staan niet in de stukken.
+- **Eigen risico** — de begroting VWS 2027 schrijft dat het "in 2027 toeneemt naar € 400
+  vanwege de indexatie", maar dat is een raming in de begroting, geen voorstel in het
+  Belastingplan, en 2027 is niet besloten (zie de opmerking bij `ZORG_EIGEN_RISICO` in
+  `lib/constants.ts`). Aan de eigenaar.
+- **DUO-rente** — geen percentage voor 2027 in de stukken; DUO maakt het later bekend.
+- **AOW-leeftijd** — de begroting SZW 2027 noemt 67 jaar en 0 maanden voor 2026 én 2027: geen
+  verschuiving in 2027, en geen onderdeel van het Belastingplan.

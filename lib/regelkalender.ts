@@ -38,9 +38,14 @@
 // tabel, dan gaat de entry in DEZELFDE PR naar `verwerkt` — anders wordt de
 // test rood op `jaar-al-canoniek`.
 //
-// Eigenaarsbesluit 27 sep 2026: een agent vult GEEN waarden voor een komend
-// jaar in. De echte kalender is daarom leeg tot de eigenaar een entry met
-// bron toevoegt; de tests draaien op een fixture-kalender.
+// Eigenaarsbesluit 30 sep 2026 (herziet dat van 27 sep 2026): de kalender
+// wordt gevuld met het Belastingplan 2027, status `voorstel`, en ALLEEN met
+// waarden die letterlijk in een officieel stuk op rijksfinancien.nl staan
+// (wetsvoorstel, memorie van toelichting, bijlagen/sleuteltabel, of de
+// Miljoenennota/begrotingen). Geen afleiding, geen afronding, geen waarde uit
+// een nieuwsartikel of uit eigen kennis; twijfel = weglaten. Wat niet
+// letterlijk in een bron staat, blijft `null`. De tests draaien daarnaast op
+// een fixture-kalender die bewijst dat elke toets bijt.
 //
 // PUUR: geen IO, geen Date.now(). Alleen de logvermelding-toets leest een
 // bestand, en die staat in de test (dit bestand mag client-side meegebundeld
@@ -162,14 +167,70 @@ export type RegelkalenderBron = z.infer<typeof RegelkalenderBronSchema>
 
 // ── De kalender ──────────────────────────────────────────────────────────────
 
+/** Belastingplan 2027 op rijksfinancien.nl (Prinsjesdag 15 sep 2026). */
+const BP2027_WETSVOORSTEL_MVT =
+  'https://www.rijksfinancien.nl/sites/default/files/bestanden/belastingplan-2027/wetsvoorstel-belastingplan-2027/Wetsvoorstel-Belastingplan-2027.pdf'
+const BP2027_SLEUTELTABEL =
+  'https://www.rijksfinancien.nl/sites/default/files/bestanden/belastingplan-2027/pakket-belastingplan-2027/Fiscale-sleuteltabel-2027-incl-correctie-tarieven-energiebelasting-zelfstandigenaftrek.pdf'
+
 /**
- * De echte regelkalender. Bewust LEEG (eigenaarsbesluit 27 sep 2026: geen
- * door een agent ingevulde waarden voor een komend jaar). Een entry komt er
- * pas bij met bron én een rij in docs/fiscale-wijzigingslog.md die dezelfde
- * url of hetzelfde kamerstuk noemt. `lib/regelkalender.test.ts` valideert
- * deze lijst met `valideerKalender` en `bezwarenCanon`.
+ * De echte regelkalender (eigenaarsbesluit 30 sep 2026: Belastingplan 2027,
+ * status `voorstel`, alleen letterlijk uit officiële stukken op
+ * rijksfinancien.nl). Elke entry staat met dezelfde url in
+ * docs/fiscale-wijzigingslog.md; `lib/regelkalender.test.ts` valideert deze
+ * lijst met `valideerKalender`, `bezwarenCanon` en de logvermelding-toets.
+ *
+ * Een param die in de bron gelijk blijft aan 2026 (toptarief 49,50%,
+ * schijfgrens 2 € 78.426, box 3-tarief 36%) staat hier bewust als `null`:
+ * dat is geen wijziging. Wat niet letterlijk in een bron staat (heffingsvrij
+ * vermogen partners, de box 3-forfaits 2027) ook.
  */
-export const REGELKALENDER: readonly RegelkalenderEntry[] = []
+export const REGELKALENDER: readonly RegelkalenderEntry[] = [
+  {
+    // MvT Belastingplan 2027, § Parametertabellen, "Tabel 1: Overzicht
+    // IB-parameters voor belastingplichtigen jonger dan de AOW-leeftijd"
+    // (pdf-blz. 34), kolom 2027. "Arbeidskorting: bedrag grens 3" is het
+    // maximum (kolom 2026 = 5.685 = BOX1_PARAMS[2026]; de sleuteltabel 2027
+    // noemt dezelfde 5.929 "Arbeidskorting: maximum").
+    id: 'box1-2027-belastingplan-2027',
+    mechanisme: 'box1-parameter',
+    jaar: 2027,
+    ingangsdatum: '2027-01-01',
+    status: 'voorstel',
+    bron: { uitgever: 'Rijksoverheid', url: BP2027_WETSVOORSTEL_MVT },
+    gezien: '2026-09-30',
+    params: {
+      jaar: 2027,
+      schijf_1_grens: 39_247,
+      schijf_2_grens: null,
+      schijf_1_tarief_pct: 36.23,
+      schijf_2_tarief_pct: 38.16,
+      schijf_3_tarief_pct: null,
+      algemene_heffingskorting_max: 3_154,
+      arbeidskorting_max: 5_929,
+    },
+  },
+  {
+    // Fiscale sleuteltabel 2027 (pakket Belastingplan 2027, versie september
+    // 2026), Box 3, "Heffingsvrij vermogen", kolom "Niveau 2027".
+    id: 'box3-2027-belastingplan-2027',
+    mechanisme: 'box3-parameter',
+    jaar: 2027,
+    ingangsdatum: '2027-01-01',
+    status: 'voorstel',
+    bron: { uitgever: 'Rijksoverheid', url: BP2027_SLEUTELTABEL },
+    gezien: '2026-09-30',
+    params: {
+      jaar: 2027,
+      heffingsvrij_single: 60_098,
+      heffingsvrij_partner: null,
+      forfait_spaargeld_pct: null,
+      forfait_beleggingen_pct: null,
+      forfait_schulden_pct: null,
+      tarief_pct: null,
+    },
+  },
+]
 
 // ── Bezwaren ─────────────────────────────────────────────────────────────────
 
