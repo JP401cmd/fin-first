@@ -1330,3 +1330,13 @@
 ## 2026-09-30
 
 - **API-routes** toegevoegd: /api/v1/krant/config, /api/v1/krant/feedback, /api/v1/krant/profiel
+
+## 2026-09-30
+
+- **Schermen** toegevoegd: /mijn/nieuwsprofiel, /onboarding/krant
+- **API-routes** toegevoegd: /api/krant/onboarding/klaar, /api/krant/profiel
+- **Componenten (aantal)** toegevoegd: +5
+
+## 2026-09-30
+
+- Geen wijzigingen.

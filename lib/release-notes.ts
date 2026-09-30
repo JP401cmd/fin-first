@@ -97,6 +97,33 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.28',
+    date: '2026-10-01',
+    title: 'Aanmelden voor alleen de Krant staat klaar',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Aanmelden voor alleen de Krant',
+            description:
+              'Je kunt je straks aanmelden voor alleen de Krant en in vijf korte stappen je nieuwsprofiel invullen. Dit staat nog uit voor lezers.',
+          },
+          {
+            title: 'Je nieuwsprofiel zelf aanpassen',
+            description:
+              'Een eigen pagina om je nieuwsprofiel na te lopen en bij te werken, met bij elk veld wat het doet. Ook dit staat nog uit voor lezers.',
+          },
+          {
+            title: 'Het tekstvak voor een financiële toelichting is weg',
+            description: 'Bij de AI-instellingen stond een vrij tekstvak voor een eigen toelichting. Dat vak is verdwenen en we bewaren die tekst niet meer.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.27',
     date: '2026-09-30',
     title: 'De basis voor de Krant als app',

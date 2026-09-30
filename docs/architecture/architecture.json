@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-30T21:27:06.010Z",
+  "generatedAt": "2026-09-30T23:22:19.038Z",
   "generatedDate": "2026-09-30",
   "repo": {
     "name": "fin",
-    "version": "0.92.27"
+    "version": "0.92.28"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -189,13 +189,13 @@
     }
   },
   "stats": {
-    "routes": 137,
-    "routesProduction": 91,
-    "api": 347,
+    "routes": 139,
+    "routesProduction": 93,
+    "api": 349,
     "tables": 105,
-    "migrations": 273,
+    "migrations": 275,
     "integrations": 25,
-    "components": 1287,
+    "components": 1292,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -745,6 +745,12 @@
       "isTest": false
     },
     {
+      "url": "/mijn/nieuwsprofiel",
+      "file": "app/(app)/mijn/nieuwsprofiel/page.tsx",
+      "group": "persoonlijk",
+      "isTest": false
+    },
+    {
       "url": "/mijn/notificaties",
       "file": "app/(app)/mijn/notificaties/page.tsx",
       "group": "persoonlijk",
@@ -783,6 +789,12 @@
     {
       "url": "/onboarding",
       "file": "app/(onboarding)/onboarding/page.tsx",
+      "group": "onboarding",
+      "isTest": false
+    },
+    {
+      "url": "/onboarding/krant",
+      "file": "app/(onboarding)/onboarding/krant/page.tsx",
       "group": "onboarding",
       "isTest": false
     },
@@ -1374,6 +1386,12 @@
         "isTest": false
       },
       {
+        "url": "/mijn/nieuwsprofiel",
+        "file": "app/(app)/mijn/nieuwsprofiel/page.tsx",
+        "group": "persoonlijk",
+        "isTest": false
+      },
+      {
         "url": "/mijn/notificaties",
         "file": "app/(app)/mijn/notificaties/page.tsx",
         "group": "persoonlijk",
@@ -1764,6 +1782,12 @@
       {
         "url": "/onboarding",
         "file": "app/(onboarding)/onboarding/page.tsx",
+        "group": "onboarding",
+        "isTest": false
+      },
+      {
+        "url": "/onboarding/krant",
+        "file": "app/(onboarding)/onboarding/krant/page.tsx",
         "group": "onboarding",
         "isTest": false
       }
@@ -3691,6 +3715,23 @@
       "domain": "krant",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/krant/onboarding/klaar",
+      "file": "app/api/krant/onboarding/klaar/route.ts",
+      "domain": "krant",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/krant/profiel",
+      "file": "app/api/krant/profiel/route.ts",
+      "domain": "krant",
+      "methods": [
+        "GET",
+        "PUT"
       ]
     },
     {
@@ -5781,6 +5822,94 @@
       ]
     },
     {
+      "domain": "krant",
+      "label": "krant",
+      "count": 10,
+      "routes": [
+        {
+          "url": "/api/krant/bezwaar",
+          "file": "app/api/krant/bezwaar/route.ts",
+          "domain": "krant",
+          "methods": [
+            "PUT"
+          ]
+        },
+        {
+          "url": "/api/krant/cron",
+          "file": "app/api/krant/cron/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/onboarding/klaar",
+          "file": "app/api/krant/onboarding/klaar/route.ts",
+          "domain": "krant",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/krant/profiel",
+          "file": "app/api/krant/profiel/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        },
+        {
+          "url": "/api/krant/testeditie",
+          "file": "app/api/krant/testeditie/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/tijdlijn",
+          "file": "app/api/krant/tijdlijn/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/tijdlijn/cron",
+          "file": "app/api/krant/tijdlijn/cron/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/tijdlijn/gelezen",
+          "file": "app/api/krant/tijdlijn/gelezen/route.ts",
+          "domain": "krant",
+          "methods": [
+            "PUT"
+          ]
+        },
+        {
+          "url": "/api/krant/tijdlijn/vernieuwen",
+          "file": "app/api/krant/tijdlijn/vernieuwen/route.ts",
+          "domain": "krant",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/krant/variant",
+          "file": "app/api/krant/variant/route.ts",
+          "domain": "krant",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "ai",
       "label": "AI & Coach",
       "count": 9,
@@ -6025,77 +6154,6 @@
           "domain": "onboarding",
           "methods": [
             "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "krant",
-      "label": "krant",
-      "count": 8,
-      "routes": [
-        {
-          "url": "/api/krant/bezwaar",
-          "file": "app/api/krant/bezwaar/route.ts",
-          "domain": "krant",
-          "methods": [
-            "PUT"
-          ]
-        },
-        {
-          "url": "/api/krant/cron",
-          "file": "app/api/krant/cron/route.ts",
-          "domain": "krant",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/krant/testeditie",
-          "file": "app/api/krant/testeditie/route.ts",
-          "domain": "krant",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/krant/tijdlijn",
-          "file": "app/api/krant/tijdlijn/route.ts",
-          "domain": "krant",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/krant/tijdlijn/cron",
-          "file": "app/api/krant/tijdlijn/cron/route.ts",
-          "domain": "krant",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/krant/tijdlijn/gelezen",
-          "file": "app/api/krant/tijdlijn/gelezen/route.ts",
-          "domain": "krant",
-          "methods": [
-            "PUT"
-          ]
-        },
-        {
-          "url": "/api/krant/tijdlijn/vernieuwen",
-          "file": "app/api/krant/tijdlijn/vernieuwen/route.ts",
-          "domain": "krant",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/krant/variant",
-          "file": "app/api/krant/variant/route.ts",
-          "domain": "krant",
-          "methods": [
-            "PUT"
           ]
         }
       ]
@@ -8987,7 +9045,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 273
+    "migrationCount": 275
   },
   "tablesByDomain": [
     {
@@ -9545,7 +9603,7 @@
     }
   ],
   "components": {
-    "total": 1287,
+    "total": 1292,
     "groups": [
       {
         "group": "app",
@@ -10884,6 +10942,20 @@
         ]
       },
       {
+        "group": "krant",
+        "count": 8,
+        "items": [
+          "krant-meer-artikel",
+          "krant-meer-artikel.test",
+          "krant-onboarding",
+          "krant-onboarding.test",
+          "meer-trifinity-knop",
+          "nieuwsprofiel-scherm",
+          "profiel-body",
+          "profiel-body.test"
+        ]
+      },
+      {
         "group": "command-palette",
         "count": 7,
         "items": [
@@ -10937,15 +11009,6 @@
           "cashflow-section",
           "cashflow-section.test",
           "vaste-kosten-analyse"
-        ]
-      },
-      {
-        "group": "krant",
-        "count": 3,
-        "items": [
-          "krant-meer-artikel",
-          "krant-meer-artikel.test",
-          "meer-trifinity-knop"
         ]
       },
       {
@@ -12102,7 +12165,7 @@
         },
         {
           "name": "profiles",
-          "write": false
+          "write": true
         }
       ],
       "life-events": [
@@ -12174,12 +12237,6 @@
           "name": "app_settings",
           "write": true
         },
-        {
-          "name": "profiles",
-          "write": true
-        }
-      ],
-      "modules": [
         {
           "name": "profiles",
           "write": true
@@ -13064,19 +13121,21 @@
           ]
         },
         {
+          "domain": "krant",
+          "label": "krant",
+          "write": true,
+          "routes": [
+            "/api/krant/cron",
+            "/api/krant/onboarding/klaar",
+            "/api/krant/tijdlijn/cron"
+          ]
+        },
+        {
           "domain": "module-guide",
           "label": "module-guide",
           "write": true,
           "routes": [
             "/api/module-guide/progress"
-          ]
-        },
-        {
-          "domain": "modules",
-          "label": "modules",
-          "write": true,
-          "routes": [
-            "/api/modules"
           ]
         },
         {
@@ -13315,15 +13374,6 @@
           "write": false,
           "routes": [
             "/api/health"
-          ]
-        },
-        {
-          "domain": "krant",
-          "label": "krant",
-          "write": false,
-          "routes": [
-            "/api/krant/cron",
-            "/api/krant/tijdlijn/cron"
           ]
         },
         {
@@ -19437,6 +19487,20 @@
       ],
       "summary": "Aanvulling op ADR 0176 (wat is een artikel) en ADR 0172/0183 (de matcher en de tijdlijn).",
       "file": "docs/adr/0191-de-redactieregels-van-de-krant.md"
+    },
+    {
+      "id": "0192-aanmelden-en-onboarding-voor-de-krant",
+      "title": "Aanmelden en onboarding voor de Krant: de preset in de auth-callback, vijf schermen, één profiel-body",
+      "status": "voorgesteld",
+      "date": "2026-09-30",
+      "elements": [
+        "as-nieuws",
+        "sp-nieuws",
+        "do-krant",
+        "t-supabase"
+      ],
+      "summary": "Vervolg op ADR 0184 (de productkeuze Krant ⇄ Geheel), ADR 0183 (de tijdlijn zonder AI), ADR 0187 (de native API) en ADR 0188 (de weg omhoog). Kaart: Krant 2C.",
+      "file": "docs/adr/0192-aanmelden-en-onboarding-voor-de-krant.md"
     }
   ],
   "churn": {
@@ -19496,8 +19560,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 4185,
-        "commits": 32
+        "loc": 4212,
+        "commits": 33
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -20790,18 +20854,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-30",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/v1/krant/config",
-          "/api/v1/krant/feedback",
-          "/api/v1/krant/profiel"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -21296,10 +21350,10 @@
     },
     {
       "date": "2026-09-30",
-      "api": 347,
-      "components": 1287,
+      "api": 349,
+      "components": 1292,
       "tables": 105,
-      "routesProduction": 91
+      "routesProduction": 93
     }
   ]
 }
