@@ -14,15 +14,11 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import type { SourceArticle } from '@/lib/news-sources'
+import { NEWS_CATEGORIES } from '@/lib/news-item'
 
-export const NEWS_CATEGORIES = [
-  'fiscaal',
-  'rente',
-  'woningmarkt',
-  'beleggingen',
-  'pensioen',
-  'macro',
-] as const
+// Eén rubriekenlijst voor ingest, Krant en de API v1 (security-run 0.92.27):
+// de bron staat in lib/news-item.ts; hier alleen doorgegeven.
+export { NEWS_CATEGORIES }
 
 // ── Schema for link selection on a list page ────────────────────────
 
