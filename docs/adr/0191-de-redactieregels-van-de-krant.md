@@ -88,7 +88,7 @@ voorbehoudzin van een overheidspagina ("Woont u in Caribisch Nederland (Bonaire,
 Saba)?") tellen dus één keer. Woordgrenzen: "Sint Maartensdijk" en "WolBES" zijn geen treffer, en
 "BES" telt alleen als hoofdletterwoord.
 
-Gemeten op productie (30 sep 2026, 243 artikelen): de kopregel vangt alle vier de Caribische
+Nagelopen in de artikelvoorraad van 30 sep 2026 (243 artikelen): de kopregel vangt alle vier de Caribische
 berichten. De aanhefregel vangt er op dit moment geen extra; hij is er voor een bericht met een
 neutrale kop.
 
