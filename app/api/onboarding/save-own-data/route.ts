@@ -9,12 +9,6 @@ import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
 import { HORIZON_SETUP_COMPLETED_SLUG } from '@/lib/horizon-data-loader'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { type ModuleId, type IntentId } from '@/lib/module-registry'
-import { extractFinancialData } from '@/lib/ai/extract-financial-data'
-import { isCloudAllowed } from '@/lib/ai/privacy-gate'
-import { checkTierGate } from '@/lib/require-tier'
-import { checkCreditBudget } from '@/lib/ai/credit-gate'
-import { recordAiUsage } from '@/lib/ai-credits'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { AssetQuickInputSchema, DebtQuickInputSchema } from '@/lib/quick-add/validation'
 import { buildAssetDraft, buildDebtDraft } from '@/lib/quick-add/build-drafts'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
@@ -79,34 +73,13 @@ const GOAL_TO_INTENT_FALLBACK: Record<GoalSlug, IntentId> = {
 // has_holdings_tracking al INLINE op de asset-insert (zie de map() in stap 3),
 // dus een aparte post-insert UPDATE is overbodig.
 
-/**
- * Mag de server-side extractie-tak draaien — de ENIGE plek in deze route waar
- * gebruikerstekst een externe AI-provider bereikt (via `extractFinancialData` →
- * `getModel`)?
- *
- * WAAROM EEN BOOLEAN EN GEEN 403 OP DE ROUTE. Deze route is een
- * onboarding-OPSLAGroute die veel méér doet dan AI: profiel, bezittingen,
- * schulden, life events, doelen. Een tier-gate bovenaan `POST` zou de complete
- * onboarding blokkeren voor iedereen zonder AI-abonnement — dat is geen
- * beveiliging maar een kapotte productflow. De poort hoort dus om de AI-tak
- * heen, precies waar de privé-gate al zat: kan het uitlezen niet, dan slaan we
- * dat over en wordt de rest van de onboarding gewoon opgeslagen. De gebruiker
- * vult zijn bezittingen daarna handmatig aan.
- *
- * De volgorde binnen de poort is de vastgelegde: privé-modus → tier → credit.
- * Privé-modus eerst omdat dat de meest fundamentele keuze van de gebruiker is;
- * de credit-check als laatste omdat een call die de tier-gate toch al tegenhoudt
- * geen budget-lezing verdient.
- */
-async function mayRunServerExtraction(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<boolean> {
-  if (!(await isCloudAllowed(supabase, userId, 'documenten'))) return false
-  if (await checkTierGate(supabase, userId, 'ai')) return false
-  const creditGate = await checkCreditBudget(supabase, userId, 'extraction')
-  return creditGate.allowed
-}
+// De news-only-tak (`isNewsOnly`: vrije tekst → AI-extractie → bezittingen,
+// schulden, life events en `profiles.financial_context`) is VERWIJDERD (Krant
+// 2C, 30 sep 2026). Een Krant-account onboardt via `/onboarding/krant` en
+// schrijft alleen zijn nieuwsprofiel (`PUT /api/krant/profiel`), nooit via deze
+// route. Daarmee bereikt deze route geen AI-leverancier meer — `geen-ai.test.ts`
+// bewaakt dat. Oude clients die `newsDescription`/`extractionData` nog
+// meesturen krijgen geen 400: `z.object` laat onbekende sleutels vallen.
 
 /**
  * Is `debtType` het schuld-type dat bij `assetType` hoort volgens de canonieke
@@ -258,7 +231,6 @@ function buildRpcPayload(
   aowTargetAge: number,
   idempotencyKey: string | undefined,
   horizonData: z.infer<typeof bodySchema>['horizonData'],
-  newsDescription: z.infer<typeof bodySchema>['newsDescription'],
   intent: z.infer<typeof bodySchema>['intent'],
   /** De woning-keuze van de gebruiker (ADR 0133), al opgelost naar een keuze. */
   housingChoice: HousingChoice,
@@ -298,7 +270,6 @@ function buildRpcPayload(
       fire_legacy_amount: horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null,
       fire_end_age: horizonData?.fire_end_age ?? identity.fire_end_age ?? 90,
       temporal_balance: horizonData?.temporal_balance ?? identity.temporal_balance ?? 3,
-      news_description: newsDescription ?? null,
       onboarding_intent: intent ?? null,
       // ── Standaardinstellingen nieuwe gebruiker (Notion "new user standaard
       // instellingen") ────────────────────────────────────────────────────
@@ -429,7 +400,6 @@ const bodySchema = z.object({
       is_active: z.boolean(),
     })).optional(),
   }).optional(),
-  newsDescription: z.string().max(500).optional(),
   /** User-selected intent from the onboarding intent step (legacy field — kept for clients that haven't shipped goal yet) */
   intent: z.enum(['coaching', 'grip_uitgaven', 'overzicht_geld', 'toekomst', 'alles', 'nieuws']).optional(),
   /**
@@ -530,54 +500,6 @@ const bodySchema = z.object({
    * `housingChoiceToConfig` is de enige vertaling naar `housing_strategy_config`.
    */
   housingChoice: z.enum(['sell', 'exclude']).optional(),
-  /**
-   * Pre-extracted data from client-side review (avoids re-running AI extraction).
-   *
-   * DE AFGELEIDE VELDEN ZIJN OPTIONEEL, MAAR ZE TELLEN. Deze tak accepteerde
-   * oorspronkelijk alleen naam/type/bedrag en vulde rendement, rente, aflossing,
-   * liquiditeit en aftrekbaarheid met nullen. Dat kon zolang de client niets
-   * beters had. Het on-device pad (lib/ai/local/local-extraction-resolver.ts)
-   * lévert die velden nu wél — deterministisch uit TypeScript-lookups, niet uit
-   * het model — en ze dan alsnog op nul zetten zou precies de winst weggooien
-   * die het lokale pad oplevert: een hypotheek zonder rente en zonder aflossing
-   * is in elke projectie een schuld die nooit afneemt.
-   *
-   * Blijven optioneel voor oudere clients; ontbreken ze, dan gelden de
-   * historische defaults (zie de mapping verderop in deze route).
-   */
-  extractionData: z.object({
-    assets: z.array(z.object({
-      name: z.string(),
-      asset_type: z.string(),
-      estimated_value: z.number(),
-      expected_return: z.number().optional(),
-      monthly_contribution: z.number().optional(),
-      is_liquid: z.boolean().optional(),
-      subtype: z.string().nullable().optional(),
-    })).optional(),
-    debts: z.array(z.object({
-      name: z.string(),
-      debt_type: z.string(),
-      estimated_balance: z.number(),
-      interest_rate: z.number().optional(),
-      monthly_payment: z.number().optional(),
-      is_tax_deductible: z.boolean().nullable().optional(),
-      subtype: z.string().nullable().optional(),
-    })).optional(),
-    life_events: z.array(z.object({
-      name: z.string(),
-      event_type: z.string(),
-      target_age: z.number().nullable(),
-      one_time_cost: z.number().optional(),
-      monthly_cost_change: z.number().optional(),
-      monthly_income_change: z.number().optional(),
-      duration_months: z.number().optional(),
-      icon: z.string().optional(),
-    })).optional(),
-    monthly_income_estimate: z.number().nullable().optional(),
-    monthly_expenses_estimate: z.number().nullable().optional(),
-    financial_context_remainder: z.string().optional(),
-  }).optional(),
 })
 
 export async function POST(req: Request) {
@@ -603,8 +525,6 @@ export async function POST(req: Request) {
     budgetteringMode,
     idempotencyKey,
     activeModules: rawActiveModules,
-    newsDescription,
-    extractionData,
     pensionData,
     intent: rawIntent,
     selectedGoalSlug: rawSelectedGoalSlug,
@@ -740,151 +660,11 @@ export async function POST(req: Request) {
       // Fallback to NL_AOW_AGE
     }
 
-    // ── News-only: extract structured data from free text ──────────────
-    // When a user selects ONLY the 'nieuws' module, they provide a free-text
-    // description instead of filling in asset/debt/budget forms. We use AI
-    // to extract structured financial data from that description.
-    const isNewsOnly = activeModules?.length === 1 && activeModules[0] === 'nieuws'
-    let extractedAssets: Array<{ name: string; asset_type: string; current_value: number; expected_return: number | null; monthly_contribution: number; is_liquid: boolean; subtype: string | null; source: string }> = []
-    let extractedDebts: Array<{ name: string; debt_type: string; current_balance: number; interest_rate: number; monthly_payment: number; is_tax_deductible: boolean | null; subtype: string | null; source: string }> = []
-    let extractedLifeEvents: Array<{ name: string; event_type: string; target_age: number | null; description?: string; one_time_cost: number; monthly_cost_change: number; monthly_income_change: number; duration_months: number; icon: string }> = []
-    let financialContext: string | null = null
-    let aiIncomeEstimate: number | null = null
-    let aiExpensesEstimate: number | null = null
-
-    if (isNewsOnly && (extractionData || newsDescription)) {
-      if (extractionData) {
-        // Client already ran extraction and user reviewed/edited the results — use directly
-        // De afgeleide velden komen mee wanneer de client ze levert (het lokale
-        // pad vult ze deterministisch — zie lib/ai/local/local-extraction-
-        // defaults.ts). Ontbreken ze, dan gelden de historische defaults van
-        // oudere clients; `??` en niet `||`, zodat een legitieme 0 (rendement
-        // van contant geld) of `false` (niet liquide) niet stilzwijgend wordt
-        // overschreven.
-        //
-        // RENDEMENT: `?? null` en niet `?? 0` (ADR 0166). Een client die het veld
-        // niet meestuurt heeft géén rendement bepaald; dat als 0% wegschrijven is
-        // een verzonnen aanname die daarna niet meer van een bewuste 0 te
-        // onderscheiden is. `null` zegt wat er aan de hand is: geen eigen aanname,
-        // reken met het profielrendement. Het huidige (lokale) extractiepad vult
-        // het veld altijd deterministisch per type — zie
-        // lib/ai/local/local-extraction-defaults.ts — dus dit raakt alleen oudere
-        // clients.
-        extractedAssets = (extractionData.assets ?? []).map((a) => ({
-          name: a.name,
-          asset_type: a.asset_type,
-          current_value: a.estimated_value,
-          expected_return: a.expected_return ?? null,
-          monthly_contribution: a.monthly_contribution ?? 0,
-          is_liquid: a.is_liquid ?? true,
-          subtype: a.subtype ?? null,
-          source: 'ai_extracted' as const,
-        }))
-
-        extractedDebts = (extractionData.debts ?? []).map((d) => ({
-          name: d.name,
-          debt_type: d.debt_type,
-          current_balance: d.estimated_balance,
-          interest_rate: d.interest_rate ?? 0,
-          monthly_payment: d.monthly_payment ?? 0,
-          is_tax_deductible: d.is_tax_deductible ?? null,
-          subtype: d.subtype ?? null,
-          source: 'ai_extracted' as const,
-        }))
-
-        extractedLifeEvents = (extractionData.life_events ?? []).map((e) => ({
-          name: e.name,
-          event_type: e.event_type,
-          target_age: e.target_age,
-          one_time_cost: e.one_time_cost ?? 0,
-          monthly_cost_change: e.monthly_cost_change ?? 0,
-          monthly_income_change: e.monthly_income_change ?? 0,
-          duration_months: e.duration_months ?? 0,
-          icon: e.icon ?? 'Calendar',
-        }))
-
-        financialContext = extractionData.financial_context_remainder || null
-        aiIncomeEstimate = extractionData.monthly_income_estimate ?? null
-        aiExpensesEstimate = extractionData.monthly_expenses_estimate ?? null
-      } else if (newsDescription && (await mayRunServerExtraction(supabase, user.id))) {
-        // Fallback: run extraction server-side (backwards compatibility)
-        //
-        // DRIE POORTEN, ÉÉN VOORWAARDE: privé-modus, AI-abonnement en
-        // creditbudget zitten samen in `mayRunServerExtraction` (zie daar voor
-        // de volgorde en de motivatie). Deze tak is het ENIGE pad in deze route
-        // dat tekst van de gebruiker naar een AI-leverancier stuurt — de
-        // model-call zit niet hier maar in extractFinancialData
-        // (lib/ai/extract-financial-data.ts), en juist daarom miste de statische
-        // scan deze route.
-        //
-        // PRIVÉ-MODUS: staat 'documenten' op lokaal, dan hoort de
-        // onboarding-client het uitlezen zelf on-device te doen en het resultaat
-        // als `extractionData` mee te sturen (de tak hierboven). Deed hij dat
-        // niet, dan slaan we het uitlezen simpelweg over: de rest van de
-        // onboarding wordt gewoon opgeslagen en de gebruiker vult zijn
-        // bezittingen handmatig aan. Bewust GEEN 403 op de hele route — dat zou
-        // de complete onboarding blokkeren om één optionele hulpstap — en
-        // bewust ook geen stille cloud-call.
-        //
-        // Let op de eerlijke grens: de vrije tekst zelf wordt verderop nog wel
-        // als `news_description` op het profiel bewaard. "Lokaal" betekent hier
-        // dus: geen AI-leverancier ziet je tekst — niet: de tekst blijft op je
-        // toestel. Dat verschil hoort ook zo in de UI-tekst te staan.
-        const dob = new Date(identity.date_of_birth)
-        const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-
-        const extraction = await extractFinancialData(supabase, newsDescription, {
-          age,
-          householdType: identity.household_type,
-          monthlyIncome: identity.net_monthly_income,
-          monthlyExpenses: identity.estimated_monthly_expenses,
-        }, { userId: user.id })
-
-        // Verbruik registreren in dezelfde maandbucket die `mayRunServerExtraction`
-        // hierboven leest — anders is deze AI-call ongemeten en telt hij niet mee
-        // voor de volgende gate. `recordAiUsage` gooit nooit: metering mag de
-        // onboarding niet breken.
-        await recordAiUsage(supabase, user.id, 'extraction')
-
-        extractedAssets = extraction.assets.map((a) => ({
-          name: a.name,
-          asset_type: a.asset_type,
-          current_value: a.estimated_value,
-          expected_return: a.expected_return,
-          monthly_contribution: a.monthly_contribution,
-          is_liquid: a.is_liquid,
-          subtype: a.subtype,
-          source: 'ai_extracted' as const,
-        }))
-
-        extractedDebts = extraction.debts.map((d) => ({
-          name: d.name,
-          debt_type: d.debt_type,
-          current_balance: d.estimated_balance,
-          interest_rate: d.interest_rate,
-          monthly_payment: d.monthly_payment,
-          is_tax_deductible: d.is_tax_deductible,
-          subtype: d.subtype,
-          source: 'ai_extracted' as const,
-        }))
-
-        extractedLifeEvents = extraction.life_events
-
-        financialContext = extraction.financial_context_remainder || null
-        aiIncomeEstimate = extraction.monthly_income_estimate ?? null
-        aiExpensesEstimate = extraction.monthly_expenses_estimate ?? null
-      }
-    }
-
     // Derive completed onboarding steps from active modules
     const completedSteps: string[] = ['identity', 'modules']
-    if (isNewsOnly) {
-      completedSteps.push('nieuws_only')
-    } else {
-      if (activeModules?.some((m) => m === 'budgetteren' || m === 'vermogensregistratie')) completedSteps.push('bezittingen')
-      if (activeModules?.includes('budgetteren')) completedSteps.push('budgets')
-      if (activeModules?.includes('toekomstplannen')) completedSteps.push('horizon')
-    }
+    if (activeModules?.some((m) => m === 'budgetteren' || m === 'vermogensregistratie')) completedSteps.push('bezittingen')
+    if (activeModules?.includes('budgetteren')) completedSteps.push('budgets')
+    if (activeModules?.includes('toekomstplannen')) completedSteps.push('horizon')
 
     // ── Strategy: multi-step save (the RPC is DEPRECATED) ──────────────────
     // De atomische RPC `save_onboarding_data` is DEPRECATED en wordt bewust
@@ -896,7 +676,7 @@ export async function POST(req: Request) {
     //      terwijl `budgets` geen `is_parent`-kolom heeft (wel `parent_id`).
     // Het multi-step fallback-pad hieronder is functioneel compleet (profiel,
     // assets, debts, hypotheek-koppeling, AOW/pensioen/eigen life-events,
-    // news-only-inserts, spaardoel, horizon-flag, completion) en is nu het
+    // spaardoel, horizon-flag, completion) en is nu het
     // primaire pad. Een DB-migratie om de RPC te herstellen is bewust vermeden
     // (lagere blast-radius — geen prod-DB-wijziging). `buildRpcPayload` blijft
     // staan als referentie voor de payload-vorm tot de RPC formeel verwijderd
@@ -1002,7 +782,6 @@ export async function POST(req: Request) {
     // kolom, ook bij `null`-waarde). Voor het geval de kolom wél geschreven
     // wordt maar tóch ontbreekt (partial-migration-state) doet de upsert
     // hieronder een retry-pad zonder die kolom.
-    if (newsDescription) profileData.news_description = newsDescription
     if (intent) profileData.onboarding_intent = intent
     if (primaryGoalSlug) profileData.primary_goal_slug = primaryGoalSlug
     if (selectedGoalSlugs.length > 0) profileData.selected_goal_slugs = selectedGoalSlugs
@@ -1025,19 +804,12 @@ export async function POST(req: Request) {
     profileData.completed_onboarding_steps = completedSteps
     // Server-controlled: leeg dashboard na onboarding. Zie buildRpcPayload.
     profileData.widget_prefs = { widgets: [] }
-    // News-only: store financial context and AI-estimated income/expenses
-    if (isNewsOnly) {
-      if (financialContext) profileData.financial_context = financialContext
-      if (aiIncomeEstimate != null) profileData.net_monthly_income = aiIncomeEstimate
-      if (aiExpensesEstimate != null) profileData.estimated_monthly_expenses = aiExpensesEstimate
-    }
 
     // Upsert met schema-cache-miss-recovery: als de DB een optionele
     // metadata-kolom mist (migratie nog niet toegepast), strippen we die
     // kolom en proberen we opnieuw. Voorkomt dat onboarding stilvalt op een
     // partial-migration-state.
     const OPTIONAL_PROFILE_COLUMNS = [
-      'news_description',
       'onboarding_intent',
       'primary_goal_slug',
       'selected_goal_slugs',
@@ -1054,7 +826,6 @@ export async function POST(req: Request) {
       'fire_stop_age',
       'temporal_balance',
       'widget_prefs',
-      'financial_context',
       'income_source',
       'expenses_source',
       'housing_strategy_config',
@@ -1287,76 +1058,6 @@ export async function POST(req: Request) {
           .insert(userEvents)
         if (eventsError) console.error('Life events insert error:', eventsError)
       }
-    }
-
-    // 6c. News-only: insert AI-extracted assets, debts, and life events
-    // These come from the AI extraction above and have source: 'ai_extracted'
-    if (isNewsOnly && extractedAssets.length > 0) {
-      const rows = extractedAssets.map((a, i) => ({
-        user_id: user.id,
-        name: a.name,
-        asset_type: a.asset_type,
-        current_value: a.current_value,
-        purchase_value: a.current_value,
-        // NULL blijft NULL: "geen eigen rendementsaanname" (ADR 0166). Zonder deze
-        // guard zou `null / 100` → 0 worden en daarmee stil een bewuste 0%.
-        //
-        // LET OP — pre-existing SCHAALFOUT, hier BEWUST niet meegefixt omdat het
-        // buiten deze kaart valt: `assets.expected_return` staat in PROCENTEN
-        // (7 = 7%), maar deze insert deelt door 100. Een AI-geëxtraheerde 7%
-        // landt daardoor als 0,07% groei. De `quickAssets`-insert hierboven
-        // schrijft wél op procentschaal, dus de twee insertpaden van dit
-        // eindpunt zijn onderling inconsistent. Aparte kaart.
-        expected_return: a.expected_return == null ? null : a.expected_return / 100, // Convert % to decimal
-
-        monthly_contribution: a.monthly_contribution,
-        is_active: true,
-        is_liquid: a.is_liquid,
-        subtype: a.subtype,
-        sort_order: i,
-        source: 'ai_extracted',
-      }))
-      const { error } = await supabase.from('assets').insert(rows)
-      if (error) console.error('AI-extracted assets insert error:', error)
-    }
-
-    if (isNewsOnly && extractedDebts.length > 0) {
-      const rows = extractedDebts.map((d, i) => ({
-        user_id: user.id,
-        name: d.name,
-        debt_type: d.debt_type,
-        original_amount: d.current_balance,
-        current_balance: d.current_balance,
-        interest_rate: d.interest_rate / 100, // Convert % to decimal
-        monthly_payment: d.monthly_payment,
-        minimum_payment: d.monthly_payment,
-        start_date: new Date().toISOString().split('T')[0],
-        is_active: true,
-        is_tax_deductible: d.is_tax_deductible,
-        subtype: d.subtype,
-        sort_order: i,
-        source: 'ai_extracted',
-      }))
-      const { error } = await supabase.from('debts').insert(rows)
-      if (error) console.error('AI-extracted debts insert error:', error)
-    }
-
-    if (isNewsOnly && extractedLifeEvents.length > 0) {
-      const rows = extractedLifeEvents.map((e, i) => ({
-        user_id: user.id,
-        name: e.name,
-        event_type: e.event_type,
-        target_age: e.target_age,
-        monthly_income_change: e.monthly_income_change,
-        monthly_cost_change: e.monthly_cost_change,
-        one_time_cost: e.one_time_cost,
-        duration_months: e.duration_months,
-        is_active: true,
-        sort_order: i + 1, // 0 is reserved for AOW
-        icon: e.icon || 'Calendar',
-      }))
-      const { error } = await supabase.from('life_events').insert(rows)
-      if (error) console.error('AI-extracted life events insert error:', error)
     }
 
     // 6d. Onboarding-spaardoel (stap v.) — non-blocking insert. Mag falen

@@ -182,18 +182,19 @@ function bron(rel: string): string {
 describe('bronscan — elke AI-route gaat door de centrale poort', () => {
   it('de lijst is niet leeg en bevat de bekende kernroutes', () => {
     expect(AI_ROUTES).toEqual(expect.arrayContaining(['app/api/ai/chat/route.ts', 'app/api/news/route.ts', 'app/api/briefing/refresh/route.ts']))
-    expect(AI_ROUTES.length).toBeGreaterThanOrEqual(25)
+    // 24 sinds Krant 2C (30 sep 2026): save-own-data bereikt geen model meer en
+    // staat niet langer in AI_ROUTE_BINDINGS.
+    expect(AI_ROUTES.length).toBeGreaterThanOrEqual(24)
   })
 
   it.each(AI_ROUTES)("%s roept checkTierGate(…, 'ai') aan en weigert met een 403", (route) => {
     const src = bron(route)
     expect(src, `${route} importeert de poort niet`).toMatch(/from '@\/lib\/require-tier'/)
     expect(src, `${route} roept checkTierGate(…, 'ai') niet aan`).toMatch(/checkTierGate\([^)]*'ai'\)/)
-    // Weigering = de gedeelde 403 (aiSubscriptionRequired) — of, bij de
-    // onboarding-helper die zelf geen response bouwt, een `return false` die
-    // de AI-stap overslaat.
-    const weigert =
-      /aiSubscriptionRequired\(/.test(src) || /if \(await checkTierGate\([^)]*'ai'\)\) return false/.test(src)
+    // Weigering = de gedeelde 403 (aiSubscriptionRequired). De vroegere
+    // uitzondering (een `return false` in de onboarding-helper van
+    // save-own-data) is met die AI-tak verdwenen (Krant 2C).
+    const weigert = /aiSubscriptionRequired\(/.test(src)
     expect(weigert, `${route} vertaalt een weigering niet naar een 403`).toBe(true)
   })
 

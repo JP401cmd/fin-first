@@ -152,9 +152,9 @@ function buildAnkerContextLine(input: {
  * plaats van zes eigen queries die functioneel overlapten. Dat scheelt
  * per chatbericht ~6 PostgREST-calls én garandeert dat Fin exact
  * dezelfde getallen ziet als de gebruiker op /core en /overzicht
- * (single-source-of-truth). Alleen de drie profielvelden die niet in
- * `CorePageData` zitten (temporal_balance, household_type,
- * financial_context) worden nog los opgehaald — RLS scopet naar de
+ * (single-source-of-truth). Alleen de profielvelden die niet in
+ * `CorePageData` zitten (temporal_balance, household_type en de
+ * plan-instellingen) worden nog los opgehaald — RLS scopet naar de
  * eigen rij.
  */
 export async function buildSharedContext(supabase: SupabaseClient): Promise<string> {
@@ -168,7 +168,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
       // `horizonRun.rawContext.profile`. Twee kolommen op een select die er toch al
       // was, dus geen extra round-trip.
       .select(
-        'temporal_balance, household_type, financial_context, housing_strategy_config, fire_no_deficit_loan, deficit_loan_rate',
+        'temporal_balance, household_type, housing_strategy_config, fire_no_deficit_loan, deficit_loan_rate',
       )
       .maybeSingle(),
     // DEZELFDE canonieke FIRE-run die `loadCoreData` al consumeert
@@ -368,10 +368,9 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
       : null,
   ]
 
-  // Add supplementary context from free-text financial description (news-only onboarding)
-  const contextSection = profile?.financial_context
-    ? '\n' + section('AANVULLENDE CONTEXT', profile.financial_context)
-    : ''
-
-  return identitySection + section('FINANCIEEL OVERZICHT', (lines.filter(Boolean) as string[]).join('\n')) + contextSection
+  // De sectie AANVULLENDE CONTEXT (de vrije tekst uit `profiles.financial_context`)
+  // is weg (Krant 2C, 30 sep 2026): de kolom wordt gedropt, de news-only-
+  // onboarding die hem vulde bestaat niet meer, en geteld op 30 sep had 0 van 29
+  // profielen hem gevuld.
+  return identitySection + section('FINANCIEEL OVERZICHT', (lines.filter(Boolean) as string[]).join('\n'))
 }

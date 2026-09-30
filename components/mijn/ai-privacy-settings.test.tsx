@@ -4,10 +4,12 @@ import { AiPrivacySettings, consentStatusLine } from './ai-privacy-settings'
 import { AI_CONSENT_ROUTE } from '@/lib/ai/consent'
 import { AI_CONSENT_SAVE_ERROR } from '@/lib/ai/privacy-facts'
 
-// Component leest ai_enabled + financial_context + de consent-stempel via de
-// supabase-client (eigen-rij prefs). De AI-schakelaar schrijft via
-// POST /api/consent/ai (ADR 0155); de financiële toelichting nog client-direct.
+// Component leest ai_enabled + de consent-stempel via de supabase-client
+// (eigen-rij prefs). De AI-schakelaar schrijft via POST /api/consent/ai
+// (ADR 0155). De financiële toelichting (`profiles.financial_context`) is weg
+// (Krant 2C): het component schrijft niets meer client-direct naar profiles.
 const updateSpy = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }))
+const selectSpy = vi.fn()
 
 // Eén client-object, net als de browser-singleton van `createBrowserClient`:
 // een vers object per aanroep laat het `[supabase]`-effect na elke render
@@ -15,17 +17,19 @@ const updateSpy = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) 
 vi.mock('@/lib/supabase/client', () => {
   const client = {
     from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: vi.fn().mockResolvedValue({
-            data: {
-              ai_enabled: true,
-              financial_context: 'zzp in de IT',
-              ai_consent_at: '2026-09-01T09:00:00.000Z',
-              ai_consent_version: 'ai_cloud_v1',
-            },
-          }),
-        }),
+      select: (cols: string) => ({
+        eq: () => {
+          selectSpy(cols)
+          return {
+            single: vi.fn().mockResolvedValue({
+              data: {
+                ai_enabled: true,
+                ai_consent_at: '2026-09-01T09:00:00.000Z',
+                ai_consent_version: 'ai_cloud_v1',
+              },
+            }),
+          }
+        },
       }),
       update: updateSpy,
     }),
@@ -76,12 +80,16 @@ describe('AiPrivacySettings', () => {
     expect(screen.getByText('Hoe je data wordt verwerkt')).toBeTruthy()
   })
 
-  it('laadt opgeslagen financiële toelichting in de textarea', async () => {
+  it('heeft geen financiële toelichting meer en vraagt financial_context niet op', async () => {
+    selectSpy.mockClear()
     render(<AiPrivacySettings />)
-    await waitFor(() => {
-      const ta = screen.getByPlaceholderText(/zzp'er in de IT/i) as HTMLTextAreaElement
-      expect(ta.value).toBe('zzp in de IT')
-    })
+    await waitFor(() => expect(selectSpy).toHaveBeenCalled())
+    for (const [cols] of selectSpy.mock.calls as [string][]) {
+      expect(cols).not.toMatch(/financial_context/)
+      expect(cols).not.toBe('*')
+    }
+    expect(screen.queryByText(/Financiële toelichting/i)).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 
   it('toont datum en versie van de vastgelegde keuze', async () => {

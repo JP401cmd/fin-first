@@ -6,7 +6,7 @@
  * de katern-layout van /toekomst (Next serialiseert hem volledig in de RSC-payload) en via
  * `RegelSimSnapshot.rawContext.profile` in API-antwoorden. Daarmee reisden onder meer
  * `role`, `weekly_briefing_email`, `onboarding_idempotency_key`, `full_name` en
- * `financial_context` mee naar de browser, terwijl geen enkele lezer ze nodig heeft.
+ * `briefing_snapshot` mee naar de browser, terwijl geen enkele lezer ze nodig heeft.
  * Zelfde gedachte als `ASSET_CLIENT_COLUMNS` in `lib/asset-data.ts`: een expliciete
  * kolomlijst, geen `*`.
  *

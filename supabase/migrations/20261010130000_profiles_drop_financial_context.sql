@@ -1,0 +1,42 @@
+-- Krant 2C — `profiles.financial_context` weg (contract-stap).
+--
+-- ⚠ PAS TOEPASSEN NÁ DE DEPLOY VAN DE CODE DIE DE KOLOM NIET MEER NOEMT. ⚠
+-- Dit is de contract-helft van een expand/contract: eerst gaat de code live die de
+-- kolom niet meer leest of schrijft, dán pas deze drop. Draai je hem eerder, dan
+-- breken de oude lezers die op dat moment nog draaien:
+--   · `lib/ai/context/shared-context.ts` selecteerde de kolom expliciet (Fin-chat en
+--     /api/news) → PostgREST 42703 → de hele gedeelde AI-context faalt;
+--   · `components/mijn/ai-privacy-settings.tsx` selecteerde en schreef hem client-direct
+--     (/mijn/privacy) → het AI-scherm laadt de schakelaar niet meer.
+-- (`save-own-data` en `onboarding/reset` hadden een schema-cache-retry en zouden
+-- overleven, maar de twee hierboven niet.)
+--
+-- WAAROM. De kolom was de vrije "financiële toelichting": gevuld door de news-only-tak
+-- van de onboarding (AI-extractie, `financial_context_remainder`) en bewerkbaar op
+-- /mijn/privacy, gelezen als sectie AANVULLENDE CONTEXT in Fins gedeelde context.
+-- Besluit eigenaar 29-09-2026 (kaart Krant 2C, keuze 3): bij 0 gevulde rijen gaat alles
+-- weg. Geteld op productie 30-09-2026: 0 van 29 profielen hebben hem gevuld
+-- (`financial_context is not null` = 0; ook na btrim = 0). Er gaat dus geen gegeven
+-- verloren. De news-only-tak, de sectie, het veld en de reset-regel zijn in dezelfde
+-- release uit de code gehaald.
+--
+-- AFHANKELIJKHEDEN (gemeten op productie, 30-09-2026): geen view
+-- (information_schema.view_column_usage), geen pg_depend-verwijzing naar de kolom
+-- (views, regels, statistiekobjecten), geen functie (pg_proc.prosrc ilike
+-- '%financial_context%'), geen policy (pg_policies qual/with_check), geen trigger, geen
+-- materialized view, geen index, en profiles zit in geen enkele publicatie
+-- (pg_publication_rel). De drop heeft dus geen CASCADE nodig; zonder CASCADE
+-- faalt hij hard als er tóch iets aan hangt, en dat is de bedoeling.
+--
+-- RLS: een DROP COLUMN opent geen schrijfpad en verandert geen policy
+-- ("Users can manage own profile" blijft own-row). Kolomgrants op de kolom verdwijnen
+-- met de kolom.
+--
+-- Wat blijft: het veld `financial_context_remainder` in het AI-extractieschema
+-- (`lib/ai/extraction-schema.ts`, de prompts, het lokale extractiepad en
+-- /beheer/extractie-test). Het wordt nergens meer opgeslagen; opruimen is prompt-werk
+-- en loopt via een eigen route.
+--
+-- Idempotent: `drop column if exists`.
+
+alter table public.profiles drop column if exists financial_context;

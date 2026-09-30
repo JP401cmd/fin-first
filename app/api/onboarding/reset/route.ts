@@ -119,14 +119,18 @@ export async function POST(request: Request) {
     // proberen ze één voor één en strippen op schema-cache-miss. Reden:
     // zonder deze reset blijven de module-/goal-guide-cards in de briefing
     // de oude afgevinkte/weggeklikte staat tonen na een data-wipe.
+    //
+    // `financial_context` en `news_description` staan hier niet meer (Krant 2C,
+    // 30 sep 2026): de eerste wordt gedropt (migratie 20261010130000), de
+    // tweede heeft op productie nooit bestaan (gemeten tegen
+    // information_schema.columns, 30-09-2026) en kostte bij elke reset een
+    // extra, mislukte update.
     const STAPPENPLAN_RESET_FIELDS: Record<string, unknown> = {
       module_guide_state: {},
       primary_goal_slug: null,
       selected_goal_slugs: null,
       onboarding_intent: null,
       completed_onboarding_steps: null,
-      news_description: null,
-      financial_context: null,
     }
     const stappenplanPayload: Record<string, unknown> = { ...STAPPENPLAN_RESET_FIELDS }
     for (let attempt = 0; attempt < Object.keys(STAPPENPLAN_RESET_FIELDS).length + 1; attempt++) {

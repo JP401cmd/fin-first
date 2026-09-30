@@ -252,11 +252,11 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-MIJN-16',
     scenarioId: 'UAT-MIJN-16',
-    titel: 'AI-instellingen: financiële toelichting en AI aan/uit',
+    titel: 'AI-instellingen: AI aan/uit',
     kriticiteit: 'BELANGRIJK',
     given: 'Ingelogd, /mijn/privacy (AI-privacy-sectie).',
-    when: 'De gebruiker geeft de AI een persoonlijke context/toelichting mee en/of zet de AI-schakelaar aan of uit, en leest de regel onder de schakelaar en de drie transparantieblokken.',
-    then: 'De toelichting wordt opgeslagen en meegegeven aan de AI-context. AI is sinds ADR 0155 een echte opt-in: de schakelaar start UIT en is uitgeschakeld tot de eigen profielvelden geladen zijn (geen flits van "aan"). Omzetten schrijft NIET meer client-direct naar `profiles` maar gaat via `POST /api/consent/ai` (decision granted/withdrawn, source `mijn-privacy`) — elke omkering is dus een gelogde keuze in `consent_events`; de schakelaar neemt de door de server teruggegeven stand over. Onder de schakelaar staat "Keuze vastgelegd op <datum> · versie <versie>", of "Nog geen keuze vastgelegd — de vraag staat open." zonder vastgelegde keuze. Faalt de POST, dan springt de schakelaar terug en verschijnt een foutmelding (role="alert"). Uit = alle cloud-AI-functies uit (geen AI-oproepen meer), consistent app-breed. De blokken "wat wordt gedeeld / gemaskeerd / hoe verwerkt" lezen dezelfde feiten als de onboarding-stap en de keuze-overlay (WF-START-30).',
+    when: 'De gebruiker zet de AI-schakelaar aan of uit en leest de regel onder de schakelaar en de drie transparantieblokken.',
+    then: 'Er is geen veld meer voor een vrije financiële toelichting (sinds 0.92.28 weg, Krant 2C). AI is sinds ADR 0155 een echte opt-in: de schakelaar start UIT en is uitgeschakeld tot de eigen profielvelden geladen zijn (geen flits van "aan"). Omzetten schrijft NIET meer client-direct naar `profiles` maar gaat via `POST /api/consent/ai` (decision granted/withdrawn, source `mijn-privacy`) — elke omkering is dus een gelogde keuze in `consent_events`; de schakelaar neemt de door de server teruggegeven stand over. Onder de schakelaar staat "Keuze vastgelegd op <datum> · versie <versie>", of "Nog geen keuze vastgelegd — de vraag staat open." zonder vastgelegde keuze. Faalt de POST, dan springt de schakelaar terug en verschijnt een foutmelding (role="alert"). Uit = alle cloud-AI-functies uit (geen AI-oproepen meer), consistent app-breed. De blokken "wat wordt gedeeld / gemaskeerd / hoe verwerkt" lezen dezelfde feiten als de onboarding-stap en de keuze-overlay (WF-START-30).',
     assertion: {
       kind: 'ui-only',
       source: 'components/mijn/ai-privacy-settings.tsx (consentStatusLine + toggleAiEnabled → lib/ai/consent-client.ts#postAiConsent) + app/api/consent/ai/route.ts + lib/ai/privacy-facts.ts (AI_SHARED_FACTS/AI_MASKED_FACTS/AI_PROCESSING_FACTS), geen cijfermatige uitkomst',

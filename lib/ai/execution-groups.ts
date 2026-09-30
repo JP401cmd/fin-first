@@ -316,13 +316,9 @@ export const AI_ROUTE_BINDINGS: readonly AiRouteBinding[] = [
     modelCallIn: 'lib/ai/extract-financial-data.ts',
     gated: true,
   },
-  {
-    route: 'app/api/onboarding/save-own-data/route.ts',
-    feature: 'document_extractie',
-    scope: 'documenten',
-    modelCallIn: 'lib/ai/extract-financial-data.ts',
-    gated: true,
-  },
+  // `app/api/onboarding/save-own-data/route.ts` stond hier tot Krant 2C (30 sep
+  // 2026): de news-only-tak riep `extractFinancialData` aan. Die tak is weg; de
+  // route bereikt geen model meer (bewaakt door save-own-data/geen-ai.test.ts).
   {
     route: 'app/api/onboarding/aangifte-extract/route.ts',
     feature: 'aangifte_extractie',

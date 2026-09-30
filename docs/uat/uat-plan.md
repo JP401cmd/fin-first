@@ -379,7 +379,7 @@ VERVALLEN (14 sep 2026, ADR 0144 "De Wat-Als-pagina gaat op in de tijdas"): WF-R
 | WF-MIJN-13 | Inloggegevens beheren: e-mail, wachtwoord, overal uitloggen | Accounttoegang actueel houden en alle sessies kunnen beëindigen. | BELANGRIJK | nee | 4 |
 | WF-MIJN-14 | Account permanent verwijderen (getypte bevestiging) | Onomkeerbaar alle data en het account wissen na exact overtypen van het e-mailadres. | KERN | nee | 3 |
 | WF-MIJN-15 | Privacy- en transparantie-overzicht raadplegen | Per data-categorie zien wat wordt opgeslagen, waar en waarom, met AVG-acties en privacyverklaring. | OVERIG | nee | 2 |
-| WF-MIJN-16 | AI-instellingen: financiële toelichting en AI aan/uit | De AI persoonlijke context meegeven en alle AI-functies kunnen uitschakelen. | BELANGRIJK | nee | 3 |
+| WF-MIJN-16 | AI-instellingen: AI aan/uit | Alle AI-functies kunnen uitschakelen. | BELANGRIJK | nee | 3 |
 | WF-MIJN-17 | Bedragen maskeren (privacy-toggle, app-breed) | Alle saldi in de app verbergen en later weer tonen; voorkeur per apparaat bewaard. | BELANGRIJK | nee | 2 |
 | WF-MIJN-18 | Koppelingen inzien, verbinding testen en handmatig syncen | Crypto-exchanges, wallets en Trading 212 gezond houden: status, test en saldi-verversing per bron. | KERN | ja | 4 |
 | WF-MIJN-19 | Belastingaangifte importeren en import per peildatum verwijderen | Bezittingen/schulden in één keer vanuit de IB-aangifte vullen of een eerdere import volledig opruimen. | KERN | ja | 3 |
@@ -6021,23 +6021,20 @@ Alle workflows zijn gebaseerd op de daadwerkelijke code onder `app/(app)/mijn/**
 
 ---
 
-#### WF-MIJN-16 — AI-instellingen: financiële toelichting en AI aan/uit
-- **Doel:** De gebruiker geeft de AI persoonlijke context mee en kan alle AI-functies uitschakelen.
+#### WF-MIJN-16 — AI-instellingen: AI aan/uit
+- **Doel:** De gebruiker kan alle AI-functies uitschakelen en ziet wat er gedeeld wordt.
 - **Trigger/startpunt:** `/mijn/privacy`, AI-sectie onder het transparantie-overzicht.
-- **Eindresultaat:** Toelichting opgeslagen ("Toelichting opgeslagen"); AI-toggle direct actief (aan: "AI-briefing, chat en gepersonaliseerd nieuws zijn actief." / uit: "…werkt als puur financieel dashboard.").
+- **Eindresultaat:** AI-toggle direct actief (aan: "AI-briefing, chat en gepersonaliseerd nieuws zijn actief." / uit: "…werkt als puur financieel dashboard.").
 - **Stappen:**
-  1. Typ in het tekstvak "Financiële toelichting" een beschrijving (max. 1.000 tekens; teller kleurt amber vanaf 950).
-  2. Klik "Opslaan" (knop is disabled zonder wijziging) en controleer de succesmelding.
-  3. Zet de schakelaar "AI-features inschakelen" om en controleer de statustekst.
-  4. Bekijk de informatieblokken "Wat wordt gedeeld", "Wat wordt gemaskeerd" en "Hoe je data wordt verwerkt".
-- **Schermen/componenten:** `/mijn/privacy` — `components/mijn/ai-privacy-settings.tsx` (profielvelden `ai_enabled`, `financial_context`, optimistische toggle met rollback).
+  1. Zet de schakelaar "AI-features inschakelen" om en controleer de statustekst.
+  2. Bekijk de informatieblokken "Wat wordt gedeeld", "Wat wordt gemaskeerd" en "Hoe je data wordt verwerkt".
+- **Schermen/componenten:** `/mijn/privacy` — `components/mijn/ai-privacy-settings.tsx` (profielveld `ai_enabled` + de consent-stempel, optimistische toggle met rollback via `POST /api/consent/ai`).
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee
 - **Varianten & randgevallen:**
   - Toggle-opslag mislukt → schakelaar rolt terug naar de vorige stand.
-  - Invoer boven 1.000 tekens wordt genegeerd (harde cap).
-  - "Niet-opgeslagen wijzigingen"-hint zolang de tekst afwijkt van de opgeslagen versie.
-- **Cross-module effecten:** AI uit → Will-chat, briefing en gepersonaliseerd nieuws stoppen app-breed; de toelichting voedt de nieuws-personalisatie.
+  - Het vroegere tekstvak "Financiële toelichting" bestaat niet meer (Krant 2C, 30 sep 2026: de kolom wordt gedropt en Fin leest hem niet meer).
+- **Cross-module effecten:** AI uit → Will-chat, briefing en gepersonaliseerd nieuws stoppen app-breed.
 
 ---
 
@@ -11896,16 +11893,15 @@ Drie workflows zijn hier bewust géén volledig scenario maar een verwijsregel, 
 
 ---
 
-#### UAT-MIJN-16 — AI-instellingen: financiële toelichting en AI aan/uit (dekt WF-MIJN-16)
+#### UAT-MIJN-16 — AI-instellingen: AI aan/uit (dekt WF-MIJN-16)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** ingelogd, `/mijn/privacy`, AI-sectie.
 - **a. Happy path:**
-  1. Typ in "Financiële toelichting" een korte beschrijving (bv. "Ik werk fulltime, geen kinderen, spaar voor vervroegd pensioen.") → *verwacht:* tekenteller loopt mee, kleurt amber vanaf 950/1.000 tekens.
-  2. Klik "Opslaan" → *verwacht:* melding "Toelichting opgeslagen" (knop was disabled zonder wijziging).
-  3. Zet de schakelaar "AI-features inschakelen" uit → *verwacht:* statustekst "…werkt als puur financieel dashboard."; zet 'm weer aan → *verwacht:* "AI-briefing, chat en gepersonaliseerd nieuws zijn actief."
-  4. Bekijk de blokken "Wat wordt gedeeld", "Wat wordt gemaskeerd" en "Hoe je data wordt verwerkt".
-  **Eindresultaat:** toelichting bewaard; AI-toggle direct effectief app-breed (Will-chat/briefing/nieuws stoppen bij uit).
-- **c. Randgeval — cap en rollback:** plak tekst van > 1.000 tekens → *verwacht:* invoer boven de 1.000 wordt genegeerd (harde cap, geen foutmelding nodig). Simuleer een netwerkfout tijdens het omzetten van de AI-toggle → *verwacht:* de schakelaar rolt zichtbaar terug naar de vorige stand.
+  1. Controleer dat er geen tekstvak "Financiële toelichting" meer is (weg sinds 0.92.28, Krant 2C).
+  2. Zet de schakelaar "AI-features inschakelen" uit → *verwacht:* statustekst "…werkt als puur financieel dashboard."; zet 'm weer aan → *verwacht:* "AI-briefing, chat en gepersonaliseerd nieuws zijn actief."
+  3. Bekijk de blokken "Wat wordt gedeeld", "Wat wordt gemaskeerd" en "Hoe je data wordt verwerkt".
+  **Eindresultaat:** AI-toggle direct effectief app-breed (Will-chat/briefing/nieuws stoppen bij uit).
+- **c. Randgeval — rollback:** simuleer een netwerkfout tijdens het omzetten van de AI-toggle → *verwacht:* de schakelaar rolt zichtbaar terug naar de vorige stand.
 
 ---
 

@@ -30,8 +30,7 @@ export function consentStatusLine(consentAt: string | null, version: string | nu
 }
 
 /**
- * AiPrivacySettings — AI-toggle, financiële toelichting en de
- * transparantie-blokken (wat wel/niet gedeeld wordt, dataverwerking) plus
+ * AiPrivacySettings — AI-toggle en de transparantie-blokken (wat wel/niet gedeeld wordt, dataverwerking) plus
  * de volledige privacyverklaring. Geëxtraheerd uit de legacy
  * /identity/instellingen-monolith (tab 'privacy' + privacy-modal) naar
  * /mijn/privacy (plan A-2, ontmanteling settings-monolith).
@@ -41,6 +40,9 @@ export function consentStatusLine(consentAt: string | null, version: string | nu
  * omkering is een gelogde keuze. De transparantieblokken lezen dezelfde feiten
  * als de onboarding-stap en de keuze-overlay (`lib/ai/privacy-facts.ts`).
  * Het lezen van de eigen profielvelden blijft client-direct (eigen-rij prefs).
+ *
+ * Het veld "Financiële toelichting" (`profiles.financial_context`) is weg
+ * (Krant 2C, 30 sep 2026): de kolom wordt gedropt en Fin leest hem niet meer.
  */
 export function AiPrivacySettings() {
   const supabase = createClient()
@@ -51,10 +53,6 @@ export function AiPrivacySettings() {
   const [aiError, setAiError] = useState<string | null>(null)
   const [consentAt, setConsentAt] = useState<string | null>(null)
   const [consentVersion, setConsentVersion] = useState<string | null>(null)
-  const [financialContext, setFinancialContext] = useState('')
-  const [financialContextSaved, setFinancialContextSaved] = useState('')
-  const [contextSaving, setContextSaving] = useState(false)
-  const [contextMessage, setContextMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false)
 
   useEffect(() => {
@@ -64,7 +62,7 @@ export function AiPrivacySettings() {
       if (!user) return
       const { data } = await supabase
         .from('profiles')
-        .select('ai_enabled, financial_context, ai_consent_at, ai_consent_version')
+        .select('ai_enabled, ai_consent_at, ai_consent_version')
         .eq('id', user.id)
         .single()
       if (!active || !data) return
@@ -72,10 +70,6 @@ export function AiPrivacySettings() {
       setConsentAt((data.ai_consent_at as string | null) ?? null)
       setConsentVersion((data.ai_consent_version as string | null) ?? null)
       setAiLoaded(true)
-      if (data.financial_context) {
-        setFinancialContext(data.financial_context as string)
-        setFinancialContextSaved(data.financial_context as string)
-      }
     })()
     return () => {
       active = false
@@ -99,82 +93,10 @@ export function AiPrivacySettings() {
     setAiSaving(false)
   }, [])
 
-  const saveFinancialContext = useCallback(async () => {
-    setContextSaving(true)
-    setContextMessage(null)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { error } = await supabase
-        .from('profiles')
-        .update({ financial_context: financialContext || null })
-        .eq('id', user.id)
-      if (error) throw error
-      setFinancialContextSaved(financialContext)
-      setContextMessage({ type: 'success', text: 'Toelichting opgeslagen' })
-      setTimeout(() => setContextMessage(null), 3000)
-    } catch {
-      setContextMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
-    }
-    setContextSaving(false)
-  }, [supabase, financialContext])
-
   return (
     <section className="mx-auto max-w-3xl px-4 sm:px-6 pb-12">
       <section className="border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
         <div className="px-4 sm:px-6 py-6 space-y-6">
-          {/* ── Financiële toelichting ── */}
-          <div className="space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-              Financiële toelichting
-            </p>
-            <p className="text-xs text-[var(--ink-3)] leading-relaxed">
-              Beschrijf je financiële situatie in eigen woorden. Deze tekst wordt gebruikt als extra
-              context voor het personaliseren van je nieuws.
-            </p>
-
-            <div>
-              <textarea
-                value={financialContext}
-                onChange={(e) => {
-                  if (e.target.value.length <= 1000) setFinancialContext(e.target.value)
-                }}
-                placeholder="Bijv. ik ben zzp'er in de IT, spaar maandelijks ~€1.500, heb een hypotheek op mijn appartement en beleg via DeGiro..."
-                rows={5}
-                className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:ring-2 focus:ring-zinc-900/10 resize-y"
-              />
-              <div className="mt-1 flex justify-end">
-                <span
-                  className={`text-xs tabular-nums ${financialContext.length >= 950 ? 'text-amber-600' : 'text-[var(--ink-4)]'}`}
-                >
-                  {financialContext.length} / 1.000
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={saveFinancialContext}
-                disabled={contextSaving || financialContext === financialContextSaved}
-                className="bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-              >
-                {contextSaving ? 'Opslaan...' : 'Opslaan'}
-              </button>
-              {contextMessage && (
-                <span
-                  className={`text-sm ${contextMessage.type === 'success' ? 'text-positive' : 'text-negative'}`}
-                >
-                  {contextMessage.text}
-                </span>
-              )}
-              {financialContext !== financialContextSaved && !contextMessage && (
-                <span className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</span>
-              )}
-            </div>
-          </div>
-
-          <div className="border-t border-dashed border-[var(--border-ed)]" />
-
           {/* AI Toggle */}
           <div className="flex items-center justify-between border border-[var(--border-ed)] p-4">
             <div className="flex-1 pr-4">

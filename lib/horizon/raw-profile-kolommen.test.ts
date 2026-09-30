@@ -23,7 +23,7 @@ const VOLLE_RIJ: Record<string, unknown> = {
   weekly_briefing_email: 'iemand@example.test',
   onboarding_idempotency_key: 'sleutel-123',
   full_name: 'Voor Beeld',
-  financial_context: 'vrije tekst over de situatie',
+  briefing_snapshot: { tekst: 'vrije tekst over de situatie' },
   commercial_tier: 'pro',
   date_of_birth: '1985-06-15',
   net_monthly_income: 4000,
@@ -43,7 +43,7 @@ describe('kiesRawProfileKolommen', () => {
       'weekly_briefing_email',
       'onboarding_idempotency_key',
       'full_name',
-      'financial_context',
+      'briefing_snapshot',
       'commercial_tier',
     ]) {
       expect(uit, verboden).not.toHaveProperty(verboden)
