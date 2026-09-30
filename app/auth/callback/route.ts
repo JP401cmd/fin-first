@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { safeRelativePath } from '@/lib/safe-redirect'
 import { SIGNUP_NOT_INVITED_SENTINEL } from '@/lib/auth-errors'
+import { PRODUCT_PARAM } from '@/lib/krant/aanmelden-pad'
+import { callbackBestemming, productUitParam, zetKrantPresetBijAanmelden } from '@/lib/krant/aanmelden'
 
 /** Herkent de besloten-testfase-sentinel (ADR 0047) case-insensitief. */
 function containsNotInvitedSentinel(value: string | null | undefined): boolean {
@@ -20,12 +22,27 @@ export async function GET(request: Request) {
   const errorDescription = searchParams.get('error_description')
   // safeRelativePath weigert open-redirect-patronen (//evil.com, @evil.com, .evil.com, absolute URLs)
   const next = safeRelativePath(searchParams.get('next'))
+  // Krant-ingang (Krant 2C, ADR 0192): `/signup?product=krant` stuurt
+  // `product=krant` mee. Gevalideerd op de enum; een onbekende waarde telt niet.
+  const product = productUitParam(searchParams.get(PRODUCT_PARAM))
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      // De preset alleen voor een VERS account binnen de tijdlijn-bèta; de id
+      // komt uit de zojuist uitgewisselde sessie, de update loopt via dezelfde
+      // sessie-client (RLS, eigen rij). Mislukt er iets, dan geen preset en de
+      // gewone landing: de aanmelding zelf is geslaagd en mag niet stranden.
+      let presetGezet = false
+      const userId = data?.user?.id
+      if (product === 'krant' && userId) {
+        presetGezet = await zetKrantPresetBijAanmelden(supabase, userId, { aangemaaktOp: data?.user?.email_confirmed_at ?? data?.user?.created_at }).catch((err) => {
+          console.error('[auth-callback] Krant-preset zetten mislukt:', err)
+          return false
+        })
+      }
+      return NextResponse.redirect(`${origin}${callbackBestemming(next, presetGezet)}`)
     }
     // Defensief: een geweigerde niet-uitgenodigde signup kan ook via de
     // code-uitwisseling terugkomen. Herken de sentinel en toon de nette

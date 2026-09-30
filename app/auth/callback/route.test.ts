@@ -16,6 +16,15 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }))
 
+// Krant 2C: de preset-beslissing zelf (vers account, bèta) staat in
+// lib/krant/aanmelden.test.ts tegen een nep-database; hier alleen of de
+// callback hem juist aanroept en de bestemming goed kiest.
+const mockZetKrantPreset = vi.fn()
+vi.mock('@/lib/krant/aanmelden', async (importActual) => ({
+  ...(await importActual<typeof import('@/lib/krant/aanmelden')>()),
+  zetKrantPresetBijAanmelden: (...a: unknown[]) => mockZetKrantPreset(...a),
+}))
+
 import { GET } from './route'
 
 const ORIGIN = 'https://app.trifinity.nl'
@@ -32,6 +41,66 @@ function locationOf(res: Response): string {
 
 beforeEach(() => {
   mockExchangeCodeForSession.mockReset()
+  mockZetKrantPreset.mockReset()
+})
+
+describe('GET /auth/callback — Krant-ingang (Krant 2C, ADR 0192)', () => {
+  const KRANT = '/auth/callback?code=abc&next=%2Fonboarding%2Fkrant&product=krant'
+  // created_at: net aangemaakt (de Krant-preset eist een vers account, security-run 0.92.28).
+  const sessie = { data: { user: { id: 'user-vers', created_at: new Date().toISOString() } }, error: null }
+
+  it('vers account + product=krant → preset op de eigen id, door naar /onboarding/krant', async () => {
+    mockExchangeCodeForSession.mockResolvedValue(sessie)
+    mockZetKrantPreset.mockResolvedValue(true)
+    const res = await GET(requestFor(KRANT))
+    expect(mockZetKrantPreset).toHaveBeenCalledTimes(1)
+    expect(mockZetKrantPreset).toHaveBeenCalledWith(expect.anything(), 'user-vers', { aangemaaktOp: sessie.data.user.created_at })
+    expect(locationOf(res)).toBe(`${ORIGIN}/onboarding/krant`)
+  })
+
+  it('bestaand account (of buiten de bèta): preset geweigerd → niet naar de Krant-onboarding, maar de gewone landing', async () => {
+    mockExchangeCodeForSession.mockResolvedValue(sessie)
+    mockZetKrantPreset.mockResolvedValue(false)
+    const res = await GET(requestFor(KRANT))
+    expect(locationOf(res)).toBe(`${ORIGIN}/dashboard`)
+  })
+
+  it('een fout bij het zetten laat de aanmelding niet stranden: gewone landing', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockExchangeCodeForSession.mockResolvedValue(sessie)
+    mockZetKrantPreset.mockRejectedValue(new Error('db weg'))
+    const res = await GET(requestFor(KRANT))
+    expect(locationOf(res)).toBe(`${ORIGIN}/dashboard`)
+    spy.mockRestore()
+  })
+
+  it.each(['budget', 'KRANT', '', 'geheel'])('onbekend of ander product (%s) → geen Krant-preset', async (product) => {
+    mockExchangeCodeForSession.mockResolvedValue(sessie)
+    const res = await GET(requestFor(`/auth/callback?code=abc&next=%2Foverzicht&product=${encodeURIComponent(product)}`))
+    expect(mockZetKrantPreset).not.toHaveBeenCalled()
+    expect(locationOf(res)).toBe(`${ORIGIN}/overzicht`)
+  })
+
+  it('zonder product blijft alles bij het oude, ook met next=/onboarding/krant (de pagina toetst zelf)', async () => {
+    mockExchangeCodeForSession.mockResolvedValue(sessie)
+    const res = await GET(requestFor('/auth/callback?code=abc&next=%2Foverzicht'))
+    expect(mockZetKrantPreset).not.toHaveBeenCalled()
+    expect(locationOf(res)).toBe(`${ORIGIN}/overzicht`)
+  })
+
+  it('next blijft een veilige relatieve route, ook met product=krant', async () => {
+    mockExchangeCodeForSession.mockResolvedValue(sessie)
+    mockZetKrantPreset.mockResolvedValue(true)
+    const res = await GET(requestFor('/auth/callback?code=abc&next=%2F%2Fevil.com&product=krant'))
+    expect(locationOf(res)).toBe(`${ORIGIN}/dashboard`)
+  })
+
+  it('geen preset zonder een geslaagde code-uitwisseling', async () => {
+    mockExchangeCodeForSession.mockResolvedValue({ data: { user: null }, error: { message: 'invalid flow state, expired' } })
+    const res = await GET(requestFor(KRANT))
+    expect(mockZetKrantPreset).not.toHaveBeenCalled()
+    expect(locationOf(res)).toBe(`${ORIGIN}/login?confirm_error=1`)
+  })
 })
 
 describe('GET /auth/callback — bestaand gedrag (ongewijzigd)', () => {

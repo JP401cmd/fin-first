@@ -1,6 +1,6 @@
 /**
  * Acceptatiecriteria — domein Krant-product: shell en productgrens
- * (WF-KRANT-01..16 / UAT-KRANT-01..16).
+ * (WF-KRANT-01..20 / UAT-KRANT-01..20).
  *
  * Nieuwe zone (29 sep 2026) voor Krant 2B — de productgrens — en Krant 2A
  * fase 2 — de productkeuze `PUT /api/modules` plus de waarde 'nieuws' in
@@ -49,11 +49,19 @@
  * bewust niet — terug naar alleen de Krant loopt uitsluitend via support
  * (WF-KRANT-15), zodat niemand zijn eigen product per ongeluk terugzet.
  *
- * Verdeling: 9 × 'exact' (pure beslisfuncties, zie krant-checks.ts),
+ * KRANT 2C (WF-KRANT-17..20, ADR 0192) — aanmelden, onboarding en profiel-
+ * scherm, achter de gesloten vlag: de preset in de auth-callback (17, exact),
+ * de vijf schermen van de onboarding (18, ui-only), /mijn/nieuwsprofiel (19,
+ * ui-only) en de omleidingen + toegang bij beide vlagstanden (20, exact). Alleen
+ * definities; een live-run van deze vier wacht op een vers testaccount binnen
+ * de bèta.
+ *
+ * Verdeling: 11 × 'exact' (pure beslisfuncties, zie krant-checks.ts),
  * 2 × 'consistency' (de AI-poort over alle AI-routes; de beheer-productkeuze
- * die dezelfde PRODUCT_PRESETS hergebruikt als WF-KRANT-11), 5 × 'ui-only'
+ * die dezelfde PRODUCT_PRESETS hergebruikt als WF-KRANT-11), 7 × 'ui-only'
  * (client-routewacht, Fin-loze shell, /krant/meer zelf, de kaart op
- * /mijn/account, de link i.p.v. knop voor een Geheel-account).
+ * /mijn/account, de link i.p.v. knop voor een Geheel-account, de
+ * Krant-onboarding, /mijn/nieuwsprofiel).
  */
 
 import type { AcceptanceCriterion, AcceptanceSet } from './types'
@@ -319,6 +327,79 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'components/krant/krant-meer-artikel.tsx#KrantMeerArtikel (isKrant ? MeerTriFinityKnop : link naar /overzicht) — bewaakt door components/krant/krant-meer-artikel.test.tsx ("een account met het volledige TriFinity krijgt geen knop")',
+    },
+  },
+  // ── Krant 2C (ADR 0192): aanmelden, onboarding en profielscherm ─────────────
+  {
+    workflow: 'WF-KRANT-17',
+    scenarioId: 'UAT-KRANT-17',
+    titel: 'Aanmelden via de Krant-ingang: de preset alleen voor een vers account binnen de bèta',
+    kriticiteit: 'KERN',
+    given:
+      'Een nieuw adres dat op de uitnodigingslijst staat (de allowlist blijft dicht, K3), op /signup?product=krant; ter vergelijking een bestaand account (onboarding_completed = true) dat dezelfde link gebruikt, en een link met een onbekend product. Zolang TIJDLIJN_BETA_OPEN false is, geldt "binnen de bèta" alleen voor een superadmin.',
+    when:
+      'De gebruiker maakt een account met e-mail (bevestigingslink) of met Google. Beide paden komen terug op /auth/callback?next=/onboarding/krant&product=krant.',
+    then:
+      'De callback valideert `product` op de enum (`productUitParam`: alleen \'krant\' en \'geheel\'). Voor een vers account binnen de bèta zet hij op de eigen rij active_modules = [\'nieuws\'] en home_screen = \'nieuws\' (`PRODUCT_PRESETS.krant`, via hetzelfde schrijfpad als PUT /api/modules; de update draagt `.eq(\'onboarding_completed\', false)`) en stuurt door naar /onboarding/krant. Een bestaand account, een account buiten de bèta of een fout bij het zetten krijgt géén preset en landt gewoon (/dashboard → homescherm, of de gewone onboarding). Een onbekend product telt niet. `ai_enabled` blijft uit en er is geen AI-toestemmingsstap. `next` blijft een veilige relatieve route (safeRelativePath).',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'versBinnenBeta=true; versBuitenBeta=false; bestaandBinnenBeta=false; bestaandBuitenBeta=false; productKrant=krant; productOnbekend=null; bestemmingGezet=/onboarding/krant; bestemmingGeweigerd=/dashboard; bestemmingAnders=/overzicht',
+      source:
+        'lib/krant/aanmelden.ts#krantPresetToegestaan + productUitParam + callbackBestemming (aangeroepen door app/auth/callback/route.ts via zetKrantPresetBijAanmelden) — zie krant-checks.ts; de callback zelf in app/auth/callback/route.test.ts, de schrijfactie in lib/krant/aanmelden.test.ts',
+    },
+  },
+  {
+    workflow: 'WF-KRANT-18',
+    scenarioId: 'UAT-KRANT-18',
+    titel: 'De Krant-onboarding: vijf schermen, elk over te slaan, en daarna de eerste tijdlijn',
+    kriticiteit: 'KERN',
+    given:
+      'Een vers Krant-account binnen de bèta op /onboarding/krant (zonder AI, zonder vrijheidstijd-teller: de Krant rekent alleen in euro\'s, B2).',
+    when:
+      'De gebruiker doorloopt de vijf schermen — wie je bent · inkomen · wonen · geld opzij en schulden · pensioen en rubrieken — vult er een paar in, slaat er een paar over en kiest bij één veld "Weet ik niet"; op het laatste scherm drukt hij "Klaar, naar mijn Krant".',
+    then:
+      '"Verder" stuurt alleen de velden die op dát scherm zijn aangeraakt naar PUT /api/krant/profiel; die krijgen herkomst \'zelf\', ook "weet ik niet" (null). "Sla dit scherm over" stuurt niets en laat die velden ongemoeid. Per veld staat de uitleg keuze · effect · waarom. De hypotheek verschijnt alleen bij een koophuis met hypotheek. "Klaar" roept POST /api/krant/onboarding/klaar aan: onboarding_completed = true, completed_onboarding_steps krijgt \'krant\' (nooit \'identity\'), en de eerste verversing van de tijdlijn start; daarna een harde navigatie naar /nieuws. Er wordt bij aanmelden en onboarding geen enkele AI-route aangeroepen (geen /api/ai, /api/news of /api/onboarding/extract).',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/krant/krant-onboarding.tsx + components/krant/profiel-body.tsx + app/(onboarding)/onboarding/krant/page.tsx — bewaakt door components/krant/krant-onboarding.test.tsx, components/krant/profiel-body.test.tsx, app/api/krant/profiel/route.test.ts, app/api/krant/onboarding/klaar/route.test.ts en de bronscan lib/krant/aanmelden.geen-ai.test.ts; meet op een vers testaccount de doorlooptijd en welke velden worden overgeslagen (poort van kaart 2C)',
+    },
+  },
+  {
+    workflow: 'WF-KRANT-19',
+    scenarioId: 'UAT-KRANT-19',
+    titel: '/mijn/nieuwsprofiel: dezelfde body, opslaan slaat alleen op, "Nu vernieuwen" apart',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Een tijdlijnlezer (Krant-account, of een Geheel-account binnen de bèta) met een ingevuld nieuwsprofiel; bij een Geheel-account zijn enkele velden afgeleid uit de app.',
+    when:
+      'De gebruiker opent /mijn/nieuwsprofiel, wijzigt twee velden, drukt "Opslaan", en daarna "Nu vernieuwen" (twee keer kort na elkaar).',
+    then:
+      'De pagina opent met een h2-aanhef (PageOpening) en een info-knop; de vijf groepen zijn h3-secties met dezelfde velden en uitleg als de onboarding. Een afgeleid veld draagt de regel "Afgeleid uit wat je in de app hebt vastgelegd". "Opslaan" stuurt alleen de twee gewijzigde velden (herkomst \'zelf\') en herberekent niets: de berichten in de tijdlijn blijven een momentopname (U12). "Nu vernieuwen" is uitgeschakeld zolang er ongeslagen wijzigingen zijn en roept daarna POST /api/krant/tijdlijn/vernieuwen aan — de tweede klik binnen tien minuten geeft de melding van de rem (429). Op mobiel toont de TopBar de titel "Nieuwsprofiel".',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'app/(app)/mijn/nieuwsprofiel/page.tsx + components/krant/nieuwsprofiel-scherm.tsx + lib/page-info-content.ts (\'/mijn/nieuwsprofiel\') + lib/nav-config.ts (EXTRA_ROUTE_TITLES) — bewaakt door components/krant/krant-onboarding.test.tsx (<NieuwsprofielScherm>)',
+    },
+  },
+  {
+    workflow: 'WF-KRANT-20',
+    scenarioId: 'UAT-KRANT-20',
+    titel: 'Achter de gesloten vlag: de omleidingen en de toegang van de Krant-onboarding',
+    kriticiteit: 'KERN',
+    given:
+      'TIJDLIJN_BETA_OPEN staat op false. Een Krant-account zonder afgeronde onboarding, als gewone gebruiker en als superadmin; een Geheel-account zonder afgeronde onboarding; en dezelfde gevallen met de vlag open (in de test als argument, de vlag zelf verandert niet).',
+    when:
+      'Het account opent een app-route of /onboarding (de omleiding), of rechtstreeks /onboarding/krant, /mijn/nieuwsprofiel, GET/PUT /api/krant/profiel of POST /api/krant/onboarding/klaar.',
+    then:
+      'Alleen een Krant-account dat de tijdlijn leest (bepaalKrantBron → tijdlijn) gaat van de app-layout en van /onboarding naar /onboarding/krant; alle anderen houden de gewone onboarding — dezelfde toets als de toegang van /onboarding/krant, dus geen lus. Bij een dichte vlag krijgt een gewone gebruiker dus nooit de Krant-onboarding, en voor wie de tijdlijn niet leest geven /mijn/nieuwsprofiel, de profielroute en de klaar-route een 404 (niets gelezen, niets geschreven). Met de vlag open gaat een vers Krant-account wél naar /onboarding/krant, en een Geheel-account nog steeds niet.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'dichtGewoon=geen; dichtSuperadmin=open; openGewoon=open; openAfgerond=afgerond; openGeheel=geen; padSuperadminKrant=/onboarding/krant; padGeheel=/onboarding',
+      source:
+        'lib/krant/aanmelden.ts#krantOnboardingToegangVoor + onboardingPadVoor (aangeroepen door app/(app)/layout.tsx, app/(onboarding)/onboarding/layout.tsx, app/(onboarding)/onboarding/krant/page.tsx en app/api/krant/onboarding/klaar/route.ts; /mijn/nieuwsprofiel en /api/krant/profiel via krantBronVoor → leestTijdlijn) — zie krant-checks.ts',
     },
   },
 ]

@@ -769,6 +769,13 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     grip:
       'Kies per soort melding — budgetwaarschuwingen, partner-transacties, mijlpalen, herinneringen en tips — of en via welk kanaal je ’m ontvangt: in-app of e-mail. Hier zet je ook uit dat Fin uit zichzelf een tip laat zien; vragen om een tip kan dan nog steeds.',
   },
+  // Krant 2C (ADR 0192): het nieuwsprofiel van de Krant.
+  '/mijn/nieuwsprofiel': {
+    insight:
+      'De Krant kiest nieuws op jouw situatie en rekent in euro’s uit wat een bericht voor je betekent. Daarvoor gebruikt hij een paar grove banden, geen precieze bedragen. Wat je zelf invult, gaat voor op wat de app afleidt.',
+    grip:
+      'Kies per veld een band of "weet ik niet" en sla op. Een wijziging geldt vanaf je volgende verversing; wat al in je tijdlijn staat, blijft staan. Wil je het meteen zien, druk dan op "Nu vernieuwen".',
+  },
   '/nieuws': {
     insight:
       'Financieel nieuws wordt pas nuttig als het relevant is voor jouw situatie — artikelen worden daarom gescoord op je profiel en doelen, niet zomaar chronologisch getoond.',

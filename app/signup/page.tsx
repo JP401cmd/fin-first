@@ -6,6 +6,7 @@ import { translateAuthError, isUserAlreadyRegisteredError } from '@/lib/auth-err
 import { checkLeakedPassword } from '@/lib/leaked-password'
 import { LEAKED_PASSWORD_MESSAGE } from '@/lib/password-policy'
 import { GoogleAuthButton } from '@/components/auth/google-auth-button'
+import { KRANT_ONBOARDING_PAD, KRANT_PRODUCT, PRODUCT_PARAM, krantCallbackUrl } from '@/lib/krant/aanmelden-pad'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -19,10 +20,18 @@ export default function SignupPage() {
   // In een effect gelezen (niet tijdens render) om hydration-mismatch te
   // vermijden; OAuth/submit gebeuren pas ná mount, dus de waarde staat er dan.
   const [checkNext, setCheckNext] = useState<string | null>(null)
+  // Krant-ingang (Krant 2C, ADR 0192): `/signup?product=krant` draagt het
+  // product door de aanmaakflow (e-mail én Google) naar de callback, die de
+  // preset alleen voor een vers account binnen de bèta zet. Een lopende
+  // vrijheidscheck gaat voor: die heeft een eigen bestemming.
+  const [krantIngang, setKrantIngang] = useState(false)
   useEffect(() => {
-    const checkToken = new URLSearchParams(window.location.search).get('check')
+    const params = new URLSearchParams(window.location.search)
+    const checkToken = params.get('check')
     if (checkToken) {
       setCheckNext(`/check/activeren?token=${encodeURIComponent(checkToken)}`)
+    } else if (params.get(PRODUCT_PARAM) === KRANT_PRODUCT) {
+      setKrantIngang(true)
     }
   }, [])
 
@@ -55,7 +64,9 @@ export default function SignupPage() {
         options: {
           emailRedirectTo: next
             ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-            : `${window.location.origin}/auth/callback`,
+            : krantIngang
+              ? krantCallbackUrl(window.location.origin)
+              : `${window.location.origin}/auth/callback`,
         },
       })
 
@@ -133,12 +144,27 @@ export default function SignupPage() {
         {/* Philosofie-haak + tijd-tot-waarde: zet de toon ("geld is opgeslagen
             tijd") en geeft een eerlijke verwachting voordat de gebruiker begint.
             Sobere copy, geen uitroeptekens — in lijn met de coach-stem. */}
-        <p className="mb-1 text-center text-sm italic text-zinc-600">
-          Geld levert tijd op &mdash; we vertalen je geld naar jaren vrijheid.
-        </p>
-        <p className="mb-4 text-center text-xs text-zinc-400">
-          Account aanmaken duurt een minuut, je profiel klaar in ~5 minuten.
-        </p>
+        {/* De Krant-ingang belooft alleen wat de Krant doet: nieuws dat jouw
+            situatie raakt, in euro's (B2) — geen vertaling naar vrijheidstijd. */}
+        {krantIngang ? (
+          <>
+            <p className="mb-1 text-center text-sm italic text-zinc-600">
+              De Krant: financieel nieuws dat jouw situatie raakt, met wat het voor jou betekent.
+            </p>
+            <p className="mb-4 text-center text-xs text-zinc-400">
+              Account aanmaken duurt een minuut, je nieuwsprofiel een paar minuten.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="mb-1 text-center text-sm italic text-zinc-600">
+              Geld levert tijd op &mdash; we vertalen je geld naar jaren vrijheid.
+            </p>
+            <p className="mb-4 text-center text-xs text-zinc-400">
+              Account aanmaken duurt een minuut, je profiel klaar in ~5 minuten.
+            </p>
+          </>
+        )}
 
         {/* Consent-zin (besluit 17) — dekt bewust BEIDE aanmaakpaden (e-mail én
             Google). BOVEN beide knoppen geplaatst: de Google-knop is het eerste
@@ -173,7 +199,8 @@ export default function SignupPage() {
         <GoogleAuthButton
           label="Aanmaken met Google"
           loadingLabel="Account aanmaken…"
-          next={checkNext}
+          next={checkNext ?? (krantIngang ? KRANT_ONBOARDING_PAD : null)}
+          product={!checkNext && krantIngang ? KRANT_PRODUCT : null}
         />
 
         <div className="my-5 flex items-center gap-3">

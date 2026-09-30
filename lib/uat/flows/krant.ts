@@ -58,6 +58,12 @@ export const KRANT_FLOW: UatFlow = {
     { id: 'geheel-op-meer', scenarioId: 'UAT-KRANT-16', label: 'WF-KRANT-16 · Geheel-account op /krant/meer: link, geen knop', kind: 'screen', stage: 2, lane: 'product' },
     { id: 'beheer-product', scenarioId: 'UAT-KRANT-15', label: 'WF-KRANT-15 · Beheer zet product om (geen huidige waarde getoond)', kind: 'action', stage: 2, lane: 'product' },
 
+    // ── 0-2 · aanmelden en onboarding (Krant 2C, ADR 0192) ────────────────
+    { id: 'aanmelden', scenarioId: 'UAT-KRANT-17', label: 'WF-KRANT-17 · /signup?product=krant → callback zet de preset (vers + bèta)', kind: 'action', stage: 0, lane: 'aanmelden' },
+    { id: 'poort-onboarding', scenarioId: 'UAT-KRANT-20', label: 'WF-KRANT-20 · Achter de vlag: wie krijgt /onboarding/krant?', kind: 'decision', stage: 1, lane: 'aanmelden' },
+    { id: 'onboarding-krant', scenarioId: 'UAT-KRANT-18', label: 'WF-KRANT-18 · Vijf schermen, elk over te slaan → klaar → eerste tijdlijn', kind: 'screen', stage: 2, lane: 'aanmelden' },
+    { id: 'nieuwsprofiel', scenarioId: 'UAT-KRANT-19', label: 'WF-KRANT-19 · /mijn/nieuwsprofiel: opslaan + "Nu vernieuwen"', kind: 'screen', stage: 3, lane: 'aanmelden' },
+
     // ── 4 · cross-zone ────────────────────────────────────────────────────
     { id: 'x-will', label: 'Fin, berichten & krant · de inhoud van /nieuws (UAT-WILL-15..19)', kind: 'cross', stage: 4, crossZone: 'WILL' },
     { id: 'x-nav', label: 'Navigatie & shell · de volledige navigatie van een Geheel-account (UAT-NAV-01..)', kind: 'cross', stage: 4, crossZone: 'NAV' },
@@ -88,6 +94,11 @@ export const KRANT_FLOW: UatFlow = {
     { from: 'entry', to: 'beheer-product' },
     { from: 'beheer-product', to: 'landing', label: 'zet op krant' },
     { from: 'beheer-product', to: 'regressie', label: 'zet op geheel' },
+    { from: 'aanmelden', to: 'poort-onboarding' },
+    { from: 'poort-onboarding', to: 'onboarding-krant', label: 'Krant-account, tijdlijnlezer', kind: 'branch' },
+    { from: 'poort-onboarding', to: 'x-start', label: 'anders: gewone onboarding', kind: 'cross' },
+    { from: 'onboarding-krant', to: 'landing', label: 'klaar' },
+    { from: 'grensroutes', to: 'nieuwsprofiel' },
     { from: 'grensroutes', to: 'x-will', kind: 'cross' },
     { from: 'regressie', to: 'x-nav', kind: 'cross' },
     { from: 'productkeuze', to: 'x-mijn', kind: 'cross' },

@@ -37,6 +37,28 @@ const EXTRA_BESTANDEN = [
   join(process.cwd(), 'components', 'app', 'beheer', 'krant-meting-panel.tsx'),
 ]
 
+/**
+ * Krant 2C (ADR 0192): de hele map components/krant (profiel-body, de
+ * onboarding, /mijn/nieuwsprofiel, 2D) en de onboarding-route van de Krant.
+ * Recursief, .ts én .tsx, zonder tests — een nieuw bestand valt er vanzelf onder.
+ */
+const EXTRA_MAPPEN = [
+  join(process.cwd(), 'components', 'krant'),
+  join(process.cwd(), 'app', '(onboarding)', 'onboarding', 'krant'),
+  // De tweede host van de profielbody (eindreview 0.92.28).
+  join(process.cwd(), 'app', '(app)', 'mijn', 'nieuwsprofiel'),
+]
+
+function bronbestandenMetTsx(dir: string): string[] {
+  const out: string[] = []
+  for (const naam of readdirSync(dir).sort()) {
+    const pad = join(dir, naam)
+    if (statSync(pad).isDirectory()) out.push(...bronbestandenMetTsx(pad))
+    else if (/\.tsx?$/.test(naam) && !/\.test\.tsx?$/.test(naam)) out.push(pad)
+  }
+  return out
+}
+
 /** Symbolen van de €→tijd-vertaling en de vervallen uitgavenband. */
 const VERBODEN_IDENTIFIERS = [
   'formatWithFreedom',
@@ -101,13 +123,22 @@ function imports(bron: string): Array<{ module: string; symbolen: string[] }> {
 }
 
 describe('euro-only (B2, ADR 0172)', () => {
-  const bestanden = [...bronbestanden(KRANT_DIR), ...EXTRA_BESTANDEN]
+  const bestanden = [...bronbestanden(KRANT_DIR), ...EXTRA_BESTANDEN, ...EXTRA_MAPPEN.flatMap(bronbestandenMetTsx)]
 
   it('vindt de bronbestanden (recursief) én de Krant-oppervlakken erbuiten', () => {
     expect(bestanden.length).toBeGreaterThan(8)
     for (const extra of EXTRA_BESTANDEN) {
       expect(statSync(extra).isFile(), extra).toBe(true)
       expect(bestanden).toContain(extra)
+    }
+    // Krant 2C: de profiel-body, de onboarding en het profielscherm vallen eronder.
+    for (const pad of [
+      ['components', 'krant', 'profiel-body.tsx'],
+      ['components', 'krant', 'krant-onboarding.tsx'],
+      ['components', 'krant', 'nieuwsprofiel-scherm.tsx'],
+      ['app', '(onboarding)', 'onboarding', 'krant', 'page.tsx'],
+    ]) {
+      expect(bestanden).toContain(join(process.cwd(), ...pad))
     }
   })
 

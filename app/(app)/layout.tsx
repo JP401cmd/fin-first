@@ -80,6 +80,7 @@ import { WELCOME_GUIDE_MODULE_KEY, openGuideSteps, summarizeGuide } from '@/lib/
 import { AccountStorageGuard } from '@/components/app/account-storage-guard'
 import { ServerTimingReporter } from '@/components/app/web-vitals-reporter'
 import { startLayoutTimer } from '@/lib/web-vitals/layout-timer'
+import { onboardingPadVoor } from '@/lib/krant/aanmelden'
 import {
   generateAllColorVars,
   topbarColorVars,
@@ -369,7 +370,10 @@ export default async function AppLayout({
   }
 
   if (profile && !profile.onboarding_completed) {
-    redirect('/onboarding')
+    // Krant 2C (ADR 0192): een Krant-account binnen de tijdlijn-bèta krijgt de
+    // Krant-onboarding, al het andere de gewone. Dezelfde toets als de toegang
+    // van /onboarding/krant zelf, dus nooit een lus.
+    redirect(onboardingPadVoor(profile))
   }
 
   const featureAccess = computeFeatureAccess({

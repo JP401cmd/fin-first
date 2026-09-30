@@ -450,6 +450,11 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   // Mijlpalen: idem — alleen in het kaartengrid op /mijn, niet in `navGroups`.
   '/mijn/mijlpalen': 'Mijlpalen',
   '/mijn/lokale-chat': 'Lokale chat',
+  // Krant 2C (ADR 0192): bewust niet in `navGroups` — de pagina bestaat alleen
+  // voor tijdlijnlezers (achter de gesloten bèta-vlag, anders 404), en een
+  // menu-ingang die voor de meeste gebruikers naar een 404 wijst is erger dan
+  // geen ingang. De pagina zet zelf ook <NavStackMeta title="Nieuwsprofiel" />.
+  '/mijn/nieuwsprofiel': 'Nieuwsprofiel',
   // ADR 0096: geen inzendformulier meer maar een verwijspagina naar de
   // meldmodus. De mobiele TopBar valt hierop terug (de pagina zet geen eigen
   // <NavStackMeta>), dus deze titel moet "Melden" zeggen — net als ⌘K en de

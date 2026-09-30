@@ -40,6 +40,8 @@ import { globalNav, menuNav, navSurfaceFor } from '@/lib/nav-config'
 import { filterPagesByModules, getAllPageItems } from '@/lib/command-palette/navigation-index'
 import { buildActionItems, type ActionRunContext } from '@/lib/command-palette/actions'
 import type { PerspectiveOption } from '@/lib/types/perspective'
+import { KRANT_ONBOARDING_PAD } from '@/lib/krant/aanmelden-pad'
+import { callbackBestemming, krantOnboardingToegangVoor, krantPresetToegestaan, onboardingPadVoor, productUitParam } from '@/lib/krant/aanmelden'
 import { KRANT_ACCEPTANCE } from './krant'
 import type { AcceptanceCriterion } from './types'
 
@@ -258,6 +260,34 @@ export const KRANT_ENGINE_CHECKS: KrantEngineCheck[] = [
       return {
         expected,
         actual: `zonderModulesRedirect=${zonderModulesRedirect}; alleZesRedirect=${alleZesRedirect}; subsetRedirect=${subsetRedirect}; subsetIsKrant=${subsetIsKrant}; zonderModulesMenuOngewijzigd=${zonderModulesMenuOngewijzigd}; alleZesGlobalNavOngewijzigd=${alleZesGlobalNavOngewijzigd}; alleZesMijnHref=${alleZesMijnHref}; zonderModulesFin=${shouldMountFin(ZONDER_MODULES)}; alleZesFin=${shouldMountFin(ALL_MODULES)}; subsetFin=${shouldMountFin(SUBSET)}; alleZesBriefing=${receivesBriefing({ active_modules: [...ALL_MODULES] })}; alleZesPerspectiefActies=${alleZesPerspectiefActies}; alleZesHomeschermActie=${alleZesHomeschermActie}`,
+      }
+    },
+  },
+  // ── Krant 2C (ADR 0192) — beide vlagstanden als argument; de vlag zelf verandert niet ──
+  {
+    workflow: 'WF-KRANT-17',
+    scenarioId: 'UAT-KRANT-17',
+    label: 'Aanmelden via de Krant-ingang (krantPresetToegestaan, productUitParam, callbackBestemming)',
+    run: () => {
+      const expected = expectedOf('WF-KRANT-17')
+      const p = (onboardingCompleted: boolean, inBeta: boolean) => krantPresetToegestaan({ onboardingCompleted, inBeta })
+      return {
+        expected,
+        actual: `versBinnenBeta=${p(false, true)}; versBuitenBeta=${p(false, false)}; bestaandBinnenBeta=${p(true, true)}; bestaandBuitenBeta=${p(true, false)}; productKrant=${s(productUitParam('krant'))}; productOnbekend=${s(productUitParam('budget'))}; bestemmingGezet=${callbackBestemming(KRANT_ONBOARDING_PAD, true)}; bestemmingGeweigerd=${callbackBestemming(KRANT_ONBOARDING_PAD, false)}; bestemmingAnders=${callbackBestemming('/overzicht', false)}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-KRANT-20',
+    scenarioId: 'UAT-KRANT-20',
+    label: 'Achter de gesloten vlag (krantOnboardingToegangVoor, onboardingPadVoor)',
+    run: () => {
+      const expected = expectedOf('WF-KRANT-20')
+      const krantVers = { active_modules: ['nieuws'], onboarding_completed: false }
+      const t = (profiel: Parameters<typeof krantOnboardingToegangVoor>[0], inBeta: boolean) => krantOnboardingToegangVoor(profiel, inBeta)
+      return {
+        expected,
+        actual: `dichtGewoon=${t(krantVers, false)}; dichtSuperadmin=${t(krantVers, true)}; openGewoon=${t(krantVers, true)}; openAfgerond=${t({ ...krantVers, onboarding_completed: true }, true)}; openGeheel=${t({ active_modules: [...ALL_MODULES], onboarding_completed: false }, true)}; padSuperadminKrant=${onboardingPadVoor({ role: 'superadmin', active_modules: ['nieuws'] })}; padGeheel=${onboardingPadVoor({ role: 'superadmin', active_modules: [...ALL_MODULES] })}`,
       }
     },
   },

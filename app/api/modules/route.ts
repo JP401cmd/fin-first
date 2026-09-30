@@ -4,8 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getVerifiedUser } from '@/lib/supabase/cached-user'
 import { parseBody } from '@/lib/api/parse-body'
 import { serverError, unauthorized } from '@/lib/api/respond'
-import { validateModules } from '@/lib/module-registry'
-import { PRODUCTS, PRODUCT_PRESETS } from '@/lib/modules/resolve'
+import { PRODUCTS } from '@/lib/modules/resolve'
+import { zetProductPreset } from '@/lib/modules/product-preset'
 
 /**
  * PUT /api/modules — de productkeuze: Krant ⇄ Geheel.
@@ -54,26 +54,12 @@ export async function PUT(request: Request) {
     const parsed = await parseBody(ModulesBodySchema, request)
     if (!parsed.ok) return parsed.response
 
-    const preset = PRODUCT_PRESETS[parsed.data.product]
-    const modules = [...preset.modules]
+    // Own-row update — uitsluitend de eigen rij (RLS), geen service-role. Het
+    // schrijfpad (preset-guard + één update van beide kolommen) deelt deze route
+    // sinds Krant 2C met de auth-callback: lib/modules/product-preset.ts.
+    const { modules, homeScreen } = await zetProductPreset(supabase, user.id, parsed.data.product)
 
-    // Guard: een preset moet zelf een geldige moduleset zijn (afhankelijkheden
-    // uit de catalogus). Faalt dit, dan is de preset-definitie kapot — een
-    // serverfout, geen invoerfout.
-    const check = validateModules(modules)
-    if (!check.valid) {
-      throw new Error(`Ongeldige preset '${parsed.data.product}': ${check.errors.join(' ')}`)
-    }
-
-    // Own-row update — uitsluitend de eigen rij (RLS), geen service-role.
-    const { error } = await supabase
-      .from('profiles')
-      .update({ active_modules: modules, home_screen: preset.homeScreen })
-      .eq('id', user.id)
-
-    if (error) throw error
-
-    return NextResponse.json({ ok: true, modules, homeScreen: preset.homeScreen })
+    return NextResponse.json({ ok: true, modules, homeScreen })
   } catch (err) {
     return serverError(err, 'modules:PUT')
   }

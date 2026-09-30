@@ -24,6 +24,7 @@ import { budgetShareFractionById, selectBudgetsForBasisForUser } from '@/lib/hou
 import { fetchRealizedBudgetAmounts, transactionAnnualIncome } from '@/lib/budget-realized'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { recordJobRun } from '@/lib/job-runs'
+import { receivesSnapshots } from '@/lib/modules/krant-grens'
 import { mapWithConcurrency } from '@/lib/concurrency'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
@@ -130,12 +131,13 @@ export async function GET(request: Request) {
   const sixMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 5, 1))
 
   // Get all users with completed onboarding
-  const { data: profiles, error: profilesError } = await supabase
+  const { data: alleProfielen, error: profilesError } = await supabase
     .from('profiles')
     // Zie snapshots/route.ts: de bron-vlaggen + handmatige bedragen voeden de
     // EFFECTIEVE spaarquote en de noodbuffer-norm (3 × netto maandsalaris).
     // + het PLAN (ADR 0129 F3a): onder een vast stop-anker geen `fire_age`.
-    .select(`id, date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, feature_preferences, budgeting_active, ${FIRE_PLAN_COLUMNS}`)
+    // + `active_modules` (Krant 2C): alleen om Krant-accounts over te slaan.
+    .select(`id, date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, feature_preferences, budgeting_active, active_modules, ${FIRE_PLAN_COLUMNS}`)
     .eq('onboarding_completed', true)
 
   if (profilesError) {
@@ -143,6 +145,11 @@ export async function GET(request: Request) {
     // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
     return NextResponse.json({ error: profilesError.message }, { status: 500 })
   }
+
+  // Krant-accounts krijgen geen snapshot (Krant 2C, zoals de briefingmail): de
+  // Krant weet niets van hun vermogen. Sinds 2C ronden ze wél hun onboarding af,
+  // dus zonder dit filter kwamen ze hier binnen.
+  const profiles = (alleProfielen ?? []).filter((p) => receivesSnapshots(p))
 
   // Huishouden + aandeel per gebruiker, vooraf (niet per gebruiker in de pool).
   // Nodig omdat de service-role-client RLS passeert: de huishoud-verbrede scope

@@ -132,6 +132,12 @@ describe('inTijdlijnBeta — wie mag in de bèta', () => {
       // De nieuwsstip: slaat de tijdlijn-peek over zolang de tijdlijn voor deze
       // lezer dicht is. Een besparing, geen poort — de route toetst zelf.
       'components/app/shell/sidebar.tsx',
+      // Krant 2C (ADR 0192): aanmelden en onboarding achter dezelfde poort — de
+      // auth-callback zet de Krant-preset alleen binnen de bèta, en de omleidingen
+      // + /onboarding/krant + de klaar-route toetsen hier wie de Krant-onboarding
+      // krijgt. Eén importeur voor al die plekken; de pure beslissingen nemen de
+      // bèta-stand als argument (tests voor beide vlagstanden in aanmelden.test.ts).
+      'lib/krant/aanmelden.ts',
     ])
     const bronnen = ['app', 'lib', 'components']
       .flatMap((d) => (readdirSync(d, { recursive: true }) as string[]).map((p) => (d + '/' + p).split('\\').join('/')))

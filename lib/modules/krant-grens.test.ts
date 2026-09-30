@@ -11,8 +11,11 @@ import {
   isRouteAllowed,
   krantRedirect,
   receivesBriefing,
+  receivesSnapshots,
   shouldMountFin,
 } from './krant-grens'
+import { join } from 'node:path'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 const KRANT: ModuleId[] = ['nieuws']
 
@@ -137,5 +140,19 @@ describe('Fin-mount, briefing en profielherkenning', () => {
   it('geen profielrij → geen Krant-account (fail-open naar het oude gedrag)', () => {
     expect(isKrantProfile(null)).toBe(false)
     expect(receivesBriefing(undefined)).toBe(true)
+  })
+
+  // Krant 2C: een Krant-account rondt zijn onboarding af en viel daardoor in de
+  // snapshots-cron (`onboarding_completed = true`). Net als de briefing: niet.
+  it('snapshots: niet voor een Krant-account, wel voor elk bestaand profiel', () => {
+    expect(receivesSnapshots({ active_modules: ['nieuws'] })).toBe(false)
+    for (const [, raw] of BESTAANDE_PROFIELEN) expect(receivesSnapshots({ active_modules: raw })).toBe(true)
+    expect(receivesSnapshots(null)).toBe(true)
+  })
+
+  it('snapshots-cron: leest active_modules mee en filtert met receivesSnapshots', () => {
+    const src = readSourceLF(join(process.cwd(), 'app', 'api', 'snapshots', 'cron', 'route.ts'))
+    expect(src).toMatch(/budgeting_active, active_modules, \$\{FIRE_PLAN_COLUMNS\}/)
+    expect(src).toMatch(/\.filter\(\(p\) => receivesSnapshots\(p\)\)/)
   })
 })

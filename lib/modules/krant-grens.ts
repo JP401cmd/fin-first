@@ -46,8 +46,7 @@ export const PATHNAME_HEADER = 'x-tf-pathname'
  * alles eronder (`/nieuws`, `/nieuws/…`), nooit een woord dat er toevallig mee
  * begint (`/nieuwsbrief`, `/nieuwsX`).
  *
- * `/krant/meer` (2D) bestaat sinds R2. `/mijn/nieuwsprofiel` (2C) bestaat nog
- * niet; het staat hier zodat die kaart niets aan de grens hoeft te veranderen.
+ * `/krant/meer` (2D) bestaat sinds R2, `/mijn/nieuwsprofiel` (2C) sinds 0.92.28.
  * `/mijn/notificaties` in plaats van het `/mijn/meldingen` van de kaart: die
  * route bestaat niet, de meldingsvoorkeuren staan op /mijn/notificaties.
  */
@@ -144,6 +143,17 @@ export function shouldMountFin(modules: readonly ModuleId[]): boolean {
  * briefing: die gaat over zijn geld, en daar weet de Krant niets van.
  */
 export function receivesBriefing(row: ActiveModulesRow | null | undefined): boolean {
+  return !isKrantProfile(row)
+}
+
+/**
+ * Krijgt dit profiel dagelijkse balans-snapshots (snapshots-cron)? Nee voor een
+ * Krant-account (Krant 2C): een snapshot legt zijn vermogen en spaarquote vast,
+ * en daar weet de Krant niets van — net als bij de briefing. Sinds 2C rondt een
+ * Krant-account zijn onboarding af (`onboarding_completed = true`), waardoor de
+ * cron hem anders zou meenemen.
+ */
+export function receivesSnapshots(row: ActiveModulesRow | null | undefined): boolean {
   return !isKrantProfile(row)
 }
 

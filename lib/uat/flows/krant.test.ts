@@ -40,10 +40,10 @@ describe('KRANT_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it("dekt alle 16 KRANT-scenario's (01..16), elk precies één keer", () => {
+  it("dekt alle 20 KRANT-scenario's (01..20), elk precies één keer", () => {
     const covered = KRANT_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id))
     const expected = UAT_SCENARIOS.filter((s) => s.zone === 'KRANT').map((s) => s.id).sort()
     expect([...covered].sort()).toEqual(expected)
-    expect(expected.length).toBe(16)
+    expect(expected.length).toBe(20)
   })
 })

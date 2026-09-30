@@ -35,17 +35,17 @@
   ],
   "shortcuts": [
     {
-      "name": "Kern",
-      "short_name": "Kern",
+      "name": "Overzicht",
+      "short_name": "Overzicht",
       "description": "Bezittingen en schulden",
-      "url": "/core",
+      "url": "/overzicht",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Horizon",
-      "short_name": "Horizon",
+      "name": "Toekomst",
+      "short_name": "Toekomst",
       "description": "Vrijheidshorizon en simulaties",
-      "url": "/horizon",
+      "url": "/toekomst",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],

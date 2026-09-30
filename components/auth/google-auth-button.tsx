@@ -20,6 +20,7 @@ export function GoogleAuthButton({
   label,
   loadingLabel,
   next,
+  product,
 }: {
   /** Zichtbare tekst, bv. "Inloggen met Google" of "Aanmaken met Google". */
   label: string
@@ -36,6 +37,12 @@ export function GoogleAuthButton({
    * open-redirects via `safeRelativePath`. Leeg = de callback-default (/dashboard, door de middleware vertaald naar het gekozen homescherm).
    */
   next?: string | null
+  /**
+   * Productingang (Krant 2C): `'krant'` voor de Krant-ingang op /signup. Gaat
+   * als `product` mee naar de callback, die hem op de enum valideert en alleen
+   * voor een vers account binnen de bèta de Krant-preset zet.
+   */
+  product?: string | null
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,6 +58,7 @@ export function GoogleAuthButton({
       const supabase = createClient()
       const callback = new URL('/auth/callback', window.location.origin)
       if (next) callback.searchParams.set('next', next)
+      if (product) callback.searchParams.set('product', product)
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

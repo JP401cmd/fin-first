@@ -158,14 +158,19 @@ describe('PUT /api/modules — de twee presets', () => {
 
 describe('PUT /api/modules — bron-scan', () => {
   const src = readFileSync(join(__dirname, 'route.ts'), 'utf8')
+  // Sinds Krant 2C schrijft de gedeelde helper (ook gebruikt door de auth-callback).
+  const helper = readFileSync(join(process.cwd(), 'lib', 'modules', 'product-preset.ts'), 'utf8')
 
-  it('gebruikt nooit de service-client', () => {
-    expect(src).not.toMatch(/supabase\/service/)
-    expect(src).not.toMatch(/getServiceClient|SERVICE_ROLE/)
+  it('gebruikt nooit de service-client — route noch helper', () => {
+    for (const s of [src, helper]) {
+      expect(s).not.toMatch(/supabase\/service/)
+      expect(s).not.toMatch(/getServiceClient|SERVICE_ROLE/)
+    }
   })
 
   it('schrijft uitsluitend met update op de eigen rij — geen delete, insert of upsert', () => {
-    expect(src).toMatch(/\.eq\('id', user\.id\)/)
-    expect(src).not.toMatch(/\.(delete|insert|upsert)\(/)
+    expect(src).toMatch(/zetProductPreset\(supabase, user\.id, /)
+    expect(helper).toMatch(/\.eq\('id', userId\)/)
+    for (const s of [src, helper]) expect(s).not.toMatch(/\.(delete|insert|upsert)\(/)
   })
 })
