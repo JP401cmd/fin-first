@@ -61,6 +61,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-09-29',
   },
   {
+    id: 'blokkade-geen-api-barriere',
+    title: 'Een beheerblokkade (profiles.blocked_at) stopt de app-shell en de native API, maar niet de cookie-API-routes en niet de sessie zelf',
+    detail:
+      'Beheer blokkeert via POST /api/admin/users/block, dat alleen profiles.blocked_at zet. Die blokkade wordt afgedwongen in de (app)-layout, in vereisBearer (API v1) en sinds 0.92.28 in de Krant-cookieroutes (/api/krant/profiel, /api/krant/onboarding/klaar). Sinds migratie 20261010120000 kan een sessie de blokkade niet meer zelf opheffen of omzeilen door het profiel te wissen. Wat blijft (security-run 0.92.28, 🟡-2, bestond al): de route trekt geen sessies in en bant niet in Supabase Auth, en de overige cookie-/api/*-routes toetsen blocked_at niet — een geblokkeerde gebruiker met een bewaard refresh-token kan die routes blijven aanroepen, binnen zijn eigen RLS. Herstel: bij blokkeren ook auth.admin.updateUserById(id, { ban_duration }) (bij deblokkeren "none"), of een centrale blocked_at-toets in de proxy. Verwijder dit punt zodra een van beide staat.',
+    severity: 'risk',
+    elementIds: ['t-platform', 't-supabase', 'as-nieuws'],
+    reviewedAt: '2026-10-01',
+  },
+  {
     id: 'krant-tijdlijn-beta-dicht-tot-poorten',
     title: 'De tijdlijn-bèta van de Krant heeft nu een scherm, maar staat nog alleen voor superadmins open — drie poorten vóór de vlag open mag',
     detail:
