@@ -199,3 +199,62 @@ datum die de lezer ziet.
 
 "Het echte nieuws is het verband" (spaarrente tegenover beleggingsrendement na box 3): dat raakt
 de grens van advies en volgt apart. Verder de duidingsprompt en de sjabloonteksten.
+
+## Aanvulling 30 sep 2026: de Tweede Kamer wordt géén detailhost
+
+**Vraag.** De Kamerbrieven staan in de Krant zonder samenvatting (`samenvatting-leeg:model`): de
+enige grondslag is de titel. Kan `www.tweedekamer.nl` met het pad
+`/kamerstukken/brieven_regering/detail` in `DETAIL_HOSTS`, zodat de ingest de briefpagina ophaalt?
+
+**Gemeten (30 sep 2026, vier briefpagina's: drie bij Financiën, één bij SZW).**
+
+- De pagina antwoordt `200`, `text/html; charset=UTF-8`, zonder doorverwijzing. De
+  veiligheidstoetsen zouden hem dus doorlaten.
+- **De brieftekst staat niet in de HTML.** De pagina draagt de titel, de indieners, de
+  activiteiten waar de brief bij hoort en een knop "Download kamerstuk". Die knop wijst naar
+  `/downloads/document?id=…` en levert een Word-bestand
+  (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`). Dat bestand haalt
+  `fetchDetailPagina` terecht niet op: de content-type-toets weigert het vóór de body.
+- `artikelTekst` levert 138 tot 510 tekens: "Brief regering : <titel>", "Delen Delen", de
+  indieners en de activiteiten. Onder de 200 tekens is dat een terugval (`leeg`). Erboven is het
+  `gelezen`, en dan wordt paginachrome als grondslag bewaard. Daarin staat een datum van een
+  **komend** debat ("1 okt 2026 … Plenair debat"), die de duiding voor de brief kan aanzien.
+- Geen datum in de metadata: `extractBronDatums` geeft niets. De zichtbare "Datum: 30 september
+  2026" staat in een lijst buiten de artikeltekst.
+- Traag en kwetsbaar: een briefpagina die niet in de cache van de site staat, deed er 13 tot
+  49 s over, ruim boven `FETCH_TIMEOUT_MS` (10 s). Twee verzoeken tegelijk gaven een `503`. Uit de
+  cache komt dezelfde pagina binnen 0,2 s.
+
+**Besluit.** De Tweede Kamer komt niet in `DETAIL_HOSTS`. Er valt niets op te halen dat de duiding
+helpt, en wat er wél staat is chrome met een misleidende datum. Er komt ook geen host-specifiek
+extractiemaatwerk: je kunt geen tekst uitsnijden die niet in de HTML staat. De Kamerbrieven houden
+alleen de kop en de lijstregel.
+
+**Als dit later toch moet**, dan niet via deze pagina. Er zijn twee routes, allebei een eigen besluit
+met een eigen host en een eigen securityreview. De eerste is de HTML-versie op
+`zoek.officielebekendmakingen.nl`, die er pas dagen na de brief is. De tweede is de open-data-API
+van de Kamer (`gegevensmagazijn.tweedekamer.nl`). Het Word-bestand zelf lezen valt buiten de scope
+van de detailpagina's (geen kantoorbestanden, zie `DOCUMENT_PAD`).
+
+## Aanvulling 30 sep 2026: matcher v7 — het onderwerp en de spreiding over uitgevers
+
+**Aanleiding.** Op de Krant van de eigenaar (30 sep) stond bij "Aftrekposten box 1" (thema's
+inkomstenbelasting, eigen-woning) "Dit bericht gaat over de eigen woning en de hypotheek", en bij
+"Prinsjesdag 2026 in begrijpelijke taal" (box 3, huis kopen, toeslagen) "gaat over toeslagen". De
+matcher noemde het thema dat bij het profiel paste. Daarnaast kwamen zes van de acht berichten in
+Achtergrond en "Ook in het nieuws" van de Tweede Kamer, verdeeld over twee bronlabels.
+
+**Besluit (matcher v7).**
+- "Dit bericht gaat over …" noemt het **eerste thema van de duiding**. De duidingsprompt legt niet vast
+  dat het eerste thema het hoofdonderwerp is, en de gronding kan het eerste thema laten vallen; het is
+  dus een goede benadering, geen afspraak met het model. Een vervolgkaart via `ai-gedrag` legt die
+  afspraak vast in de prompt (met een `DUIDING_VERSIE`-bump).
+- De zichtbare reden ("Volgens je profiel …") komt alleen nog van een doelgroepregel of van dat eerste
+  thema. De reden van een bijthema staat alleen onder "Waarom zie ik dit?": naast een ander onderwerp
+  leest hij als verband ("koopwoning … gaat over box 3"), de fout uit de compliance-check van B37. De
+  catalogus en het attest veranderen niet.
+- Achtergrond en katern tonen **samen** hoogstens twee berichten per **uitgever**: het deel van het
+  bronlabel vóór " — " ("Tweede Kamer — Kamerbrieven SZW" → "Tweede Kamer"). Eén telling over beide
+  blokken, Achtergrond kiest eerst.
+
+Berichten in een tijdlijn zijn momentopnamen: dit geldt voor nieuwe verversingen.

@@ -81,7 +81,7 @@ describe('UAT Fin — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = WILL_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(24) // +1: WF-WILL-40 (matcher v5, 29-09-2026); +3: WF-WILL-41..43 (Krant 1E, ADR 0190); +1: WF-WILL-44 (redactieregels, ADR 0191)
+    expect(exactWorkflows.length).toBe(25) // +1: WF-WILL-40 (matcher v5, 29-09-2026); +3: WF-WILL-41..43 (Krant 1E, ADR 0190); +1: WF-WILL-44 (redactieregels, ADR 0191); +1: WF-WILL-45 (matcher v7)
   })
 
   it('markeert de AI-gegenereerde/proces-workflows als ui-only (niet-deterministisch)', () => {

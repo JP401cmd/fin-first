@@ -48,7 +48,9 @@ import { bepaalKrantBron } from '@/lib/krant/tijdlijn-bron'
 import { VERNIEUW_INTERVAL_MS } from '@/lib/krant/tijdlijn-vernieuwen'
 import { TIJDLIJN_PAGINA, KATERN_ONDER, WEEK_KEY, codeerCursor, decodeerCursor } from '@/lib/krant/tijdlijn-lezen'
 import {
+  BRON_MAX_PER_BLOK,
   MATCHER_VERSIE,
+  uitgeverVan,
   NIEUWS_MAX_OUDERDOM_DAGEN,
   voldoetAanLeescontract,
   type KandidaatArtikel,
@@ -643,7 +645,7 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
       const metDeadline = artikel('a08-kinderopvangtoeslag') // deadline in de toekomst
       return {
         expected:
-          'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=6; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudZonderEchteDatum=true; oudMetDeadline=true',
+          'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=7; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudZonderEchteDatum=true; oudMetDeadline=true',
         actual:
           `NIEUWS_MAX_OUDERDOM_DAGEN=${NIEUWS_MAX_OUDERDOM_DAGEN}; MATCHER_VERSIE=${MATCHER_VERSIE}; ` +
           `gepubliceerd46=${voldoetAanLeescontract({ ...vers, published_at: dagenTerug(46) }, ctx)}; ` +
@@ -778,7 +780,7 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
       const gezien = matchEditie(huurder, [art('w44-gezien', { themas: huur }, { published_bron: 'eerste_gezien' })], ctx)
       return {
         expected:
-          'MATCHER_VERSIE=6; basisInTijdlijn=0; gewijzigdInTijdlijn=1; basisInAchtergrond=1; naslagInTijdlijn=0; caribischOveral=0; terloopsInTijdlijn=1; bufferWeinigSpaargeld=raakt; bufferVeelSpaargeld=0; cijferZonderRekenregel=0; gezienOp=true; gepubliceerd=null',
+          'MATCHER_VERSIE=7; basisInTijdlijn=0; gewijzigdInTijdlijn=1; basisInAchtergrond=1; naslagInTijdlijn=0; caribischOveral=0; terloopsInTijdlijn=1; bufferWeinigSpaargeld=raakt; bufferVeelSpaargeld=0; cijferZonderRekenregel=0; gezienOp=true; gepubliceerd=null',
         actual:
           `MATCHER_VERSIE=${MATCHER_VERSIE}; basisInTijdlijn=${t1.items.length}; gewijzigdInTijdlijn=${t1b.items.length}; ` +
           `basisInAchtergrond=${t1.algemeen.achtergrond?.items.length ?? 0}; ` +
@@ -788,6 +790,68 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
           `bufferWeinigSpaargeld=${weinig.items[0]?.vorm ?? 'geen'}; bufferVeelSpaargeld=${veel.items.length}; ` +
           `cijferZonderRekenregel=${cijfer.items.length + (cijfer.algemeen.achtergrond?.items.length ?? 0)}; ` +
           `gezienOp=${gezien.items[0]?.gezienOp === RECENT}; gepubliceerd=${gezien.items[0]?.gepubliceerd ?? 'null'}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-45',
+    scenarioId: 'UAT-WILL-45',
+    label: '"Gaat over" = hoofdthema en twee per uitgever in Achtergrond + katern (echte matchEditie v7)',
+    run: () => {
+      criterion('WF-WILL-45')
+      const ctx: MatchContext = {
+        now: KRANT_NU,
+        gezienArtikelIds: new Set(),
+        gedemptRubrieken: new Set(),
+        impact: standaardImpactContext(AOW_RIJEN, KRANT_NU.getUTCFullYear()),
+        modus: 'tijdlijn',
+      }
+      const RECENT = '2026-09-19T05:10:00Z'
+      const basis = KRANT_ARTIKELEN.find((x) => x.id === 'a15-oud')
+      if (!basis?.duiding) throw new Error('fixture a15-oud ontbreekt')
+      const art = (id: string, d: Partial<NonNullable<KandidaatArtikel['duiding']>>, o: Partial<KandidaatArtikel> = {}): KandidaatArtikel => ({
+        ...basis,
+        id,
+        category: 'fiscaal',
+        fetched_at: RECENT,
+        published_at: RECENT,
+        published_bron: 'feed',
+        bron_soort: 'rss',
+        bron_wijziging: null,
+        bron_fragment: null,
+        ...o,
+        duiding: { ...basis.duiding!, ...d },
+      })
+      const ib = { thema: 'inkomstenbelasting' as const, citaat: 'In box 1 kunnen aftrekposten worden opgevoerd' }
+      const ew = { thema: 'eigen-woning' as const, citaat: 'aftrekbare kosten van de eigen woning' }
+      const koper: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'koop-met-hypotheek' }
+      const bijthema = matchEditie(koper, [art('w45-ib', { soort: 'achtergrond', themas: [ib, ew] }, { title: 'Aftrekposten box 1' })], ctx).items[0]
+      const hoofd = matchEditie(koper, [art('w45-ew', { soort: 'achtergrond', themas: [ew, ib] }, { title: 'Aftrekposten box 1' })], ctx).items[0]
+
+      const van = (id: string, bron: string, uur: number) =>
+        art(id, { soort: 'achtergrond', themas: [] }, { source_name: bron, published_at: `2026-09-19T${String(uur).padStart(2, '0')}:00:00Z` })
+      const blokken = matchEditie(
+        LEEG_PROFIEL,
+        [
+          ...[1, 2, 3, 4, 5, 6].map((n) => van(`w45-tk-${n}`, n % 2 === 1 ? 'Tweede Kamer — Kamerbrieven SZW' : 'Tweede Kamer — Kamerbrieven Financiën', 20 - n)),
+          van('w45-cbs-1', 'CBS — Prijzen (CPI / inflatie)', 8),
+          van('w45-cbs-2', 'CBS — Inkomen en bestedingen', 7),
+          van('w45-rijk', 'Rijksoverheid — Ministerie van Financiën', 6),
+        ],
+        ctx,
+      ).algemeen
+      const achtergrond = blokken.achtergrond?.items ?? []
+      const tweedeKamer = [...achtergrond, ...blokken.items].filter((i) => uitgeverVan(i.bron) === 'Tweede Kamer').length
+      return {
+        expected:
+          'MATCHER_VERSIE=7; BRON_MAX_PER_BLOK=2; onderwerpHoofdthema=true; redenBijthemaZichtbaar=false; redenBijthemaInWaarom=true; redenHoofdthemaZichtbaar=true; tweedeKamerSamen=2; andereUitgeverInAchtergrond=true',
+        actual:
+          `MATCHER_VERSIE=${MATCHER_VERSIE}; BRON_MAX_PER_BLOK=${BRON_MAX_PER_BLOK}; ` +
+          `onderwerpHoofdthema=${bijthema?.tekst.includes('gaat over de inkomstenbelasting (box 1).') ?? false}; ` +
+          `redenBijthemaZichtbaar=${bijthema?.tekst.includes('koopwoning') ?? false}; ` +
+          `redenBijthemaInWaarom=${bijthema?.waarom.includes('reden:reden-koopwoning') ?? false}; ` +
+          `redenHoofdthemaZichtbaar=${hoofd?.tekst.startsWith('Volgens je profiel heb je een koopwoning.') ?? false}; ` +
+          `tweedeKamerSamen=${tweedeKamer}; andereUitgeverInAchtergrond=${achtergrond.some((i) => uitgeverVan(i.bron) !== 'Tweede Kamer')}`,
       }
     },
   },

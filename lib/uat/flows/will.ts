@@ -102,6 +102,7 @@ export const WILL_FLOW: UatFlow = {
     { id: 'tijdlijn-ai-quotum', scenarioId: 'UAT-WILL-43', label: 'WF-WILL-43 · Hoogstens 5 verversingen met AI per week', kind: 'action', stage: 3, lane: 'krant', subOf: 'tijdlijn-ai-laag' },
     { id: 'tijdlijn-oud-nieuws', scenarioId: 'UAT-WILL-40', label: 'WF-WILL-40 · Oud nieuws (publicatie > 45 dagen) telt niet als nieuw', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
     { id: 'tijdlijn-redactieregels', scenarioId: 'UAT-WILL-44', label: 'WF-WILL-44 · Redactieregels: basis/wijziging, Caribisch NL, spaarbuffer, "gezien op"', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
+    { id: 'tijdlijn-hoofdthema-spreiding', scenarioId: 'UAT-WILL-45', label: 'WF-WILL-45 · "Gaat over" = hoofdthema; samen twee per uitgever in Achtergrond en katern', kind: 'screen', stage: 3, lane: 'krant', subOf: 'tijdlijn' },
     { id: 'nieuwsstip', scenarioId: 'UAT-WILL-39', label: 'WF-WILL-39 · Nieuwsstip in de zijbalk (tijdlijnlezer)', kind: 'screen', stage: 3, lane: 'krant' },
 
     // ── 4 · uitkomst ──────────────────────────────────────────────────────

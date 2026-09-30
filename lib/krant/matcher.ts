@@ -110,8 +110,12 @@ import {
  *   over Caribisch Nederland haalt het leescontract niet; (2b) een bufferbericht raakt via `sparen-rente`
  *   de laagste spaarband in plaats van spaarders vanaf € 5.000; (3) alleen een echte datum (feed, meta,
  *   pagina) is `gepubliceerd` en telt voor "oud nieuws" — anders `gezienOp`.
+ * 7 (30-09-2026, kwaliteit vóór de vlag · melding eigenaar): "Dit bericht gaat over …" noemt het hoofdthema
+ *   van de duiding (het eerste thema), niet het thema dat bij het profiel past; de zichtbare reden komt
+ *   alleen nog van een doelgroepregel of van dat hoofdthema. Achtergrond en katern tonen samen hoogstens
+ *   BRON_MAX_PER_BLOK berichten per uitgever (`uitgeverVan`).
  */
-export const MATCHER_VERSIE = 6
+export const MATCHER_VERSIE = 7
 
 /** Volgorde bij gelijke datum in het algemeen katern: wat vastligt of gemeten is, vóór verwachting en uitleg. */
 const KATERN_SOORT_RANG: Record<DuidingV1['soort'], number> = {
@@ -143,6 +147,21 @@ export const EDITIE_MAX = 8
 export const RUBRIEK_MAX = 3
 /** Het algemene katern (B7). */
 export const ALGEMEEN_MAX = 5
+/**
+ * Hoogstens zoveel berichten van één uitgever (`uitgeverVan`) in Achtergrond en katern SAMEN (v7).
+ * Op 30-09-2026 kwamen zes van de acht algemene berichten van de Tweede Kamer, verdeeld over twee
+ * bronlabels (Kamerbrieven SZW en Financiën). Redactioneel, geen financiële aanname.
+ */
+export const BRON_MAX_PER_BLOK = 2
+
+/**
+ * De uitgever achter een bronlabel: het deel vóór " — " ("Tweede Kamer — Kamerbrieven SZW" → "Tweede
+ * Kamer"). Een label zonder " — " (bv. een bron die in beheer is aangemaakt) is zijn eigen uitgever.
+ */
+export function uitgeverVan(bronLabel: string): string {
+  const i = bronLabel.indexOf(' — ')
+  return (i > 0 ? bronLabel.slice(0, i) : bronLabel).trim()
+}
 /** Het editievenster in dagen: de weekeditie leest de afgelopen week. */
 export const WEEK_VENSTER_DAGEN = 7
 /**
@@ -704,10 +723,18 @@ function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profi
  * B37 "Over jouw situatie", drie delen uit de catalogus: de reden uit de
  * raakt-regel die 'ja' gaf (compliance-check: nooit een vrij gekozen
  * profielkenmerk — "koopwoning" bij een box 3-bericht was precies die fout),
- * het onderwerp (het eerste thema dat raakt, anders het eerste thema van de
- * duiding) met het jaar alleen als de ingangsdatum gegrond is, en het slot
- * naar de grond. Een gevoelige reden (inkomen, uitkering, krediet) staat
+ * het onderwerp met het jaar alleen als de ingangsdatum gegrond is, en het
+ * slot naar de grond. Een gevoelige reden (inkomen, uitkering, krediet) staat
  * alleen in `waarom`; is er geen andere, dan vervalt de zichtbare reden.
+ *
+ * v7 (melding eigenaar 30-09-2026): het onderwerp is het EERSTE thema van de
+ * duiding (de benadering van het hoofdonderwerp; de prompt legt die volgorde
+ * nog niet vast, ADR 0191), niet het thema dat bij het profiel past —
+ * "Aftrekposten box 1" heette "de eigen woning en de hypotheek". Daarom is de
+ * zichtbare reden alleen die van een doelgroepregel of van het hoofdthema
+ * zelf. De reden van een bijthema gaat alleen naar `waarom` (en dus naar
+ * "Waarom zie ik dit?"): naast een ander onderwerp leest hij als verband
+ * ("koopwoning … gaat over box 3"), dezelfde fout als hierboven.
  */
 function raaktTekst(
   artikel: KandidaatArtikel & { duiding: DuidingV1 },
@@ -718,17 +745,19 @@ function raaktTekst(
   waarom: string[],
 ): string {
   const duiding = artikel.duiding
-  const kandidaten: DoelgroepRegel[] = [
-    ...(grond === 'doelgroep' ? duiding.doelgroep : []),
-    ...themaJa.flatMap((t) => jaRegels(t, profiel, raaktVoorThema(t, artikel))),
-  ]
-  const redenen = kandidaten.map((r) => REDEN_PER_REGEL[regelSleutel(r)]).filter((id): id is SjabloonId => id != null)
+  const hoofdthema = duiding.themas[0]?.thema
+  const redenVan = (regels: readonly DoelgroepRegel[]) =>
+    regels.map((r) => REDEN_PER_REGEL[regelSleutel(r)]).filter((id): id is SjabloonId => id != null)
+  const doelgroepRedenen = redenVan(grond === 'doelgroep' ? duiding.doelgroep : [])
+  const themaRedenen = themaJa.map((t) => ({ thema: t, redenen: redenVan(jaRegels(t, profiel, raaktVoorThema(t, artikel))) }))
+  const redenen = [...doelgroepRedenen, ...themaRedenen.flatMap((t) => t.redenen)]
   for (const id of new Set(redenen)) waarom.push(`reden:${id}`)
-  const zichtbaar = redenen.find((id) => !GEVOELIGE_REDENEN.has(id))
+  const toonbaar = [...doelgroepRedenen, ...themaRedenen.filter((t) => t.thema === hoofdthema).flatMap((t) => t.redenen)]
+  const zichtbaar = toonbaar.find((id) => !GEVOELIGE_REDENEN.has(id))
 
   const delen: string[] = []
   if (zichtbaar) delen.push(renderSjabloon('raakt-reden', 0, { reden: renderSjabloon(zichtbaar, 0) }))
-  const thema = themaJa[0] ?? duiding.themas[0]?.thema
+  const thema = hoofdthema
   if (thema) {
     const onderwerp = renderSjabloon(`onderwerp-${thema}` as SjabloonId, 0)
     const jaar = duiding.ingangsdatum?.slice(0, 4)
@@ -814,20 +843,24 @@ export function matchEditie(profiel: NieuwsprofielV1, artikelen: readonly Kandid
   // jou (besloten, voorstel, uitleg; nooit markt of cijfers) — daarna het katern
   // uit wat overblijft. In de editiemodus bestaat Achtergrond niet.
   const tijdlijn = ctx.modus === 'tijdlijn'
+  // Eén telling per uitgever over beide blokken (v7): Achtergrond kiest eerst, het katern telt door.
+  const perUitgever = new Map<string, number>()
   const achtergrondItems: AlgemeenItem[] = tijdlijn
-    ? leesbaar
-        .filter((a) => !gekozen.has(a.id) && ACHTERGROND_SOORTEN.has(a.duiding.soort) && a.duiding.mechanisme?.soort !== 'beursbeweging')
-        .sort(katernVolgorde)
-        .slice(0, ACHTERGROND_MAX)
-        .map(naarAlgemeenItem)
+    ? gespreid(
+        leesbaar
+          .filter((a) => !gekozen.has(a.id) && ACHTERGROND_SOORTEN.has(a.duiding.soort) && a.duiding.mechanisme?.soort !== 'beursbeweging')
+          .sort(katernVolgorde),
+        ACHTERGROND_MAX,
+        perUitgever,
+      ).map(naarAlgemeenItem)
     : []
   const inAchtergrond = new Set(achtergrondItems.map((i) => i.artikelId))
 
-  const algemeenItems: AlgemeenItem[] = leesbaar
-    .filter((a) => !gekozen.has(a.id) && !inAchtergrond.has(a.id))
-    .sort(katernVolgorde)
-    .slice(0, ALGEMEEN_MAX)
-    .map(naarAlgemeenItem)
+  const algemeenItems: AlgemeenItem[] = gespreid(
+    leesbaar.filter((a) => !gekozen.has(a.id) && !inAchtergrond.has(a.id)).sort(katernVolgorde),
+    ALGEMEEN_MAX,
+    perUitgever,
+  ).map(naarAlgemeenItem)
 
   const leeg = items.length === 0
   return {
@@ -864,6 +897,24 @@ function katernVolgorde(a: KandidaatArtikel & { duiding: DuidingV1 }, b: Kandida
   if (sa !== sb) return sa - sb
   if (a.title !== b.title) return a.title < b.title ? -1 : 1
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+}
+
+/**
+ * De eerste `max` artikelen in de gegeven volgorde, zolang hun uitgever onder BRON_MAX_PER_BLOK blijft
+ * (v7). `perUitgever` is gedeeld tussen Achtergrond en katern, zodat de grens voor beide samen geldt;
+ * wat erover gaat, valt weg en een andere uitgever vult de plek.
+ */
+function gespreid<T extends Pick<KandidaatArtikel, 'source_name'>>(gesorteerd: readonly T[], max: number, perUitgever: Map<string, number>): T[] {
+  const gekozen: T[] = []
+  for (const a of gesorteerd) {
+    if (gekozen.length >= max) break
+    const uitgever = uitgeverVan(a.source_name)
+    const n = perUitgever.get(uitgever) ?? 0
+    if (n >= BRON_MAX_PER_BLOK) continue
+    perUitgever.set(uitgever, n + 1)
+    gekozen.push(a)
+  }
+  return gekozen
 }
 
 function naarAlgemeenItem(a: KandidaatArtikel & { duiding: DuidingV1 }): AlgemeenItem {

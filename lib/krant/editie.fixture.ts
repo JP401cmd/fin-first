@@ -178,7 +178,9 @@ function artikel(o: ArtikelOpties): KandidaatArtikel {
     id: o.id,
     title: o.title,
     source_url: `https://voorbeeld.nl/${o.id}`,
-    source_name: 'Voorbeeldbron',
+    // v7: een eigen bron per artikel, zodat de katerntests op volgorde blijven
+    // toetsen; de grens per bron (BRON_MAX_PER_BLOK) staat in matcher.test.ts.
+    source_name: `Voorbeeldbron ${o.id}`,
     category: o.category,
     published_at: o.published_at ?? fetched,
     fetched_at: fetched,

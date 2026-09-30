@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { standaardImpactContext } from './impact'
 import {
   ACHTERGROND_MAX,
+  BRON_MAX_PER_BLOK,
   EDITIE_MAX,
   GEVOELIGE_REDENEN,
   REDEN_PER_REGEL,
@@ -12,6 +13,7 @@ import {
   regelSleutel,
   toetsRegel,
   toetsThema,
+  uitgeverVan,
   voldoetAanLeescontract,
   NIEUWS_MAX_OUDERDOM_DAGEN,
   type KandidaatArtikel,
@@ -254,6 +256,7 @@ describe('matcher — score en selectie', () => {
       ...zelfdeMoment,
       id,
       title,
+      source_name: `Bron ${title}`,
       duiding: { ...basis.duiding!, soort },
     })
     const invoer = [
@@ -303,7 +306,7 @@ describe('matcher — uitkomst', () => {
 
   it('draagt de matcher- en sjabloonversie en het profieltype, zonder id', () => {
     const u = matchEditie(PROFIEL_DAAN, ARTIKELEN, context())
-    expect(u.matcherVersie).toBe(6)
+    expect(u.matcherVersie).toBe(7)
     expect(u.sjabloonVersie).toBe(2)
     expect(u.profielType).toBe('onder-35·wonen-onbekend·alleen')
     expect(JSON.stringify(u)).not.toMatch(/user_id|userId/)
@@ -431,6 +434,62 @@ describe('matcher — tijdlijn (1C, B37): "Over jouw situatie", drempel 2, Achte
     expect(t.items[0].tekst).toContain('Dit bericht gaat over huren, vanaf 2028.')
   })
 
+  // Given een bericht waarvan het HOOFDthema (het eerste thema van de duiding)
+  // het profiel niet raakt maar een bijthema wél, When de matcher de regel
+  // "Over jouw situatie" schrijft, Then noemt "Dit bericht gaat over …" het
+  // hoofdthema en niet het thema dat bij het profiel past (v7; melding eigenaar
+  // 30-09-2026: "Aftrekposten box 1" heette "de eigen woning en de hypotheek").
+  // De reden van dat bijthema staat niet in de zichtbare zin — "koopwoning …
+  // gaat over box 1" leest als verband, de fout uit de compliance-check van
+  // B37 — maar wél in `waarom`, en dus onder "Waarom zie ik dit?".
+  describe('v7: "gaat over" is het hoofdthema van de duiding', () => {
+    const koper: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'koop-met-hypotheek' }
+    const IB = { thema: 'inkomstenbelasting' as const, citaat: 'In box 1 kunnen aftrekposten worden opgevoerd' }
+    const EW = { thema: 'eigen-woning' as const, citaat: 'aftrekbare kosten van de eigen woning' }
+    const B3 = { thema: 'box3-vermogen' as const, citaat: 'Box 3 gaat vanaf 2028 anders werken' }
+
+    it('het hoofdthema raakt niet, een bijthema wel: onderwerp = hoofdthema, reden alleen in waarom', () => {
+      const t = matchEditie(koper, [artikelMet({ soort: 'achtergrond', themas: [IB, EW] })], tijdlijn())
+      expect(t.items).toHaveLength(1)
+      expect(t.items[0].tekst).toBe('Dit bericht gaat over de inkomstenbelasting (box 1). Of en hoeveel het jou raakt, rekent de Krant hier niet uit.')
+      expect(t.items[0].waarom).toEqual(expect.arrayContaining(['thema:eigen-woning', 'reden:reden-koopwoning']))
+    })
+
+    it('het Prinsjesdag-geval: gevoelige reden van een bijthema, onderwerp = het eerste thema', () => {
+      const p: NieuwsprofielV1 = { ...LEEG_PROFIEL, inkomen: 'tot-1750' }
+      const themas: DuidingV1['themas'] = [B3, { thema: 'toeslagen', citaat: 'De huurtoeslag en zorgtoeslag gaan omhoog' }]
+      const t = matchEditie(p, [artikelMet({ soort: 'voorstel', themas })], tijdlijn())
+      expect(t.items).toHaveLength(1)
+      expect(t.items[0].tekst).toBe(
+        'Dit bericht gaat over de belasting op spaargeld en beleggingen (box 3). Of en hoeveel het jou raakt, rekent de Krant hier niet uit.',
+      )
+      expect(t.items[0].waarom).toContain('thema:toeslagen')
+    })
+
+    it('raakt het hoofdthema zelf, dan staat zijn reden zichtbaar — ook als een bijthema óók raakt', () => {
+      const rijkeKoper: NieuwsprofielV1 = { ...koper, spaargeld: '50k-100k' }
+      const eerstWoning = matchEditie(rijkeKoper, [artikelMet({ soort: 'achtergrond', themas: [EW, B3] })], tijdlijn()).items[0]
+      expect(eerstWoning.tekst).toBe(
+        'Volgens je profiel heb je een koopwoning. Dit bericht gaat over de eigen woning en de hypotheek. Of en hoeveel het jou raakt, rekent de Krant hier niet uit.',
+      )
+      expect(eerstWoning.waarom).toEqual(expect.arrayContaining(['reden:reden-koopwoning', 'reden:reden-spaargeld-50k']))
+      // Omgekeerde volgorde: nu is box 3 het hoofdthema, en is de spaargeldreden de zichtbare.
+      const eerstBox3 = matchEditie(rijkeKoper, [artikelMet({ soort: 'achtergrond', themas: [B3, EW] })], tijdlijn()).items[0]
+      expect(eerstBox3.tekst).toBe(
+        'Volgens je profiel heb je € 50.000 of meer spaargeld. Dit bericht gaat over de belasting op spaargeld en beleggingen (box 3). Of en hoeveel het jou raakt, rekent de Krant hier niet uit.',
+      )
+      expect(eerstBox3.tekst).not.toMatch(/koopwoning/)
+    })
+
+    it('een bevestigde doelgroepregel blijft zijn reden tonen, met het hoofdthema als onderwerp', () => {
+      const doelgroep = [{ veld: 'wonen', op: 'in' as const, waarden: ['koop-met-hypotheek', 'koop-zonder-hypotheek'] }]
+      const t = matchEditie(koper, [artikelMet({ doelgroep, themas: [IB, EW] })], tijdlijn())
+      expect(t.items[0].tekst).toBe(
+        'Volgens je profiel heb je een koopwoning. Dit bericht gaat over de inkomstenbelasting (box 1). Dat geldt ook voor jou. Wat het in euro’s doet, rekent de Krant hier niet uit.',
+      )
+    })
+  })
+
   it('Achtergrond: alleen in de tijdlijn, hoogstens ACHTERGROND_MAX, besluit/voorstel/uitleg, nooit markt, los van het katern', () => {
     const t = matchEditie(LEEG_PROFIEL, ARTIKELEN, tijdlijn())
     const achtergrond = t.algemeen.achtergrond!
@@ -445,6 +504,54 @@ describe('matcher — tijdlijn (1C, B37): "Over jouw situatie", drempel 2, Achte
     const katern = new Set(t.algemeen.items.map((i) => i.artikelId))
     for (const i of achtergrond.items) expect(katern.has(i.artikelId)).toBe(false)
     expect('achtergrond' in matchEditie(LEEG_PROFIEL, ARTIKELEN, context()).algemeen).toBe(false)
+  })
+
+  // Given zes Kamerbrieven die allemaal nieuwer zijn dan de rest, verdeeld over
+  // de twee bronlabels van de Tweede Kamer (SZW en Financiën, zoals op
+  // productie), When Achtergrond en het katern gevuld worden, Then staan er
+  // SAMEN hoogstens BRON_MAX_PER_BLOK van de Tweede Kamer in en vullen andere
+  // uitgevers de plekken (v7; op 30-09 kwamen zes van de acht algemene
+  // berichten van de Tweede Kamer). Aan beide uiteinden: precies twee van één
+  // uitgever blijven allebei staan.
+  it('v7: Achtergrond en katern tonen samen hoogstens twee berichten per uitgever', () => {
+    const van = (id: string, bron: string, uur: number): KandidaatArtikel => ({
+      ...artikelMet({ soort: 'achtergrond', themas: [] }, id),
+      source_name: bron,
+      published_at: `2026-09-19T${String(uur).padStart(2, '0')}:00:00Z`,
+    })
+    const tkLabel = (n: number) => (n % 2 === 1 ? 'Tweede Kamer — Kamerbrieven SZW' : 'Tweede Kamer — Kamerbrieven Financiën')
+    const tk = [1, 2, 3, 4, 5, 6].map((n) => van(`tk-${n}`, tkLabel(n), 20 - n))
+    const cbs = [van('cbs-1', 'CBS — Prijzen (CPI / inflatie)', 8), van('cbs-2', 'CBS — Inkomen en bestedingen', 7)]
+    const rijk = [van('rijk-1', 'Rijksoverheid — Ministerie van Financiën', 6)]
+    const t = matchEditie(LEEG_PROFIEL, [...tk, ...cbs, ...rijk], tijdlijn())
+
+    expect(BRON_MAX_PER_BLOK).toBe(2)
+    const achtergrond = t.algemeen.achtergrond!.items
+    const katern = t.algemeen.items
+    expect(achtergrond.map((i) => i.artikelId)).toEqual(['tk-1', 'tk-2', 'cbs-1'])
+    expect(katern.map((i) => i.artikelId)).toEqual(['cbs-2', 'rijk-1'])
+    const perUitgever = new Map<string, number>()
+    for (const i of [...achtergrond, ...katern]) perUitgever.set(uitgeverVan(i.bron), (perUitgever.get(uitgeverVan(i.bron)) ?? 0) + 1)
+    expect(Object.fromEntries(perUitgever)).toEqual({ 'Tweede Kamer': 2, CBS: 2, Rijksoverheid: 1 })
+
+    // Precies twee van één uitgever (twee labels): allebei zichtbaar, niets verdwijnt onnodig.
+    const twee = matchEditie(LEEG_PROFIEL, tk.slice(0, 2), tijdlijn())
+    expect(twee.algemeen.achtergrond!.items.map((i) => i.artikelId)).toEqual(['tk-1', 'tk-2'])
+    expect(twee.algemeen.items).toHaveLength(0)
+  })
+
+  it('v7: uitgeverVan neemt het deel vóór " — "; een label zonder streep is zijn eigen uitgever', () => {
+    expect(uitgeverVan('Tweede Kamer — Kamerbrieven SZW')).toBe('Tweede Kamer')
+    expect(uitgeverVan('Rijksoverheid — Ministerie van SZW')).toBe('Rijksoverheid')
+    expect(uitgeverVan('Mijn eigen bron')).toBe('Mijn eigen bron')
+    expect(uitgeverVan(' — alleen een staart')).toBe('— alleen een staart')
+  })
+
+  it('v7: ook het katern van de weekeditie houdt zich aan twee per uitgever', () => {
+    const e = matchEditie(LEEG_PROFIEL, ARTIKELEN, context())
+    const n = new Map<string, number>()
+    for (const i of e.algemeen.items) n.set(uitgeverVan(i.bron), (n.get(uitgeverVan(i.bron)) ?? 0) + 1)
+    for (const aantal of n.values()) expect(aantal).toBeLessThanOrEqual(BRON_MAX_PER_BLOK)
   })
 
   it('elke raakt-regel van elk thema heeft een reden in de catalogus, en elk thema een onderwerp', () => {

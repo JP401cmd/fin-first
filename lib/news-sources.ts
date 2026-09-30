@@ -278,6 +278,9 @@ export function standaardWebBronnen(nu: Date = new Date()): WebSource[] {
     // de titel van de brief. Hier stond op 29-09 "Voorstellen op box 3,
     // koopkracht werkenden en sociale zekerheid" — het bericht dat de eigenaar
     // miste. De briefpagina's staan NIET in DETAIL_HOSTS: alleen de kop.
+    // Gemeten 30-09-2026 (ADR 0191, aanvulling): de brieftekst staat niet in de
+    // HTML, alleen als Word-download. De pagina levert titel, indieners en de
+    // datum van een komend debat, en duurt ongecached 13–49 s.
     { url: 'https://www.tweedekamer.nl/kamerstukken/brieven_regering?qry=%2A&fld_tk_categorie=Kamerstukken&fld_prl_kamerstuk=Brieven%20regering&srt=date%3Adesc%3Adate&fld_prl_voortouwcommissie=Vaste%20commissie%20voor%20Financi%C3%ABn', label: 'Tweede Kamer — Kamerbrieven Financiën', soort: 'web_lijst' },
     { url: 'https://www.tweedekamer.nl/kamerstukken/brieven_regering?qry=%2A&fld_tk_categorie=Kamerstukken&fld_prl_kamerstuk=Brieven%20regering&srt=date%3Adesc%3Adate&fld_prl_voortouwcommissie=Vaste%20commissie%20voor%20Sociale%20Zaken%20en%20Werkgelegenheid', label: 'Tweede Kamer — Kamerbrieven SZW', soort: 'web_lijst' },
   ]

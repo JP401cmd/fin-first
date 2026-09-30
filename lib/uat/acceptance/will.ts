@@ -675,10 +675,10 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De matcher toetst het leescontract (`voldoetAanLeescontract` → `inVenster`) — dezelfde pure toets voor de dagelijkse tijdlijncron, de vernieuwknop (WF-WILL-34), de weekcron (schaduweditie) en de herberekening.',
     then:
-      'Een publicatiedatum ouder dan `NIEUWS_MAX_OUDERDOM_DAGEN` (45) telt NIET als nieuw, ook al is het artikel deze week opgehaald: het verschijnt niet in de tijdlijn of editie. Bij 44 dagen telt het wel. Zonder (bruikbare) publicatiedatum beslist de ophaaldatum — sinds matcher v6 (ADR 0191) telt alleen een ECHTE publicatiedatum (feed, metadata of de datum bij de kop); `eerste_gezien` is het ophaalmoment en maakt niets "oud". Een aankomende deadline gaat voor: dan blijft ook een oud bericht in het venster. Uitkomst draagt `matcherVersie` 6 (v5: eigenaarsbesluit 29-09-2026; v6: redactieregels).',
+      'Een publicatiedatum ouder dan `NIEUWS_MAX_OUDERDOM_DAGEN` (45) telt NIET als nieuw, ook al is het artikel deze week opgehaald: het verschijnt niet in de tijdlijn of editie. Bij 44 dagen telt het wel. Zonder (bruikbare) publicatiedatum beslist de ophaaldatum — sinds matcher v6 (ADR 0191) telt alleen een ECHTE publicatiedatum (feed, metadata of de datum bij de kop); `eerste_gezien` is het ophaalmoment en maakt niets "oud". Een aankomende deadline gaat voor: dan blijft ook een oud bericht in het venster. Uitkomst draagt `matcherVersie` 7 (v5: eigenaarsbesluit 29-09-2026; v6: redactieregels; v7: hoofdthema en twee per bron).',
     assertion: {
       kind: 'exact',
-      expected: 'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=6; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudZonderEchteDatum=true; oudMetDeadline=true',
+      expected: 'NIEUWS_MAX_OUDERDOM_DAGEN=45; MATCHER_VERSIE=7; gepubliceerd46=false; gepubliceerd44=true; zonderPublicatiedatum=true; oudZonderEchteDatum=true; oudMetDeadline=true',
       source:
         'lib/krant/matcher.ts#voldoetAanLeescontract + inVenster/isOudNieuws + #NIEUWS_MAX_OUDERDOM_DAGEN + #MATCHER_VERSIE — echte, pure productiefunctie op de gedeelde fixture lib/krant/editie.fixture.ts (zelfde invoer als matcher.test.ts), geen mirror — zie will-checks.ts',
     },
@@ -742,15 +742,34 @@ const criteria: AcceptanceCriterion[] = [
     given:
       'Geduide artikelen in het venster (ADR 0191, steekproef eigenaar 29-09-2026): (1) een sectie van een vaste uitlegpagina die binnenkwam omdat de pagina nieuw was (`bron_wijziging` basis) en dezelfde sectie als wijziging op een bekende pagina (gewijzigd), plus een link van een naslaglijst zonder eigen datum (de Box 3-uitlegpagina\'s van de Belastingdienst); (2a) een AFM-bericht met "Caribisch Nederland" in de kop, en een Nederlands bericht dat Bonaire één keer terloops noemt; (2b) de AFM-blog "betaal jezelf eerst: spaarbuffer" met thema sparen-rente, bij een lezer met spaargeld tot € 5.000 en een lezer met € 50.000–100.000; (2c) een cijfer zonder rekenregel met een thema dat raakt; (3) een artikel zonder echte publicatiedatum (`published_bron` eerste_gezien).',
     when:
-      'De tijdlijn ververst (dagcron of de vernieuwknop, WF-WILL-34) en de matcher (`matchEditie`, modus tijdlijn, MATCHER_VERSIE 6) bouwt de berichten, Achtergrond en het katern.',
+      'De tijdlijn ververst (dagcron of de vernieuwknop, WF-WILL-34) en de matcher (`matchEditie`, modus tijdlijn, MATCHER_VERSIE 7) bouwt de berichten, Achtergrond en het katern.',
     then:
       '(1) De basissectie komt nooit in de tijdlijn en draagt dus nooit het label Nieuw; ze mag in Achtergrond staan, ACHTER al het nieuws. De gewijzigde sectie komt wél als bericht. Een link van een naslaglijst is ook de stand van zaken en dus geen bericht; draagt de pagina zelf een echte publicatiedatum, dan wel. (2a) Het Caribische bericht staat nergens — niet als bericht, niet in Achtergrond, niet in het katern; het terloopse bericht blijft gewoon. (2b) De bufferblog is "Over jouw situatie" voor de lezer met weinig spaargeld (zonder zichtbare reden: die is gevoelig) en géén bericht voor de lezer met veel spaargeld (wel Achtergrond). (2c) Het cijfer is nooit een bericht of Achtergrond, alleen katern. (3) Onder het bericht staat "gezien op <datum>" en nooit de ophaaldag als publicatiedatum; met een echte datum (feed, metadata, of de datum bij de kop — AFM "Nieuws 24/08/26") staat de publicatiedatum er. Een gewijzigde sectie toont "gezien op": haar datum is die van de hele pagina. Onder "Waarom zie ik dit?" staan zinnen uit de catalogus ("Volgens je profiel heb je € 5.000 of meer spaargeld."), nooit de codes van de matcher; bij het bufferbericht staat daar geen reden.',
     assertion: {
       kind: 'exact',
       expected:
-        'MATCHER_VERSIE=6; basisInTijdlijn=0; gewijzigdInTijdlijn=1; basisInAchtergrond=1; naslagInTijdlijn=0; caribischOveral=0; terloopsInTijdlijn=1; bufferWeinigSpaargeld=raakt; bufferVeelSpaargeld=0; cijferZonderRekenregel=0; gezienOp=true; gepubliceerd=null',
+        'MATCHER_VERSIE=7; basisInTijdlijn=0; gewijzigdInTijdlijn=1; basisInAchtergrond=1; naslagInTijdlijn=0; caribischOveral=0; terloopsInTijdlijn=1; bufferWeinigSpaargeld=raakt; bufferVeelSpaargeld=0; cijferZonderRekenregel=0; gezienOp=true; gepubliceerd=null',
       source:
         'lib/krant/matcher.ts#matchEditie (v6) + lib/krant/redactie.ts (isBasisSectie, isNaslagLijst, isCaribischBericht, isBufferBericht, lezersDatum) — echte, pure productiefuncties op de gedeelde fixture lib/krant/editie.fixture.ts, geen mirror — zie will-checks.ts; weergave "gezien op": components/berichten/tijdlijn-client.tsx#Bron',
+    },
+  },
+  // ── Kwaliteit vóór de vlag (matcher v7, melding eigenaar 30-09-2026) ───────
+  {
+    workflow: 'WF-WILL-45',
+    scenarioId: 'UAT-WILL-45',
+    titel: '"Dit bericht gaat over" noemt het hoofdonderwerp, en de algemene blokken tonen samen hoogstens twee berichten per uitgever',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Geduide artikelen in het venster: (1) "Aftrekposten box 1" met als thema\'s eerst inkomstenbelasting, dan eigen-woning, bij een lezer met een koopwoning; dezelfde twee thema\'s in omgekeerde volgorde; (2) zes Kamerbrieven, verdeeld over de twee bronlabels van de Tweede Kamer (SZW en Financiën), die nieuwer zijn dan twee CBS-berichten en één Rijksoverheid-bericht, bij een lezer zonder profiel.',
+    when: 'De tijdlijn ververst (dagcron of de vernieuwknop, WF-WILL-34) en de matcher (`matchEditie`, modus tijdlijn, MATCHER_VERSIE 7) bouwt de berichten, Achtergrond en het katern.',
+    then:
+      '(1) Onder "Over jouw situatie" noemt "Dit bericht gaat over …" het eerste thema van de duiding: "de inkomstenbelasting (box 1)", niet "de eigen woning en de hypotheek". De reden "Volgens je profiel heb je een koopwoning." staat dan niet in die zin (ze hoort bij een bijthema en zou als verband lezen), maar wel onder "Waarom zie ik dit?". Staat eigen-woning vooraan, dan staat de reden er wél. (2) Achtergrond en het katern tonen SAMEN hoogstens twee berichten van dezelfde uitgever (het deel van de bronnaam vóór de streep: "Tweede Kamer"), ook als die uitgever meer bronlabels heeft; een andere uitgever vult de plek.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'MATCHER_VERSIE=7; BRON_MAX_PER_BLOK=2; onderwerpHoofdthema=true; redenBijthemaZichtbaar=false; redenBijthemaInWaarom=true; redenHoofdthemaZichtbaar=true; tweedeKamerSamen=2; andereUitgeverInAchtergrond=true',
+      source:
+        'lib/krant/matcher.ts#matchEditie (v7: raaktTekst + gespreid + uitgeverVan, #BRON_MAX_PER_BLOK) — echte, pure productiefunctie op de gedeelde fixture lib/krant/editie.fixture.ts, geen mirror — zie will-checks.ts',
     },
   },
 ]
