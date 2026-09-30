@@ -97,6 +97,33 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.26',
+    date: '2026-09-30',
+    title: 'De Krant noemt het echte onderwerp en spreidt zijn bronnen',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: '"Dit bericht gaat over" noemt het hoofdonderwerp',
+            description:
+              'Een bericht over de inkomstenbelasting heette soms een bericht over je woning, omdat dat bij je profiel paste. Nu staat het echte onderwerp er.',
+          },
+          {
+            title: 'Meer verschillende bronnen onder de tijdlijn',
+            description: 'Achtergrond en "Ook in het nieuws" tonen samen hoogstens twee berichten van dezelfde afzender, zoals de Tweede Kamer.',
+          },
+          {
+            title: 'Het nieuws van de ochtend meteen in de tijdlijn',
+            description:
+              'Wat we in de ochtend duiden, staat nu dezelfde ochtend in de tijdlijn en niet pas de dag erna. De tijdlijn staat nog uit voor lezers.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.25',
     date: '2026-09-30',
     title: 'De Krant kiest scherper wat nieuws is',

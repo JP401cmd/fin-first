@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-29T22:52:59.080Z",
-  "generatedDate": "2026-09-29",
+  "generatedAt": "2026-09-30T21:01:28.316Z",
+  "generatedDate": "2026-09-30",
   "repo": {
     "name": "fin",
-    "version": "0.92.25"
+    "version": "0.92.26"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -19408,8 +19408,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 4140,
-        "commits": 30
+        "loc": 4167,
+        "commits": 31
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -20701,7 +20701,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-29",
+    "previousDate": "2026-09-30",
     "hasChanges": false,
     "sections": []
   },
@@ -21191,6 +21191,13 @@
     },
     {
       "date": "2026-09-29",
+      "api": 344,
+      "components": 1287,
+      "tables": 105,
+      "routesProduction": 91
+    },
+    {
+      "date": "2026-09-30",
       "api": 344,
       "components": 1287,
       "tables": 105,
