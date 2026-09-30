@@ -1326,3 +1326,7 @@
 ## 2026-09-30
 
 - Geen wijzigingen.
+
+## 2026-09-30
+
+- **API-routes** toegevoegd: /api/v1/krant/config, /api/v1/krant/feedback, /api/v1/krant/profiel

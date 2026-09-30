@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-30T21:01:28.316Z",
+  "generatedAt": "2026-09-30T21:27:06.010Z",
   "generatedDate": "2026-09-30",
   "repo": {
     "name": "fin",
-    "version": "0.92.26"
+    "version": "0.92.27"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -191,7 +191,7 @@
   "stats": {
     "routes": 137,
     "routesProduction": 91,
-    "api": 344,
+    "api": 347,
     "tables": 105,
     "migrations": 273,
     "integrations": 25,
@@ -4662,6 +4662,31 @@
       ]
     },
     {
+      "url": "/api/v1/krant/config",
+      "file": "app/api/v1/krant/config/route.ts",
+      "domain": "v1",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/v1/krant/feedback",
+      "file": "app/api/v1/krant/feedback/route.ts",
+      "domain": "v1",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/v1/krant/profiel",
+      "file": "app/api/v1/krant/profiel/route.ts",
+      "domain": "v1",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/valuations",
       "file": "app/api/valuations/route.ts",
       "domain": "valuations",
@@ -6931,6 +6956,38 @@
           "domain": "recurring",
           "methods": [
             "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "v1",
+      "label": "v1",
+      "count": 3,
+      "routes": [
+        {
+          "url": "/api/v1/krant/config",
+          "file": "app/api/v1/krant/config/route.ts",
+          "domain": "v1",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/v1/krant/feedback",
+          "file": "app/api/v1/krant/feedback/route.ts",
+          "domain": "v1",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/v1/krant/profiel",
+          "file": "app/api/v1/krant/profiel/route.ts",
+          "domain": "v1",
+          "methods": [
+            "GET",
+            "PUT"
           ]
         }
       ]
@@ -12708,6 +12765,12 @@
           "write": false
         }
       ],
+      "v1": [
+        {
+          "name": "news_feedback",
+          "write": true
+        }
+      ],
       "valuations": [
         {
           "name": "valuations",
@@ -14358,6 +14421,14 @@
           ]
         },
         {
+          "domain": "v1",
+          "label": "v1",
+          "write": true,
+          "routes": [
+            "/api/v1/krant/feedback"
+          ]
+        },
+        {
           "domain": "admin",
           "label": "Beheer",
           "write": false,
@@ -16000,6 +16071,7 @@
       "goals",
       "investment_holdings",
       "life_events",
+      "news_feedback",
       "profiles",
       "questionnaire_invitations",
       "questionnaire_sessions",
@@ -19294,6 +19366,22 @@
       "file": "docs/adr/0186-model-per-ai-feature.md"
     },
     {
+      "id": "0187-api-v1-met-bearer",
+      "title": "API v1 met Bearer: een native ingang naar de Krant, als de lezer onder RLS, met het contract als bron",
+      "status": "voorgesteld",
+      "date": "2026-09-29",
+      "elements": [
+        "as-nieuws",
+        "do-krant",
+        "app-comp",
+        "t-supabase",
+        "t-platform",
+        "ext-supabase"
+      ],
+      "summary": "De Krant krijgt een eigen app (Krant 3B, Expo; B16/B17). Die app heeft geen cookies: hij logt in bij Supabase Auth met een e-mailcode (B19) en stuurt daarna het access token mee als `Authorization: Bearer <jwt>`. Tot nu toe kende de server alleen cookie-auth (`lib/supabase/server",
+      "file": "docs/adr/0187-api-v1-met-bearer.md"
+    },
+    {
       "id": "0188-de-weg-omhoog-van-krant-naar-geheel",
       "title": "De weg omhoog van de Krant naar het Geheel (fase 1)",
       "status": "voorgesteld",
@@ -19408,8 +19496,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 4167,
-        "commits": 31
+        "loc": 4185,
+        "commits": 32
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -20702,8 +20790,18 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-30",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/v1/krant/config",
+          "/api/v1/krant/feedback",
+          "/api/v1/krant/profiel"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -21198,7 +21296,7 @@
     },
     {
       "date": "2026-09-30",
-      "api": 344,
+      "api": 347,
       "components": 1287,
       "tables": 105,
       "routesProduction": 91

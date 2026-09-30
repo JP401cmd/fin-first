@@ -97,6 +97,24 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.27',
+    date: '2026-09-30',
+    title: 'De basis voor de Krant als app',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Een eigen ingang voor de toekomstige Krant-app',
+            description:
+              'De app kan straks je nieuwsprofiel lezen en aanpassen en je oordeel over een bericht doorgeven. Er is nog geen app; in de webversie verandert niets.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.26',
     date: '2026-09-30',
     title: 'De Krant noemt het echte onderwerp en spreidt zijn bronnen',
