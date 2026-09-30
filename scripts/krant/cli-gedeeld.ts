@@ -74,16 +74,20 @@ export function huidigeCommit(): string {
 /**
  * Dezelfde poort als productie: de prompts, controles en versies komen uit de
  * lokale checkout. Schrijven mag alleen als die checkout gelijk is aan
- * origin/master (security-run 29 sep, 🟡-2; review 29 sep). `paden` = de
- * bestanden die de schrijfactie bepalen; die moeten schoon zijn.
+ * origin/master (security-run 29 sep, 🟡-2; review 29 sep), en de HELE
+ * getrackte boom moet schoon zijn. Tot 30 sep toetste hij een padlijst per
+ * opdracht; de tijdlijnroute laadt echter 79 bestanden, waaronder de
+ * AI-sanitizer, de privacypoort en de loaders — een ongecommitte wijziging
+ * dáár draaide dan met de service-rol tegen productie (security-run 0.92.26,
+ * 🟡-1). Ongetrackte bestanden (env-kopie, node_modules-junction) tellen niet.
  *
- * Let op: deze poort draait NA de module-imports. Tegen een gewijzigd script
- * beschermt hij dus niet; daarvoor vergelijkt de skill `git status` vóór en
- * ná elke agent.
+ * Let op: deze poort draait NA de module-imports van het script zelf. Tegen
+ * een gewijzigd script beschermt hij dus niet; daarvoor vergelijkt de skill
+ * `git status` vóór en ná elke agent.
  */
-export function eisSchoneCheckout(paden: readonly string[]): string {
-  const vuil = git('status', '--porcelain', '--', ...paden)
-  if (vuil) stop(`lokale wijzigingen in ${paden.join(', ')} — schrijf alleen vanaf een schone checkout:\n${vuil}`)
+export function eisSchoneCheckout(): string {
+  const vuil = git('status', '--porcelain', '--untracked-files=no')
+  if (vuil) stop(`lokale wijzigingen in de checkout — schrijf alleen vanaf een schone checkout:\n${vuil}`)
   try {
     git('fetch', '-q', 'origin', 'master')
   } catch {

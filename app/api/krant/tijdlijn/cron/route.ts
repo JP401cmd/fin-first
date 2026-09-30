@@ -25,7 +25,9 @@ export const TIJDLIJN_CRON_CONCURRENCY = 3
  * Dagelijks 06:30 UTC (vercel.json), ná de ingest + duiding van 05:00. Eigen
  * cron in plaats van een staart aan de ingest: het tijdbudget van de ingest
  * knelt al (de duiding wordt uitgesteld), en wat na 06:30 geduid wordt komt
- * de dag erna of via de knop.
+ * de dag erna of via de knop. Duidt de ochtendroutine (ADR 0171, hartslag),
+ * dan draait `scripts/krant/ochtend.ts hartslag` deze route na het duiden
+ * nog een keer (aanvulling 30 sep 2026).
  *
  * Voor wie (B40, fase 2): iedereen met de module nieuws en afgeronde
  * onboarding wiens /nieuws de tijdlijn ÍS — dezelfde `bepaalKrantBron` als de

@@ -100,7 +100,7 @@ async function beoordeel() {
   const uitvoer = leesUitvoer(uitvoerPaden)
   if (vlag('schrijf') && !vlag('ja')) stop('--schrijf vraagt ook --ja (schrijft naar de database).')
   const schrijven = vlag('schrijf') && vlag('ja')
-  const commit = schrijven ? eisSchoneCheckout(['lib/krant', 'scripts/krant']) : huidigeCommit()
+  const commit = schrijven ? eisSchoneCheckout() : huidigeCommit()
 
   const supabase = client()
   if (schrijven) await eisNoodstopAan(supabase)

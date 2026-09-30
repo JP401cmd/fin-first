@@ -341,3 +341,20 @@ draait.
   modelkwaliteit.
 - **Terug naar de cron.** Schrijf geen hartslag meer; na 48 uur duidt de cron weer zelf. Er is geen
   code-wijziging nodig.
+
+## Aanvulling 30 sep 2026 — na de ochtendroutine ververst de tijdlijn
+
+**Aanleiding.** Op 30 sep om 08:46 zei de Krant van de eigenaar "Er is niets nieuws sinds de vorige
+keer", terwijl er 19 artikelen op de duiding wachtten. De tijdlijncron (06:30 UTC) is ontworpen als
+"ná de ingest + duiding van 05:00". Sinds de ochtendroutine het duiden doet, duidt de ingest niets
+meer, en de routine draait na 08:00 NL. De cron vond daardoor elke ochtend niets nieuws; wat de sessie
+duidde, kwam pas de volgende dag in de tijdlijn, of na een klik op Vernieuwen.
+
+**Besluit.** `scripts/krant/ochtend.ts hartslag` ververst na het schrijven van de hartslag de
+tijdlijnen met de echte cronroute (`GET /api/krant/tijdlijn/cron`, lokaal). Dat is ook los te draaien
+als `ochtend.ts tijdlijn`. Er zijn dezelfde poorten als bij de dagcron (bèta-vlag, bezwaar,
+privacy per lezer, AI-quotum), dezelfde summary met alleen tellingen, en een `job_runs`-rij
+`krant-tijdlijn`. Schrijven eist dezelfde schone checkout van `origin/master` als de weekjob. Een
+tweede verversing op een dag voegt alleen toe wat er nog niet stond. De AI-laag slaat een lezer
+over als er sinds zijn vorige verversing niets nieuws is, dus het quotum loopt niet dubbel op.
+De skill werkt ongewijzigd, want die schrijft de hartslag al als laatste stap. Haar tekst loopt wel achter: het akkoord van de eigenaar en het rapport noemen de tijdlijnstap niet. Een voorstel voor die tekst ligt bij de eigenaar (`.claude/` wijzigt alleen met zijn akkoord). De voorwaarden van de tijdlijnstap (schone checkout, productiehost) worden vóór het schrijven van de hartslag getoetst. Sinds deze aanvulling eist de schone-checkout-poort van alle schrijvende ochtendopdrachten de hele getrackte boom, niet een padlijst: de tijdlijnroute laadt ook de AI-sanitizer, de privacypoort en de loaders (security-run 0.92.26).

@@ -39,9 +39,6 @@ import {
 } from './cli-gedeeld'
 import { geheimenUitEnv } from '../../lib/krant/geheim-toets'
 
-/** Wat de schrijfactie bepaalt: prompt, schema, invoer en de module zelf. */
-const SCHRIJF_BRONNEN = ['lib/news-enrich.ts', 'lib/news-ingest.ts', 'lib/news-html.ts', 'lib/krant', 'scripts/krant']
-
 /** Ongecategoriseerde rijen van de laatste `dagen` dagen. */
 function openRijen(supabase: SupabaseClient, dagen: number) {
   const sinds = new Date(Date.now() - dagen * 24 * 60 * 60 * 1000).toISOString()
@@ -88,7 +85,7 @@ async function beoordeel() {
   const uitvoer = leesUitvoer(paden)
   if (vlag('schrijf') && !vlag('ja')) stop('--schrijf vraagt ook --ja (schrijft naar de database).')
   const schrijven = vlag('schrijf') && vlag('ja')
-  const commit = schrijven ? eisSchoneCheckout(SCHRIJF_BRONNEN) : huidigeCommit()
+  const commit = schrijven ? eisSchoneCheckout() : huidigeCommit()
 
   const supabase = client()
   if (schrijven) await eisNoodstopAan(supabase)

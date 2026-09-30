@@ -1,4 +1,4 @@
-// Krant-ochtendroutine (skill .claude/skills/krant-ochtend). Drie opdrachten:
+// Krant-ochtendroutine (skill .claude/skills/krant-ochtend). Vier opdrachten:
 //
 //   npx tsx scripts/krant/ochtend.ts status --env .env.local
 //     ALLEEN LEZEN. Toont per Krant-job wat er moet gebeuren: hartslag, laatste
@@ -14,7 +14,16 @@
 //     Schrijft de hartslag: één job_runs-rij 'krant-ochtend' (success). Zolang
 //     die jonger is dan 48 uur slaat de news-ingest-cron de duiding over
 //     (lib/krant/ochtend-hartslag.ts). Weigert als er na de sessie nog meer dan
-//     HARTSLAG_MAX_OPEN duidingen open staan.
+//     HARTSLAG_MAX_OPEN duidingen open staan. Ververst daarna de tijdlijnen
+//     (zie `tijdlijn` hieronder), want pas nu is de duiding van vandaag klaar.
+//
+//   npx tsx scripts/krant/ochtend.ts tijdlijn --env .env.local --ja
+//     Draait de ECHTE tijdlijncron (GET uit app/api/krant/tijdlijn/cron/route.ts)
+//     lokaal: dezelfde lezers, poorten en summary als de dagcron van 06:30 UTC.
+//     Nodig omdat die dagcron vóór de ochtendroutine draait: zolang de sessie
+//     duidt, zag een lezer de duidingen van vandaag anders pas morgen (op
+//     30-09-2026: "Er is niets nieuws" om 08:46, terwijl 19 artikelen op de
+//     duiding wachtten). Alleen vanaf een schone checkout van origin/master.
 //
 // De service-sleutel komt uit het opgegeven env-bestand en wordt nooit gelogd.
 
@@ -193,7 +202,7 @@ async function toonStatus() {
 
 async function weekjob() {
   if (!vlag('ja')) stop('weekjob schrijft naar de database: geef --ja (na akkoord van de eigenaar).')
-  const commit = eisSchoneCheckout(['lib/krant', 'app/api/krant/cron', 'lib/briefing', 'lib/news-ingest.ts', 'scripts/krant'])
+  const commit = eisSchoneCheckout()
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!url || !process.env.SUPABASE_SERVICE_ROLE_KEY) stop('NEXT_PUBLIC_SUPABASE_URL en SUPABASE_SERVICE_ROLE_KEY ontbreken in het env-bestand.')
   eisVerwachteHost(url)
@@ -212,6 +221,9 @@ async function weekjob() {
 
 async function hartslag() {
   if (!vlag('ja')) stop('hartslag schrijft naar de database: geef --ja (na akkoord van de eigenaar).')
+  // Eerst alle voorwaarden van de tijdlijnstap, zodat een vuile of achterlopende
+  // checkout stopt vóór er een hartslag staat (eindreview + security 0.92.26).
+  const voorwaarden = tijdlijnVoorwaarden()
   const supabase = client()
   const startedAt = new Date().toISOString()
   const s = await bepaalStatus(supabase)
@@ -232,6 +244,51 @@ async function hartslag() {
     stop('De nieuwe hartslag is niet terug te lezen — controleer job_runs (de insert kan stil mislukt zijn).')
   }
   console.log(`✓ hartslag geschreven (${na.laatste}). De ingest van morgen laat de duiding aan de sessie over; categoriseren doet hij zelf.`)
+  // De duiding van vandaag is nu klaar; de dagcron van 06:30 UTC zag haar nog niet.
+  const ok = await draaiTijdlijn(voorwaarden)
+  if (!ok) {
+    console.error('✗ De hartslag staat, maar de tijdlijnen zijn niet ververst. Draai later "ochtend.ts tijdlijn"; de hartslag niet opnieuw.')
+    process.exitCode = 1
+  }
+}
+
+interface TijdlijnVoorwaarden {
+  commit: string
+  host: string
+}
+
+/** Wat de tijdlijnstap eist vóór hij iets schrijft: --ja, een schone checkout gelijk aan origin/master, de productiehost. */
+function tijdlijnVoorwaarden(): TijdlijnVoorwaarden {
+  if (!vlag('ja')) stop('tijdlijn schrijft naar de database: geef --ja (na akkoord van de eigenaar).')
+  const commit = eisSchoneCheckout()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!url || !process.env.SUPABASE_SERVICE_ROLE_KEY) stop('NEXT_PUBLIC_SUPABASE_URL en SUPABASE_SERVICE_ROLE_KEY ontbreken in het env-bestand.')
+  eisVerwachteHost(url)
+  if (process.env.NODE_ENV === 'production' && !process.env.CRON_SECRET) stop('NODE_ENV=production zonder CRON_SECRET: de route zou weigeren.')
+  return { commit, host: new URL(url).host }
+}
+
+/**
+ * De tijdlijncron lokaal: de echte route, dus dezelfde poorten (bèta-vlag,
+ * bezwaar, privacy per lezer, AI-quotum) en een job_runs-rij 'krant-tijdlijn'.
+ * Een tweede run op een dag voegt alleen toe wat er nog niet stond.
+ */
+async function draaiTijdlijn(v: TijdlijnVoorwaarden): Promise<boolean> {
+  console.log(`→ tijdlijnen verversen · database: ${v.host} · commit ${v.commit.slice(0, 9)}`)
+  const route = (await import(pathToFileURL(resolve('app/api/krant/tijdlijn/cron/route.ts')).href)) as { GET: (r: Request) => Promise<Response> }
+  const headers: Record<string, string> = {}
+  if (process.env.CRON_SECRET) headers.authorization = `Bearer ${process.env.CRON_SECRET}`
+  const res = await route.GET(new Request('http://localhost/api/krant/tijdlijn/cron', { headers }))
+  const body = (await res.json().catch(() => null)) as Record<string, unknown> | null
+  console.log(`HTTP ${res.status}`)
+  // Alleen tellingen; de summary bevat geen inhoud (ADR 0146).
+  console.log(JSON.stringify(body, null, 2))
+  return res.ok
+}
+
+async function tijdlijn() {
+  const ok = await draaiTijdlijn(tijdlijnVoorwaarden())
+  if (!ok) process.exitCode = 1
 }
 
 async function main() {
@@ -240,7 +297,8 @@ async function main() {
   if (opdracht === 'status') await toonStatus()
   else if (opdracht === 'weekjob') await weekjob()
   else if (opdracht === 'hartslag') await hartslag()
-  else stop('Gebruik: status | weekjob | hartslag (zie de kop van dit bestand).')
+  else if (opdracht === 'tijdlijn') await tijdlijn()
+  else stop('Gebruik: status | weekjob | hartslag | tijdlijn (zie de kop van dit bestand).')
 }
 
 main().catch((err) => stop(err instanceof Error ? err.message : String(err)))
