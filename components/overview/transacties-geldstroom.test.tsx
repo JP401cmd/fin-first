@@ -8,10 +8,21 @@ import type { TransactionRow } from '@/components/app/transacties-feed'
  * TransactiesFeed. Filtert op huidige maand; toont 4 KPI's.
  */
 
+/**
+ * Een datum als YYYY-MM-DD in LOKALE tijd. Het component filtert op de lokale
+ * maand; `toISOString()` is UTC en gaf in de eerste uren van een nieuwe maand
+ * (Nederlandse tijd) nog de vorige maand, waardoor elke transactie wegviel
+ * (gezien 1 okt 2026, 00:30).
+ */
+function lokaleDatum(d: Date = new Date()): string {
+  const twee = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${twee(d.getMonth() + 1)}-${twee(d.getDate())}`
+}
+
 function tx(id: string, amount: number, date?: string): TransactionRow {
   return {
     id,
-    date: date ?? new Date().toISOString().slice(0, 10),
+    date: date ?? lokaleDatum(),
     description: `tx-${id}`,
     amount,
     category: null,
@@ -54,9 +65,9 @@ describe('TransactiesGeldstroom', () => {
   })
 
   it('filtert transacties van vorige maand weg', () => {
-    const lastMonth = new Date()
-    lastMonth.setMonth(lastMonth.getMonth() - 1)
-    const lastMonthDate = lastMonth.toISOString().slice(0, 10)
+    // De eerste van de vorige maand (setMonth(-1) op de 31e schuift terug naar deze maand).
+    const nu = new Date()
+    const lastMonthDate = lokaleDatum(new Date(nu.getFullYear(), nu.getMonth() - 1, 1))
     const { container } = render(
       <TransactiesGeldstroom
         transactions={[
