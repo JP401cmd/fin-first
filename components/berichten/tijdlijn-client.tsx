@@ -644,6 +644,14 @@ export function TijdlijnClient({
             .
           </p>
 
+          <p>
+            Je nieuwsprofiel bepaalt welke berichten je hier ziet.{' '}
+            <Link href="/mijn/nieuwsprofiel" className="underline underline-offset-2 hover:text-[var(--ink)]">
+              Bekijk je nieuwsprofiel of pas het aan
+            </Link>
+            .
+          </p>
+
           <KrantBezwaar bezwaar={bezwaar} context="tijdlijn" />
 
           {!metAi && kanAiKiezen && (

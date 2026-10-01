@@ -109,6 +109,14 @@ describe('TijdlijnClient', () => {
     expect(screen.getAllByTestId('regel-voor-jou')).toHaveLength(2)
   })
 
+  // Eindreview 0.92.28: de onboarding verwijst naar "Mijn nieuwsprofiel"; de tijdlijn is de ingang.
+  it('"Over je Krant" linkt naar het nieuwsprofiel, met een spatie vóór de link', () => {
+    render(<TijdlijnClient overzicht={overzicht()} kanAiKiezen={false} bezwaar={false} />)
+    const link = screen.getByRole('link', { name: 'Bekijk je nieuwsprofiel of pas het aan' })
+    expect(link.getAttribute('href')).toBe('/mijn/nieuwsprofiel')
+    expect(link.parentElement?.textContent).toBe('Je nieuwsprofiel bepaalt welke berichten je hier ziet. Bekijk je nieuwsprofiel of pas het aan.')
+  })
+
   it('meldt één keer dat de tijdlijn gelezen is', () => {
     render(<TijdlijnClient overzicht={overzicht()} kanAiKiezen={false} bezwaar={false} />)
     const gelezen = fetchMock.mock.calls.filter(([url]) => url === '/api/krant/tijdlijn/gelezen')
