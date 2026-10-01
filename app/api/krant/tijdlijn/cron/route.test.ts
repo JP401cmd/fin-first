@@ -210,6 +210,18 @@ describe('wie er ververst wordt', () => {
     expect(summary).toMatchObject({ lezers: 1, buitenBeta: 2, bezwaar: 0, verversingen: 1, berichten: 2, opgeruimd: 1, fouten: 0 })
   })
 
+  // Security-run 0.92.28 🟡-1: een geblokkeerd account krijgt geen verversing, ook binnen de bèta.
+  it('een geblokkeerd account wordt nooit ververst (telt als buiten de bèta)', async () => {
+    profielen = [
+      profiel({ id: 'u-admin', role: 'superadmin', active_modules: null }),
+      profiel({ id: 'u-geblokkeerd', role: 'superadmin', active_modules: null, blocked_at: '2026-10-01T00:00:00Z' }),
+    ]
+    const res = await GET(req('cron-secret'))
+    expect(gedraaid()).toEqual(['u-admin'])
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(summary).toMatchObject({ lezers: 1, buitenBeta: 1 })
+  })
+
   it('bèta open (B40): iedereen met module nieuws — Krant- én Geheel-account, zonder opt-in; nooit zonder module nieuws of onboarding', async () => {
     beta.open = true
     await GET(req('cron-secret'))

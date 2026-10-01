@@ -131,7 +131,7 @@ export async function GET(request: Request) {
   try {
     const { data: profielen, error: profielenFout } = await service
       .from('profiles')
-      .select('id, is_demo_user, active_modules, krant_schaduw_bezwaar_at')
+      .select('id, is_demo_user, active_modules, krant_schaduw_bezwaar_at, blocked_at')
       .eq('onboarding_completed', true)
     if (profielenFout) {
       await recordJobRun(service, { job: 'krant-editie', status: 'error', startedAt, error: profielenFout.message })
@@ -142,8 +142,11 @@ export async function GET(request: Request) {
     // bezwaar maakte, valt buiten de schaduwrun. Het bezwaar komt uit dezelfde
     // profiles-lezing als de modules — faalt die, dan draait de run al niet
     // (fail-closed hierboven). Op profiles, niet op nieuwsprofiel: een reset
-    // wist nieuwsprofiel en zou het bezwaar stil opheffen.
-    const nieuwslezers = (profielen ?? []).filter((p) => resolveActiveModules(p).includes('nieuws'))
+    // wist nieuwsprofiel en zou het bezwaar stil opheffen. Een geblokkeerd
+    // account krijgt geen editie: het kan niet meer lezen (security-run 0.92.29).
+    const nieuwslezers = (profielen ?? []).filter(
+      (p) => p.blocked_at == null && resolveActiveModules(p).includes('nieuws'),
+    )
     const lezers = nieuwslezers.filter((p) => p.krant_schaduw_bezwaar_at == null)
     summary.bezwaar = nieuwslezers.length - lezers.length
     summary.gebruikers = lezers.length

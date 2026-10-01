@@ -124,6 +124,15 @@ describe('geen-tijdlijn', () => {
     expect(mockVervers).not.toHaveBeenCalled()
   })
 
+  // Security-run 0.92.28 🟡-1: een geblokkeerd account ververst niets, ook binnen de bèta.
+  it('geblokkeerd account → geen-tijdlijn, zonder claim of verversing', async () => {
+    beta.open = true
+    const nep = maakClient({ profiel: { active_modules: ['nieuws'], blocked_at: '2026-10-01T00:00:00Z' } })
+    const uit = await verversEigenTijdlijn(nep.client as never, UID, { now: NU })
+    expect(uit).toEqual({ status: 'geen-tijdlijn' })
+    expect(mockVervers).not.toHaveBeenCalled()
+  })
+
   it('geen profielrij → geen-tijdlijn', async () => {
     const nep = maakClient({ profiel: null })
     const uit = await verversEigenTijdlijn(nep.client as never, UID, { now: NU })

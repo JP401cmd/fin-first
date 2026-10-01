@@ -53,7 +53,7 @@ export async function verversEigenTijdlijn(
   const now = opts.now ?? new Date()
 
   const [profielRes, nieuwsRes, laatsteRes] = await Promise.all([
-    service.from('profiles').select('role, active_modules, active_subscriptions, ai_enabled').eq('id', userId).maybeSingle(),
+    service.from('profiles').select('role, active_modules, active_subscriptions, ai_enabled, blocked_at').eq('id', userId).maybeSingle(),
     service.from('nieuwsprofiel').select('krant_variant').eq('user_id', userId).maybeSingle(),
     service
       .from('krant_edities')
@@ -67,7 +67,8 @@ export async function verversEigenTijdlijn(
   if (profielRes.error) throw new Error(`[krant/tijdlijn-vernieuwen] profiel lezen mislukt: ${profielRes.error.message}`)
   if (nieuwsRes.error) throw new Error(`[krant/tijdlijn-vernieuwen] variant lezen mislukt: ${nieuwsRes.error.message}`)
   if (laatsteRes.error) throw new Error(`[krant/tijdlijn-vernieuwen] laatste verversing lezen mislukt: ${laatsteRes.error.message}`)
-  if (!profielRes.data) return { status: 'geen-tijdlijn' }
+  // Geblokkeerd = geen tijdlijn, gelijk aan krantBronVoor en vereisBearer (security-run 0.92.28, 🟡-1).
+  if (!profielRes.data || profielRes.data.blocked_at != null) return { status: 'geen-tijdlijn' }
 
   const modules = resolveActiveModules(profielRes.data)
   const variant = nieuwsRes.data?.krant_variant === 'ai' ? 'ai' : nieuwsRes.data?.krant_variant === 'tijdlijn' ? 'tijdlijn' : null

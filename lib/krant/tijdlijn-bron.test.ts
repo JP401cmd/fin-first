@@ -239,3 +239,31 @@ describe('krantBronVoor', () => {
     expect(uit.kanAiKiezen).toBe(false)
   })
 })
+
+// Given een geblokkeerd account (profiles.blocked_at gevuld) — óók een superadmin
+// met AI en een 'ai'-keuze — When een Krant-route de bron bepaalt, Then is die
+// bron 'wacht': geen tijdlijn, geen AI-laag, niets te kiezen. Gelijk aan
+// vereisBearer (API v1); security-run 0.92.28 🟡-1, af vóór de vlag opengaat.
+describe('krantBronVoor — geblokkeerd account', () => {
+  it.each([
+    ['een superadmin met AI en de keuze ai', { role: 'superadmin', active_modules: null, ai_enabled: true, active_subscriptions: ['ai'] }, 'ai'],
+    ['een Krant-account binnen de bèta', { role: 'superadmin', active_modules: ['nieuws'], ai_enabled: false, active_subscriptions: [] }, null],
+  ])('%s → wacht', async (_naam, profiel, variant) => {
+    const c = client(
+      { data: { ...profiel, blocked_at: '2026-10-01T00:00:00Z' }, error: null },
+      { data: { krant_variant: variant }, error: null },
+    )
+    const uit = await krantBronVoor(c as never, 'u1')
+    expect(uit.bron).toBe('wacht')
+    expect(leestTijdlijn(uit.bron)).toBe(false)
+    expect(uit.kanAiKiezen).toBe(false)
+  })
+
+  it('niet geblokkeerd (blocked_at null) → ongewijzigd gedrag', async () => {
+    const c = client(
+      { data: { role: 'superadmin', active_modules: null, ai_enabled: true, active_subscriptions: ['ai'], blocked_at: null }, error: null },
+      { data: { krant_variant: 'ai' }, error: null },
+    )
+    expect((await krantBronVoor(c as never, 'u1')).bron).toBe('ai')
+  })
+})

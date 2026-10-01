@@ -89,13 +89,24 @@ function leesVariant(v: unknown): KrantVariant {
  * en beslist. Fail-closed: kan het profiel niet gelezen worden, dan 'wacht'
  * voor een onbekend account — nooit een tijdlijn bij twijfel over de vlag, en
  * geen AI-pad dat een Krant-account zou kunnen raken.
+ *
+ * Een GEBLOKKEERD account (`profiles.blocked_at`) krijgt ook 'wacht': geen
+ * tijdlijn, geen AI-laag, niets te kiezen — gelijk aan `vereisBearer` in de
+ * native API. Alle Krant-routes die de bron vragen (lezen, gelezen, variant,
+ * en via `verversEigenTijdlijn` het vernieuwen) weigeren hem zo op één plek
+ * (security-run 0.92.28, 🟡-1). De bezwaarroute vraagt de bron niet en weigert
+ * dus niet op blocked_at: bezwaar is een AVG-recht dat alleen verwerking
+ * vermindert. Wie geblokkeerd is, heeft sinds 0.92.029 ook een ban in Supabase
+ * Auth en dus geen sessie meer — die maakt bezwaar via het contactkanaal.
  */
 export async function krantBronVoor(supabase: SupabaseClient, userId: string): Promise<KrantBronUitkomst> {
   const [profielRes, nieuwsRes] = await Promise.all([
-    supabase.from('profiles').select('role, active_modules, active_subscriptions, ai_enabled').eq('id', userId).maybeSingle(),
+    supabase.from('profiles').select('role, active_modules, active_subscriptions, ai_enabled, blocked_at').eq('id', userId).maybeSingle(),
     supabase.from('nieuwsprofiel').select('krant_variant').eq('user_id', userId).maybeSingle(),
   ])
-  if (profielRes.error || !profielRes.data) return { bron: 'wacht', krantAccount: false, variant: null, inBeta: false, kanAiKiezen: false }
+  if (profielRes.error || !profielRes.data || profielRes.data.blocked_at != null) {
+    return { bron: 'wacht', krantAccount: false, variant: null, inBeta: false, kanAiKiezen: false }
+  }
   const krantAccount = isNewsOnly(resolveActiveModules(profielRes.data))
   // Een leesfout op nieuwsprofiel = geen keuze bekend = de standaard.
   const variant = nieuwsRes.error ? null : leesVariant(nieuwsRes.data?.krant_variant)

@@ -177,7 +177,7 @@ export async function GET(request: Request) {
     for (let van = 0; ; van += TIJDLIJN_CRON_PAGINA) {
       const { data: pagina, error: profielFout } = await service
         .from('profiles')
-        .select('id, role, active_modules, active_subscriptions, ai_enabled, onboarding_completed, krant_schaduw_bezwaar_at')
+        .select('id, role, active_modules, active_subscriptions, ai_enabled, onboarding_completed, krant_schaduw_bezwaar_at, blocked_at')
         .eq('onboarding_completed', true)
         .order('id', { ascending: true })
         .range(van, van + TIJDLIJN_CRON_PAGINA - 1)
@@ -195,6 +195,7 @@ export async function GET(request: Request) {
       active_subscriptions: string[] | null
       ai_enabled: boolean | null
       krant_schaduw_bezwaar_at: string | null
+      blocked_at: string | null
     }
     const nieuwslezers = (profielen as Rij[])
       .map((p) => ({ ...p, modules: resolveActiveModules(p) }))
@@ -228,7 +229,8 @@ export async function GET(request: Request) {
         bepaalKrantBron({
           krantAccount: isNewsOnly(p.modules),
           variant: aiLezers.has(p.id) ? 'ai' : null,
-          inBeta: inTijdlijnBeta(p.role),
+          // Geblokkeerd telt als buiten de bèta: geen verversing (security-run 0.92.28, 🟡-1).
+          inBeta: p.blocked_at == null && inTijdlijnBeta(p.role),
           aiToegestaan: aiKrantToegestaan(p),
         }),
       )

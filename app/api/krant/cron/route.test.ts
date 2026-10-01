@@ -119,6 +119,15 @@ describe('de run', () => {
     expect(mockRecordJobRun).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ job: 'krant-editie', status: 'success', summary }))
   })
 
+  it('een geblokkeerd account krijgt geen editie en telt niet als lezer', async () => {
+    profielen.push({ id: 'u-geblokkeerd', is_demo_user: false, active_modules: null, blocked_at: '2026-10-01T00:00:00Z' })
+    const res = await GET(req('cron-secret'))
+    const ids = mockRun.mock.calls.map((c) => (c[1] as { userId: string }).userId)
+    expect(ids).not.toContain('u-geblokkeerd')
+    const { summary } = (await res.json()) as { summary: Record<string, unknown> }
+    expect(summary).toMatchObject({ gebruikers: 3 })
+  })
+
   it('meet alleen op testaccounts; echte gebruikers per profieltype k=5-onderdrukt, testaccounts ongedrukt — geen inhoud, geen id', async () => {
     const res = await GET(req('cron-secret'))
     const { summary } = (await res.json()) as { summary: { perProfieltype: Record<string, unknown>; testaccounts: Record<string, unknown> } }
