@@ -97,6 +97,27 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.29',
+    date: '2026-10-01',
+    title: 'Je nieuwsprofiel vinden, en een blokkade die echt afsluit',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Je nieuwsprofiel vanuit de Krant',
+            description: 'Onder je tijdlijn staat nu een link naar je nieuwsprofiel, zodat je kunt zien en aanpassen wat bepaalt welke berichten je krijgt.',
+          },
+          {
+            title: 'Een geblokkeerd account kan niet meer inloggen',
+            description: 'Blokkeert beheer een account, dan stopt ook de inlog. Ook de Krant toont zo’n account niets meer.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.28',
     date: '2026-10-01',
     title: 'Aanmelden voor alleen de Krant staat klaar',

@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-30T23:22:19.038Z",
-  "generatedDate": "2026-09-30",
+  "generatedAt": "2026-10-01T00:28:40.019Z",
+  "generatedDate": "2026-10-01",
   "repo": {
     "name": "fin",
-    "version": "0.92.28"
+    "version": "0.92.29"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -19512,7 +19512,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 71
+        "commits": 72
       },
       {
         "path": "app/(app)/toekomst",
@@ -19560,8 +19560,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 4212,
-        "commits": 33
+        "loc": 4233,
+        "commits": 34
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -19571,7 +19571,7 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3148,
-        "commits": 67
+        "commits": 66
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -20853,7 +20853,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-30",
+    "previousDate": "2026-10-01",
     "hasChanges": false,
     "sections": []
   },
@@ -21350,6 +21350,13 @@
     },
     {
       "date": "2026-09-30",
+      "api": 349,
+      "components": 1292,
+      "tables": 105,
+      "routesProduction": 93
+    },
+    {
+      "date": "2026-10-01",
       "api": 349,
       "components": 1292,
       "tables": 105,
