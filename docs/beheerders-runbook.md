@@ -22,8 +22,18 @@ ingedeeld in vier groepen: **Technisch beheer**, **Functioneel beheer**, **Test 
 - Je kunt je **eigen** rol niet wijzigen en de **laatste** superadmin niet degraderen.
 
 ### Een account blokkeren / deblokkeren
-- Op de gebruikerskaart: **Blokkeren** (vraagt bevestiging). De gebruiker wordt direct
-  uitgelogd en kan niet meer inloggen; deblokkeren herstelt de toegang.
+- Op de gebruikerskaart: **Blokkeren** (vraagt bevestiging). Twee lagen: de app sluit
+  het account direct af (`profiles.blocked_at`), en Supabase Auth krijgt een ban, zodat
+  inloggen en het verversen van de sessie falen. Een al uitgegeven toegangstoken werkt
+  op de overige routes nog tot de JWT-expiry (≤ 1 uur). Deblokkeren haalt beide weg.
+- **Let op bij deblokkeren:** de ban bevriest de sessies, hij trekt ze niet in.
+  Deblokkeren laat een refresh-token dat vóór de blokkade bestond weer werken, op elk
+  apparaat waar het account ingelogd was. Blokkeerde je om een vermoede overname,
+  deblokkeer dan niet zonder eerst die sessies in te trekken (SQL-editor:
+  `delete from auth.sessions where user_id = '<id>'` — de refresh-tokens gaan mee) en
+  het wachtwoord te laten resetten. Een knop hiervoor staat op de backlog.
+- Faalt de ban (foutmelding op de kaart), dan staat de blokkade in de app al wel:
+  probeer **Blokkeren** opnieuw.
 - Je kunt jezelf niet blokkeren en een superadmin niet (zet eerst de rol op gebruiker).
 
 ### Zien hoe iemand de app gebruikt
@@ -46,8 +56,10 @@ ingedeeld in vier groepen: **Technisch beheer**, **Functioneel beheer**, **Test 
   Wijs daar in je antwoord naar. Beheer heeft bewust **geen** export van andermans
   data meer (ADR 0146).
 - **Kan de gebruiker niet meer inloggen** (geblokkeerd, e-mail kwijt)? Dan handelt de
-  eigenaar het verzoek met de hand af: herstel eerst de toegang (deblokkeren of
-  wachtwoordreset naar het accountadres). Lukt dat niet, dan pas een export op
+  eigenaar het verzoek met de hand af: herstel eerst de toegang. Bij een geblokkeerd
+  account is dat eerst deblokkeren (dat heft ook de ban op); een wachtwoordreset
+  alleen helpt dan niet, want de ban weigert ook het inloggen daarna. Bij een kwijt
+  e-mailadres: wachtwoordreset naar het accountadres. Lukt dat niet, dan pas een export op
   databaseniveau, met een aantekening in het AVG-register waarom en door wie.
 
 ### Verwijderverzoek (recht op vergetelheid)

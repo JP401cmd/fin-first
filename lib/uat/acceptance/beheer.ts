@@ -186,7 +186,7 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De beheerder zoekt op e-mail, wijzigt de rol, blokkeert/deblokkeert (browser-bevestiging) en schakelt add-on-abonnementen (AI/Connected) aan/uit; een onbekend e-mailadres geeft een "geen gebruiker gevonden"-staat.',
     then:
-      'Elke wijziging is direct actief en verschijnt in "Recente toewijzingen" + de audit-trail; blokkade logt de gebruiker direct uit en houdt hem buiten; abonnement stuurt de feature-gating in de hele app. Geen eigen berekening.',
+      'Elke wijziging is direct actief en verschijnt in "Recente toewijzingen" + de audit-trail; blokkade logt de gebruiker direct uit en houdt hem buiten — sinds 0.92.29 ook met een ban in Supabase Auth (opnieuw inloggen en het verversen van de sessie falen; deblokkeren haalt de ban weg) en zonder Krant (de tijdlijn, de vernieuwknop en de dagcron slaan een geblokkeerd account over); abonnement stuurt de feature-gating in de hele app. Geen eigen berekening.',
     assertion: {
       kind: 'ui-only',
       source:

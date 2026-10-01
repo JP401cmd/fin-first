@@ -1,17 +1,34 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { logAdminAction } from '@/lib/admin-audit'
 
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  return createServiceClient(url, serviceKey)
-}
+const blokkeerSchema = z.object({ userId: z.uuid(), blocked: z.boolean() }).strict()
 
-/** POST — blokkeer of deblokkeer een account (zet/wist profiles.blocked_at). */
+/**
+ * Hoe lang een blokkade in Supabase Auth duurt: in de praktijk voor altijd, tot
+ * beheer deblokkeert (dan `'none'`). Honderd jaar in uren, het formaat van GoTrue.
+ */
+export const BLOKKADE_BAN_DUUR = '876000h'
+
+/**
+ * POST — blokkeer of deblokkeer een account.
+ *
+ * Twee lagen: `profiles.blocked_at` (de app-shell, de Krant-routes en de API v1
+ * lezen die) én een ban in Supabase Auth. Zonder die ban bleef een bewaard
+ * refresh-token werken en kon een geblokkeerde gebruiker de overige cookie-API-
+ * routes blijven aanroepen (concern `blokkade-geen-api-barriere`, security-run
+ * 0.92.28). Met de ban stoppen inloggen en het verversen van de sessie direct;
+ * een al uitgegeven access-token verloopt binnen de JWT-expiry (≤ 1 uur, het
+ * geaccepteerde venster van ADR 0052). De app-shell sluit hem wél direct af
+ * via blocked_at. Volgorde: blocked_at, audit-regel, ban. Faalt de ban, dan
+ * staat de blokkade in de app al en krijgt beheer een fout om het opnieuw te
+ * proberen.
+ */
 export async function POST(req: Request) {
   const supabase = await createClient()
 
@@ -24,13 +41,10 @@ export async function POST(req: Request) {
     return unauthorized()
   }
 
-  const body = await req.json().catch(() => ({}))
-  const userId = body.userId as string | undefined
-  const blocked = body.blocked
+  const parsed = await parseBody(blokkeerSchema, req)
+  if (!parsed.ok) return parsed.response
+  const { userId, blocked } = parsed.data
 
-  if (!userId || typeof blocked !== 'boolean') {
-    return NextResponse.json({ error: 'userId en blocked (boolean) zijn vereist' }, { status: 400 })
-  }
   // Lockout-bescherming: jezelf blokkeren kan niet.
   if (userId === adminUser.id) {
     return NextResponse.json({ error: 'Je kunt jezelf niet blokkeren.' }, { status: 400 })
@@ -65,6 +79,9 @@ export async function POST(req: Request) {
     return serverError(error, 'admin-users-block:POST')
   }
 
+  // De audit-regel direct na de toestandswijziging, vóór de ban: ook als de ban
+  // daarna faalt, staat de (de)blokkade in het spoor (eindreview 0.92.29). Een
+  // tweede regel bij een nieuwe poging is onschuldig.
   await logAdminAction(service, {
     actorId: adminUser.id,
     actorEmail: adminUser.email,
@@ -72,6 +89,13 @@ export async function POST(req: Request) {
     targetUser: userId,
     targetLabel: target.full_name ?? userId,
   })
+
+  const { error: banFout } = await service.auth.admin.updateUserById(userId, {
+    ban_duration: blocked ? BLOKKADE_BAN_DUUR : 'none',
+  })
+  if (banFout) {
+    return serverError(banFout, 'admin-users-block:POST:ban')
+  }
 
   return NextResponse.json({ success: true, blockedAt })
 }

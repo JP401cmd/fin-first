@@ -164,8 +164,9 @@ export default async function AppLayout({
   // géén /auth/v1/user-ronde (Snelheid B2, ADR 0052). De proxy deed die check al;
   // React cache() deelt de uitkomst met loadLeverScores() en de paginaloaders.
   // Een ingetrokken sessie blijft tot de JWT-expiry geldig (geaccepteerd venster,
-  // ADR 0052). De blocked_at-check verderop is daar los van (die trok nooit een
-  // sessie in).
+  // ADR 0052). De blocked_at-check verderop sluit een geblokkeerde gebruiker
+  // direct af; sinds 0.92.29 zet de blokkeerroute daarnaast een ban in Supabase
+  // Auth, zodat inloggen en verversen ook stoppen.
   const user = await getCachedUser(supabase)
 
   if (!user) {
